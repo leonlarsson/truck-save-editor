@@ -146,7 +146,7 @@ pub fn parse(text: &str) -> Result<Document> {
                 let (name, value) = line
                     .split_once(':')
                     .ok_or_else(|| error("expected a field, like `name: value`"))?;
-                add_field(unit, name.trim(), value.trim()).map_err(|message| error(message))?;
+                add_field(unit, name.trim(), value.trim()).map_err(&error)?;
             }
             State::Done => return Err(error("text after the closing `}`")),
         }
