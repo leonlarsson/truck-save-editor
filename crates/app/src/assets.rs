@@ -22,6 +22,7 @@ gpui_kit::assets::icon_assets!(
         Save,
         Search,
         Sun,
+        TriangleAlert,
         Truck,
         Undo2,
         Users,

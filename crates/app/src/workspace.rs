@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use gpui_kit::assets::IconName;
 use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Icon, Sizable as _, StyledExt as _, WindowExt as _,
+    alert::Alert,
     button::{Button, ButtonVariants as _},
     command::CommandState,
     h_flex,
@@ -776,10 +777,25 @@ impl Render for Workspace {
                     .min_w_0()
                     .h_full()
                     .child(self.render_header(&session, cx))
+                    .children(newer_game_warning(&session, cx))
                     .child(div().flex_1().min_h_0().child(self.render_page(opened))),
             )
             .into_any_element()
     }
+}
+
+/// Says so when the save comes from a newer game than the editor was tested with: it still opens
+/// and saves (what it doesn't understand is kept as it is), but the player should know.
+fn newer_game_warning(session: &Entity<Session>, cx: &App) -> Option<Alert> {
+    let version = session.read(cx).slot().info.version?;
+    (version > save::NEWEST_TESTED_SAVE_VERSION).then(|| {
+        // The words in the normal text colour (amber text on pale amber is hard to read); the
+        // icon and background say it's a warning.
+        Alert::warning("newer-game", t!(cx, "newer-game-warning"))
+            .banner()
+            .text_color(cx.theme().foreground)
+            .icon(Icon::new(IconName::TriangleAlert).text_color(cx.theme().warning))
+    })
 }
 
 /// Writes the session's changes in the background: back up the slot, then write it.

@@ -110,6 +110,10 @@ saved-title = Saved “{ $name }”
 saved-backup = The old version is backed up in { $path }
 save-failed = Couldn't save “{ $name }”
 
+## Warnings
+
+newer-game-warning = This save is from a newer version of the game than this editor has been tested with. Everything the editor doesn't understand is kept as it is, but check your changes in the game, and keep the backup.
+
 ## Undo and redo
 
 undo = Undo

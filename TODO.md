@@ -54,7 +54,7 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [x] Inventory diff: list every unit kind, field and value type in a save, and compare two saves' lists (`docs/compatibility.md`).
 - [x] Weekly GitHub Actions check for new game versions (steamcmd.net build id + Steam News); opens an issue with the checklist.
 - [ ] Fixtures from more game versions and forms: text saves, Coaches, ATS.
-- [ ] Read the save `version` and warn when it's newer than any version the editor was tested with.
+- [x] Read the save `version` and warn when it's newer than any version the editor was tested with.
 
 ## Starting fresh
 
