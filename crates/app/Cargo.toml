@@ -13,5 +13,9 @@ path = "src/main.rs"
 [dependencies]
 gpui-kit.workspace = true
 
+[dev-dependencies]
+# UI integration tests: headless windows driven by real clicks and keys.
+gpui-kit = { workspace = true, features = ["test-support"] }
+
 [lints]
 workspace = true

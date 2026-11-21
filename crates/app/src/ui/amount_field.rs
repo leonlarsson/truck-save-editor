@@ -1,8 +1,9 @@
 //! A field for a whole-number amount (money, experience points).
 //!
 //! While you type it holds plain digits, so editing never fights a formatter; when you leave it (or
-//! press Enter) it reads what you typed (`2.5m`, `+1m`, `-500k`, see `format::parse_amount`) and
-//! shows the result formatted (`2,480,350`). Something that isn't an amount puts the old value back.
+//! press Enter, or click elsewhere) it reads what you typed (`2.5m`, `+1m`, `-500k`, see `format::parse_amount`) and
+//! shows the result formatted (`2,480,350`). Something that isn't an amount puts the old value back,
+//! and so does Esc.
 
 use gpui_kit::component::{
     ActiveTheme as _, Sizable as _,
@@ -10,9 +11,9 @@ use gpui_kit::component::{
     v_flex,
 };
 use gpui_kit::{
-    AppContext as _, Context, Entity, EventEmitter, Focusable as _, IntoElement,
-    ParentElement as _, Render, SharedString, Styled as _, Subscription, Window, div,
-    prelude::FluentBuilder as _,
+    AppContext as _, Context, Entity, EventEmitter, Focusable as _, InteractiveElement as _,
+    IntoElement, KeyDownEvent, MouseDownEvent, ParentElement as _, Render, SharedString,
+    Styled as _, Subscription, Window, div, prelude::FluentBuilder as _,
 };
 
 use crate::format::{parse_amount, thousands};
@@ -28,6 +29,9 @@ pub struct AmountField {
     prefix: Option<SharedString>,
     suffix: Option<SharedString>,
     hint: Option<SharedString>,
+    /// Set while Esc is leaving the field, so leaving puts the old amount back instead of using
+    /// what was typed.
+    is_cancelling: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -50,7 +54,9 @@ impl AmountField {
                     this.start_editing(window, cx);
                 }
                 InputEvent::Blur => {
-                    this.commit(window, cx);
+                    if !std::mem::take(&mut this.is_cancelling) {
+                        this.commit(window, cx);
+                    }
                     this.show_formatted(window, cx);
                 }
                 InputEvent::Change => {}
@@ -63,6 +69,7 @@ impl AmountField {
             prefix: None,
             suffix: None,
             hint: None,
+            is_cancelling: false,
             _subscriptions: vec![subscription],
         }
     }
@@ -93,8 +100,7 @@ impl AmountField {
     /// Sets the amount from elsewhere (a button, Discard). Doesn't emit `AmountChanged`.
     pub fn set_value(&mut self, value: i64, window: &mut Window, cx: &mut Context<Self>) {
         self.value = value;
-        let is_editing = self.input.read(cx).focus_handle(cx).is_focused(window);
-        if is_editing {
+        if self.is_editing(window, cx) {
             self.start_editing(window, cx);
         } else {
             self.show_formatted(window, cx);
@@ -108,6 +114,26 @@ impl AmountField {
             state.set_value(raw, window, cx);
             state.select_all(window, cx);
         });
+    }
+
+    fn is_editing(&self, window: &Window, cx: &Context<Self>) -> bool {
+        self.input.read(cx).focus_handle(cx).is_focused(window)
+    }
+
+    /// Esc: leave the field and put the amount back as it was.
+    fn cancel(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.is_editing(window, cx) {
+            self.is_cancelling = true;
+            window.blur(cx);
+        }
+    }
+
+    /// A click anywhere else: leave the field, keeping what was typed. GPUI doesn't take focus
+    /// away from a field when empty space is clicked, so the field does it itself.
+    fn leave(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.is_editing(window, cx) {
+            window.blur(cx);
+        }
     }
 
     fn show_formatted(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -137,8 +163,17 @@ impl Render for AmountField {
         let muted = cx.theme().muted_foreground;
         v_flex()
             .gap_1p5()
+            .capture_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
+                if event.keystroke.key == "escape" {
+                    this.cancel(window, cx);
+                }
+            }))
+            .on_mouse_down_out(cx.listener(|this, _: &MouseDownEvent, window, cx| {
+                this.leave(window, cx);
+            }))
             .child(
                 Input::new(&self.input)
+                    .id("amount-input")
                     .large()
                     .aria_label(self.label.clone())
                     .when_some(self.prefix.clone(), |input, prefix| {
@@ -151,5 +186,158 @@ impl Render for AmountField {
             .when_some(self.hint.clone(), |this, hint| {
                 this.child(div().text_xs().text_color(muted).child(hint))
             })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use gpui_kit::test::{TestSupportExt as _, TestWindowExt as _};
+    use gpui_kit::{
+        AnyWindowHandle, App, AppContext as _, Bounds, Context, Entity, InteractiveElement as _,
+        IntoElement, ParentElement as _, Render, Styled as _, TestAppContext, Window, WindowBounds,
+        WindowOptions, div, px, size,
+    };
+
+    use super::{AmountChanged, AmountField};
+
+    /// A window with the field and some empty space beside it to click on.
+    struct Host {
+        field: Entity<AmountField>,
+        confirmed: Vec<i64>,
+    }
+
+    impl Render for Host {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div()
+                .size_full()
+                .p_4()
+                .child(div().w(px(300.)).child(self.field.clone()))
+                .child(div().id("outside").test_support().size(px(100.)))
+        }
+    }
+
+    fn open(cx: &mut TestAppContext, value: i64) -> (AnyWindowHandle, Entity<Host>) {
+        cx.update(gpui_kit::init);
+        cx.update(|cx| {
+            gpui_kit::open_window(
+                WindowOptions {
+                    window_bounds: Some(WindowBounds::Windowed(Bounds::new(
+                        Default::default(),
+                        size(px(640.), px(480.)),
+                    ))),
+                    ..Default::default()
+                },
+                cx,
+                |window, cx| {
+                    cx.new(|cx| {
+                        let field = cx.new(|cx| AmountField::new(value, "Amount", window, cx));
+                        cx.subscribe(&field, |this: &mut Host, _, AmountChanged(value), _| {
+                            this.confirmed.push(*value);
+                        })
+                        .detach();
+                        Host {
+                            field,
+                            confirmed: Vec::new(),
+                        }
+                    })
+                },
+            )
+        })
+        .unwrap_or_else(|error| panic!("couldn't open the test window: {error}"))
+    }
+
+    /// Runs one user action in the window. Each gets its own update, like real input, so the
+    /// events it causes are delivered before the next action.
+    fn act(
+        cx: &mut TestAppContext,
+        handle: AnyWindowHandle,
+        action: impl FnOnce(&mut Window, &mut App),
+    ) {
+        cx.update_window(handle, |_, window, cx| {
+            action(window, cx);
+            window.render_frame(cx);
+        })
+        .unwrap_or_else(|error| panic!("{error}"));
+        cx.run_until_parked();
+    }
+
+    fn field_text(
+        cx: &mut TestAppContext,
+        handle: AnyWindowHandle,
+    ) -> (Option<String>, Option<bool>) {
+        let mut result = (None, None);
+        act(cx, handle, |window, _| {
+            let field = window.find("amount-input");
+            result = (field.value().map(str::to_string), field.focused());
+        });
+        result
+    }
+
+    #[gpui_kit::test]
+    fn clicking_elsewhere_confirms_and_leaves(cx: &mut TestAppContext) {
+        let (handle, host) = open(cx, 2_480_350);
+        // A headless window starts inactive, and an inactive window gets no focus events.
+        act(cx, handle, |window, cx| {
+            window.activate_window();
+            window.render_frame(cx);
+        });
+        assert_eq!(
+            field_text(cx, handle),
+            (Some("2,480,350".into()), Some(false))
+        );
+
+        act(cx, handle, |window, cx| window.click("amount-input", cx));
+        // Editing shows plain digits, all selected, so typing replaces them.
+        assert_eq!(field_text(cx, handle), (Some("2480350".into()), Some(true)));
+
+        act(cx, handle, |window, cx| window.input("2.5m", cx));
+        act(cx, handle, |window, cx| window.click("outside", cx));
+        assert_eq!(
+            field_text(cx, handle),
+            (Some("2,500,000".into()), Some(false))
+        );
+        cx.update(|cx| assert_eq!(host.read(cx).confirmed, vec![2_500_000]));
+    }
+
+    #[gpui_kit::test]
+    fn escape_puts_the_old_amount_back_and_leaves(cx: &mut TestAppContext) {
+        let (handle, host) = open(cx, 1_000);
+        act(cx, handle, |window, cx| {
+            window.activate_window();
+            window.render_frame(cx);
+        });
+        act(cx, handle, |window, cx| window.click("amount-input", cx));
+        act(cx, handle, |window, cx| window.input("999", cx));
+        act(cx, handle, |window, cx| window.press("escape", cx));
+        assert_eq!(field_text(cx, handle), (Some("1,000".into()), Some(false)));
+        cx.update(|cx| assert!(host.read(cx).confirmed.is_empty()));
+    }
+
+    #[gpui_kit::test]
+    fn enter_confirms_and_keeps_editing(cx: &mut TestAppContext) {
+        let (handle, host) = open(cx, 1_000);
+        act(cx, handle, |window, cx| {
+            window.activate_window();
+            window.render_frame(cx);
+        });
+        act(cx, handle, |window, cx| window.click("amount-input", cx));
+        act(cx, handle, |window, cx| window.input("+1k", cx));
+        act(cx, handle, |window, cx| window.press("enter", cx));
+        assert_eq!(field_text(cx, handle), (Some("2000".into()), Some(true)));
+        cx.update(|cx| assert_eq!(host.read(cx).confirmed, vec![2_000]));
+    }
+
+    #[gpui_kit::test]
+    fn something_that_isnt_an_amount_is_ignored(cx: &mut TestAppContext) {
+        let (handle, host) = open(cx, 1_000);
+        act(cx, handle, |window, cx| {
+            window.activate_window();
+            window.render_frame(cx);
+        });
+        act(cx, handle, |window, cx| window.click("amount-input", cx));
+        act(cx, handle, |window, cx| window.input("lots", cx));
+        act(cx, handle, |window, cx| window.click("outside", cx));
+        assert_eq!(field_text(cx, handle), (Some("1,000".into()), Some(false)));
+        cx.update(|cx| assert!(host.read(cx).confirmed.is_empty()));
     }
 }

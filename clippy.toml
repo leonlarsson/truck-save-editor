@@ -1,0 +1,5 @@
+# `unwrap`, `expect` and `panic!` are warned about in app code (see Cargo.toml), but a test
+# should fail loudly, so they're fine there.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true

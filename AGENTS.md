@@ -92,7 +92,8 @@ Dependencies point downward: `app` → `save` → `sii`. **`sii` and `save` have
 ## Verifying
 
 - **Formats:** round-trip tests (decrypt → decode → write text → parse gives an equal document) on synthetic samples, and on fixtures when present.
-- **UI:** `mise run app` under WSLg for looks and flow. In development builds, `TSE_PAGE=fleet` opens a page on launch and `TSE_THEME=dark` (or `light`) picks the theme, so screenshots can show any page in either theme without clicking. Windows behaviour (paths, fonts, DPI, speed) is only real in the Windows build.
+- **UI by eye:** `scripts/look.sh` starts the dev build under WSLg, captures just its window to a PNG, and clicks or types into it (`start`, `shot`, `click`, `keys`, `stop`). In development builds, `TSE_PAGE=fleet` opens a page on launch and `TSE_THEME=dark` (or `light`) picks the theme. Look at every changed screen in both themes, and drive the flow you changed (click, type, Esc, click away) before calling it done. Windows behaviour (paths, fonts, DPI, speed) is only real in the Windows build (`mise run win-run`).
+- **UI integration tests** (`#[gpui_kit::test]`, see the `gpui-kit` skill's `test.md`): give each user action its own `cx.update_window(…)` followed by `cx.run_until_parked()`, because entity events are only delivered between updates; and call `window.activate_window()` first, because a headless window starts inactive and an inactive window gets no focus or blur events. `crates/app/src/ui/amount_field.rs` has a worked example.
 - **Design:** check every changed screen in both themes, and run the Design Guides' review checklist (`.claude/skills/gpui-kit-design-guides`).
 - **In game:** only the owner can check. Ask with the exact slot, what was changed and what to look for, and say how to restore the backup.
 
