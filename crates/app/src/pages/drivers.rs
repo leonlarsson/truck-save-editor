@@ -5,7 +5,7 @@ use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Sizable as _,
     button::{Button, ButtonVariants as _},
     h_flex,
-    table::{Column, ColumnSort, DataTable, TableDelegate, TableState},
+    table::{Column, ColumnSort, DataTable, TableDelegate, TableEvent, TableState},
     v_flex,
 };
 use gpui_kit::{
@@ -18,6 +18,7 @@ use crate::format::thousands;
 use crate::game_data;
 use crate::i18n::t;
 use crate::labels::ADR_CLASS_COUNT;
+use crate::pages::details;
 use crate::session::Session;
 use crate::ui::{FilterBar, FilterChanged, GameIconView};
 
@@ -35,6 +36,7 @@ impl DriversPage {
     pub fn new(session: Entity<Session>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let delegate = DriverTable {
             drivers: Vec::new(),
+            session: session.clone(),
             sort: None,
         };
         let table = cx.new(|cx| TableState::new(delegate, window, cx).sortable(true));
@@ -44,6 +46,17 @@ impl DriversPage {
         let _subscriptions = vec![
             cx.observe(&session, |this, _, cx| this.reload(cx)),
             cx.subscribe(&filter, |this, _, _: &FilterChanged, cx| this.reload(cx)),
+            cx.subscribe_in(
+                &table,
+                window,
+                |this, table, event: &TableEvent, window, cx| {
+                    if let TableEvent::DoubleClickedRow(row) = event
+                        && let Some(driver) = table.read(cx).delegate().drivers.get(*row).cloned()
+                    {
+                        details::open_driver(this.session.clone(), &driver, window, cx);
+                    }
+                },
+            ),
             game_data::observe(cx, |this, cx| this.reload(cx)),
         ];
         let mut page = Self {
@@ -137,6 +150,8 @@ impl Render for DriversPage {
 
 struct DriverTable {
     drivers: Vec<Driver>,
+    /// For the Details buttons.
+    session: Entity<Session>,
     sort: Option<(DriverColumn, ColumnSort)>,
 }
 
@@ -147,15 +162,17 @@ enum DriverColumn {
     Experience,
     Skills,
     Adr,
+    Details,
 }
 
 impl DriverColumn {
-    const ALL: [DriverColumn; 5] = [
+    const ALL: [DriverColumn; 6] = [
         DriverColumn::Hometown,
         DriverColumn::Location,
         DriverColumn::Experience,
         DriverColumn::Skills,
         DriverColumn::Adr,
+        DriverColumn::Details,
     ];
 }
 
@@ -187,6 +204,7 @@ impl DriverTable {
                 DriverColumn::Experience => a.experience.cmp(&b.experience),
                 DriverColumn::Skills => skill_total(&a.skills).cmp(&skill_total(&b.skills)),
                 DriverColumn::Adr => adr_count(&a.skills).cmp(&adr_count(&b.skills)),
+                DriverColumn::Details => std::cmp::Ordering::Equal,
             };
             if sort == ColumnSort::Descending {
                 ordering.reverse()
@@ -218,6 +236,7 @@ impl DriverTable {
                 urgent = levels[3].1,
                 eco = levels[4].1
             ),
+            DriverColumn::Details => SharedString::default(),
             DriverColumn::Adr => t!(
                 cx,
                 "adr-count",
@@ -254,6 +273,7 @@ impl TableDelegate for DriverTable {
             Some(DriverColumn::Skills) => Column::new("skills", t!(cx, "column-skills"))
                 .width(150.)
                 .sortable(),
+            Some(DriverColumn::Details) => Column::new("details", "").width(80.),
             Some(DriverColumn::Adr) | None => Column::new("adr", t!(cx, "column-adr"))
                 .width(90.)
                 .sortable(),
@@ -286,6 +306,27 @@ impl TableDelegate for DriverTable {
             .copied()
             .unwrap_or(DriverColumn::Hometown);
         let text = self.text(row_ix, column, cx);
+        if column == DriverColumn::Details {
+            let Some(driver) = self.drivers.get(row_ix).cloned() else {
+                return div().into_any_element();
+            };
+            let session = self.session.clone();
+            return h_flex()
+                .w_full()
+                .h_full()
+                .items_center()
+                .justify_end()
+                .child(
+                    Button::new(("details", row_ix))
+                        .xsmall()
+                        .ghost()
+                        .label(t!(cx, "details"))
+                        .on_click(move |_, window, cx| {
+                            details::open_driver(session.clone(), &driver, window, cx)
+                        }),
+                )
+                .into_any_element();
+        }
         if column != DriverColumn::Hometown {
             return div().child(text).into_any_element();
         }

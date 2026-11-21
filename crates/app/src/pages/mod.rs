@@ -1,6 +1,7 @@
 //! The app's pages, one per sidebar entry.
 
 pub mod all_data;
+pub mod details;
 pub mod drivers;
 pub mod fleet;
 pub mod garages;

@@ -317,6 +317,49 @@ impl Session {
         self.change(cx, |pending, _| pending.keep_offers = true);
     }
 
+    /// Fills one truck's or coach's tank.
+    pub fn refuel(&mut self, id: &str, cx: &mut Context<Self>) {
+        self.change(cx, |pending, _| {
+            pending.refueled.insert(id.to_string());
+        });
+    }
+
+    /// Gives one driver every skill at its highest level and all ADR classes.
+    pub fn max_driver(&mut self, id: &str, cx: &mut Context<Self>) {
+        self.change(cx, |pending, _| {
+            pending.maxed_drivers.insert(id.to_string());
+        });
+    }
+
+    /// Buys one garage (if needed) and makes it large.
+    pub fn upgrade_garage(&mut self, id: &str, cx: &mut Context<Self>) {
+        self.change(cx, |pending, _| {
+            pending.upgraded_garages.insert(id.to_string());
+        });
+    }
+
+    /// Changes one value of a unit by name, as a detail panel does (see `set_raw_value`).
+    pub fn set_field(
+        &mut self,
+        unit: &str,
+        field: &str,
+        index: Option<usize>,
+        text: String,
+        cx: &mut Context<Self>,
+    ) {
+        let path = FieldPath {
+            unit: unit.to_string(),
+            field: field.to_string(),
+            index,
+        };
+        self.set_raw_value(path, text, cx);
+    }
+
+    /// A unit as it'll be saved (for detail panels: every field, every change in it).
+    pub fn unit(&self, id: &str) -> Option<sii::Unit> {
+        self.preview().unit(id).cloned()
+    }
+
     /// Marks one vehicle for repair.
     pub fn repair(&mut self, id: &str, cx: &mut Context<Self>) {
         self.change(cx, |pending, _| {

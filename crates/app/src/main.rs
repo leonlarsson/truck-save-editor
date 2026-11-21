@@ -23,10 +23,13 @@ use crate::workspace::Workspace;
 /// The product name. Never hard-code it anywhere else.
 pub const APP_NAME: &str = "Truck Save Editor";
 
-/// Every keyboard shortcut, in one place.
+/// Every keyboard shortcut, in one place, and the app-wide handlers for the ones that work
+/// everywhere (Undo, Redo).
 pub fn bind_keys(cx: &mut gpui_kit::App) {
     use gpui_kit::KeyBinding;
-    let workspace = Some(workspace::KEY_CONTEXT);
+    workspace::init(cx);
+    // No context: anywhere in the window, panels and dialogs included.
+    let workspace = None;
     cx.bind_keys([
         KeyBinding::new("ctrl-k", palette::OpenPalette, None),
         KeyBinding::new("cmd-k", palette::OpenPalette, None),

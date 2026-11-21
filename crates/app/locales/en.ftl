@@ -162,6 +162,31 @@ job-expires-in-days = { $days ->
 job-expired = Expired
 job-ferry = { $distance } · ferry
 
+## Detail panels
+
+details = Details
+detail-truck = Truck
+detail-coach = Coach
+detail-trailer = Trailer
+detail-driver = Driver
+detail-garage = Garage
+detail-about = About
+detail-gone = This is no longer in the save.
+part-engine = Engine
+part-transmission = Transmission
+part-cabin = Cabin
+part-chassis = Chassis
+part-body = Body
+part-wheels = Wheels
+repair-all-parts = Repair everything
+fill-tank = Fill the tank
+driver-from = From { $city }
+driver-now-in = Now in { $city }
+driver-max = Max this driver
+garage-empty = None
+garage-make-large = Make it large
+garage-buy-large = Buy it, large
+
 ## Filters
 
 filter-count = { $shown } of { $total }

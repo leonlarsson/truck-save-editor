@@ -16,9 +16,9 @@ use gpui_kit::component::{
     v_flex,
 };
 use gpui_kit::{
-    App, AppContext as _, Context, Entity, FocusHandle, InteractiveElement as _, IntoElement,
-    ParentElement as _, Render, SharedString, StatefulInteractiveElement as _, Styled as _,
-    Subscription, Window, div, prelude::FluentBuilder as _, px, rems,
+    App, AppContext as _, Context, Entity, FocusHandle, Global, InteractiveElement as _,
+    IntoElement, ParentElement as _, Render, SharedString, StatefulInteractiveElement as _,
+    Styled as _, Subscription, WeakEntity, Window, div, prelude::FluentBuilder as _, px, rems,
 };
 use save::{Profile, Slot};
 
@@ -46,9 +46,49 @@ use save::VehicleKind;
 
 gpui_kit::actions!(workspace, [Undo, Redo]);
 
-/// The key context of the open save's window content: its shortcuts (Undo, Redo) apply here, and
-/// a focused text field's own shortcuts (its own Undo) win over them.
+/// The key context of the open save's window content.
 pub const KEY_CONTEXT: &str = "Workspace";
+
+/// The workspace, for app-wide shortcuts. Undo and Redo work wherever focus is, a detail panel or
+/// a dialog included: those are drawn above the workspace, not inside it, so a handler on the
+/// workspace would never hear them. (A focused text field's own Undo still wins: its binding is
+/// more specific.)
+struct ActiveWorkspace(WeakEntity<Workspace>);
+
+impl Global for ActiveWorkspace {}
+
+/// Registers the app-wide handlers for Undo and Redo.
+pub fn init(cx: &mut App) {
+    cx.on_action(|_: &Undo, cx| step_history(cx, true));
+    cx.on_action(|_: &Redo, cx| step_history(cx, false));
+}
+
+fn step_history(cx: &mut App, is_undo: bool) {
+    let session = cx
+        .try_global::<ActiveWorkspace>()
+        .and_then(|active| active.0.upgrade())
+        .and_then(|workspace| {
+            workspace
+                .read(cx)
+                .opened
+                .as_ref()
+                .map(|opened| opened.session.clone())
+        });
+    let Some(session) = session else {
+        return;
+    };
+    // Not while saving: the save is being written from the changes as they were.
+    if session.read(cx).is_saving() {
+        return;
+    }
+    session.update(cx, |session, cx| {
+        if is_undo {
+            session.undo(cx)
+        } else {
+            session.redo(cx)
+        }
+    });
+}
 
 pub struct Workspace {
     page: Page,
@@ -84,6 +124,9 @@ impl Workspace {
                 this.open(event.profile.clone(), event.slot.clone(), window, cx);
             },
         );
+        // A separate line: `set_global` borrows `cx` mutably, `entity` immutably.
+        let this = cx.entity().downgrade();
+        cx.set_global(ActiveWorkspace(this));
         let focus_handle = cx.focus_handle();
         // Keyboard shortcuts (Ctrl+K) reach the workspace when nothing inside it has focus yet.
         focus_handle.focus(window, cx);
@@ -785,16 +828,6 @@ impl Render for Workspace {
             .track_focus(&self.focus_handle)
             .on_action(
                 cx.listener(|this, _: &OpenPalette, window, cx| this.open_palette(window, cx)),
-            )
-            .on_action(
-                cx.listener(|this, _: &Undo, window, cx| {
-                    this.run(PaletteCommand::Undo, window, cx)
-                }),
-            )
-            .on_action(
-                cx.listener(|this, _: &Redo, window, cx| {
-                    this.run(PaletteCommand::Redo, window, cx)
-                }),
             )
             .bg(cx.theme().background)
             .text_color(cx.theme().foreground)

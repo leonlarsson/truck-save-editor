@@ -11,8 +11,8 @@ use save::{Game, Location, Profile, Slot, SlotKind};
 
 use crate::workspace::Workspace;
 
-/// A made-up save: a career, two cities (one visited), as plain text.
-const SAVE: &str = "SiiNunit\r\n{\r\neconomy : _nameless.1 {\r\n bank: _nameless.2\r\n player: _nameless.3\r\n experience_points: 5000\r\n adr: 0\r\n long_dist: 0\r\n heavy: 0\r\n fragile: 0\r\n urgent: 0\r\n mechanical: 0\r\n visited_cities: 1\r\n visited_cities[0]: lyon\r\n visited_cities_count: 1\r\n visited_cities_count[0]: 2\r\n}\r\n\r\nbank : _nameless.2 {\r\n money_account: 1000\r\n loans: 0\r\n}\r\n\r\nplayer : _nameless.3 {\r\n hq_city: lyon\r\n}\r\n\r\ngarage : garage.lyon {\r\n status: 1\r\n}\r\n\r\ngarage : garage.berlin {\r\n status: 0\r\n}\r\n\r\n}\r\n";
+/// A made-up save: a career, two cities (one visited), one half-full truck, as plain text.
+const SAVE: &str = "SiiNunit\r\n{\r\neconomy : _nameless.1 {\r\n bank: _nameless.2\r\n player: _nameless.3\r\n experience_points: 5000\r\n adr: 0\r\n long_dist: 0\r\n heavy: 0\r\n fragile: 0\r\n urgent: 0\r\n mechanical: 0\r\n visited_cities: 1\r\n visited_cities[0]: lyon\r\n visited_cities_count: 1\r\n visited_cities_count[0]: 2\r\n}\r\n\r\nbank : _nameless.2 {\r\n money_account: 1000\r\n loans: 0\r\n}\r\n\r\nplayer : _nameless.3 {\r\n hq_city: lyon\r\n trucks: 1\r\n trucks[0]: _nameless.4\r\n}\r\n\r\nvehicle : _nameless.4 {\r\n engine_wear: 0\r\n transmission_wear: 0\r\n cabin_wear: 0\r\n chassis_wear: 0\r\n fuel_relative: &3f000000\r\n wheels_wear: 0\r\n odometer: 1000\r\n license_plate: \"AB 123|france\"\r\n}\r\n\r\ngarage : garage.lyon {\r\n status: 1\r\n}\r\n\r\ngarage : garage.berlin {\r\n status: 0\r\n}\r\n\r\n}\r\n";
 
 /// A slot folder in the system's temporary folder, removed when dropped.
 struct TempSlot(PathBuf);
@@ -177,6 +177,30 @@ fn quick_start_is_one_undo_step(cx: &mut TestAppContext) {
     cx.update(|cx| {
         let session = workspace.read(cx).session().expect("a save is open");
         assert_eq!(session.read(cx).career().money, 10_000_000);
+    });
+
+    act(cx, handle, |window, cx| window.press("ctrl-z", cx));
+    assert_eq!(change_count(&workspace, cx), 0);
+}
+
+#[gpui_kit::test]
+fn a_detail_panel_edits_one_vehicle(cx: &mut TestAppContext) {
+    let slot = TempSlot::new("details");
+    let (handle, workspace) = open(cx, &slot);
+    run_command(cx, handle, "fleet");
+    act(cx, handle, |window, cx| {
+        window.click(("details", 0usize), cx)
+    });
+    // The panel slides in; let it arrive before clicking inside it.
+    cx.executor()
+        .advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    act(cx, handle, |window, cx| window.click("fill-tank", cx));
+    assert_eq!(change_count(&workspace, cx), 1);
+    cx.update(|cx| {
+        let session = workspace.read(cx).session().expect("a save is open");
+        let fuel = session.read(cx).vehicles()[0].fuel;
+        assert_eq!(fuel, Some(1.0));
     });
 
     act(cx, handle, |window, cx| window.press("ctrl-z", cx));

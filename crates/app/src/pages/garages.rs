@@ -6,7 +6,7 @@ use gpui_kit::component::{
     button::{Button, ButtonVariants as _},
     h_flex,
     select::{SearchableVec, Select, SelectEvent, SelectItem, SelectState},
-    table::{Column, ColumnSort, DataTable, TableDelegate, TableState},
+    table::{Column, ColumnSort, DataTable, TableDelegate, TableEvent, TableState},
     v_flex,
 };
 use gpui_kit::{
@@ -17,6 +17,7 @@ use save::Garage;
 
 use crate::game_data;
 use crate::i18n::t;
+use crate::pages::details;
 use crate::session::Session;
 use crate::ui::{FilterBar, FilterChanged};
 
@@ -37,6 +38,7 @@ impl GaragesPage {
     pub fn new(session: Entity<Session>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let delegate = GarageTable {
             garages: Vec::new(),
+            session: session.clone(),
             sort: None,
         };
         let toggles = vec![
@@ -55,6 +57,17 @@ impl GaragesPage {
                 this.sync_headquarters(window, cx);
             }),
             cx.subscribe(&filter, |this, _, _: &FilterChanged, cx| this.reload(cx)),
+            cx.subscribe_in(
+                &table,
+                window,
+                |this, table, event: &TableEvent, window, cx| {
+                    if let TableEvent::DoubleClickedRow(row) = event
+                        && let Some(garage) = table.read(cx).delegate().garages.get(*row).cloned()
+                    {
+                        details::open_garage(this.session.clone(), &garage, window, cx);
+                    }
+                },
+            ),
             game_data::observe_in(window, cx, |this, window, cx| {
                 this.reload(cx);
                 this.sync_headquarters(window, cx);
@@ -224,6 +237,8 @@ impl Render for GaragesPage {
 
 struct GarageTable {
     garages: Vec<Garage>,
+    /// For the Details buttons.
+    session: Entity<Session>,
     sort: Option<(GarageColumn, ColumnSort)>,
 }
 
@@ -233,14 +248,16 @@ enum GarageColumn {
     Size,
     Trucks,
     Drivers,
+    Details,
 }
 
 impl GarageColumn {
-    const ALL: [GarageColumn; 4] = [
+    const ALL: [GarageColumn; 5] = [
         GarageColumn::City,
         GarageColumn::Size,
         GarageColumn::Trucks,
         GarageColumn::Drivers,
+        GarageColumn::Details,
     ];
 }
 
@@ -263,6 +280,7 @@ impl GarageTable {
                 GarageColumn::Size => (a.is_owned, a.slots).cmp(&(b.is_owned, b.slots)),
                 GarageColumn::Trucks => a.trucks.cmp(&b.trucks),
                 GarageColumn::Drivers => a.drivers.cmp(&b.drivers),
+                GarageColumn::Details => std::cmp::Ordering::Equal,
             };
             if sort == ColumnSort::Descending {
                 ordering.reverse()
@@ -290,6 +308,7 @@ impl GarageTable {
             GarageColumn::Size => t!(cx, "garage-slots", count = garage.slots),
             GarageColumn::Trucks => filled(garage.trucks),
             GarageColumn::Drivers => filled(garage.drivers),
+            GarageColumn::Details => SharedString::default(),
         }
     }
 }
@@ -315,6 +334,7 @@ impl TableDelegate for GarageTable {
                 .width(110.)
                 .text_right()
                 .sortable(),
+            Some(GarageColumn::Details) => Column::new("details", "").width(80.),
             Some(GarageColumn::Drivers) | None => Column::new("drivers", t!(cx, "column-drivers"))
                 .width(110.)
                 .text_right()
@@ -347,12 +367,36 @@ impl TableDelegate for GarageTable {
             .get(col_ix)
             .copied()
             .unwrap_or(GarageColumn::City);
+        if column == GarageColumn::Details {
+            let Some(garage) = self.garages.get(row_ix).cloned() else {
+                return div().into_any_element();
+            };
+            let session = self.session.clone();
+            return h_flex()
+                .w_full()
+                .h_full()
+                .items_center()
+                .justify_end()
+                .child(
+                    Button::new(("details", row_ix))
+                        .xsmall()
+                        .ghost()
+                        .label(t!(cx, "details"))
+                        .on_click(move |_, window, cx| {
+                            details::open_garage(session.clone(), &garage, window, cx)
+                        }),
+                )
+                .into_any_element();
+        }
         let is_muted = self.garages.get(row_ix).is_some_and(|g| !g.is_owned);
         let text = self.text(row_ix, column, cx);
         if is_muted {
-            div().text_color(cx.theme().muted_foreground).child(text)
+            div()
+                .text_color(cx.theme().muted_foreground)
+                .child(text)
+                .into_any_element()
         } else {
-            div().child(text)
+            div().child(text).into_any_element()
         }
     }
 

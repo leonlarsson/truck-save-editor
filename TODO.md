@@ -40,6 +40,8 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [x] Trailers (owned, with wear and repair, doubles included), odometers, plates, fuel.
 - [x] Jobs: the cargo market (every offer, sortable, searchable, the game's company and cargo names), and keep every offer a week.
 - [ ] Jobs: the current job (finish, cancel), and cargo icons.
+- [x] Detail panels: one truck, coach or trailer (plate, odometer, fuel, each part's wear), driver (experience, skills, ADR), garage (size, what's in it).
+- [ ] Detail panels: move a truck or driver to another garage.
 - [x] All data: every unit and field, editable (shape-checked).
 - [x] All data: edits show on the typed pages (and typed changes in All data), and search across every value.
 - [x] Reading the game's archives (HashFS v1/v2) and its data: levels, ranks, skill limits, text and city names (`hashfs`, `gamedata`).

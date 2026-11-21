@@ -4,7 +4,7 @@ use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Selectable as _, Sizable as _,
     button::{Button, ButtonGroup, ButtonVariants as _},
     h_flex,
-    table::{Column, ColumnSort, DataTable, TableDelegate, TableState},
+    table::{Column, ColumnSort, DataTable, TableDelegate, TableEvent, TableState},
     v_flex,
 };
 use gpui_kit::{
@@ -16,6 +16,7 @@ use save::{Vehicle, VehicleKind};
 use crate::format::thousands;
 use crate::game_data;
 use crate::i18n::t;
+use crate::pages::details;
 use crate::session::Session;
 use crate::ui::{FilterBar, FilterChanged, GameIconView};
 
@@ -51,6 +52,18 @@ impl FleetPage {
             cx.observe(&session, |this, _, cx| this.reload(cx)),
             game_data::observe(cx, |this, cx| this.reload(cx)),
             cx.subscribe(&filter, |this, _, _: &FilterChanged, cx| this.reload(cx)),
+            cx.subscribe_in(
+                &table,
+                window,
+                |this, table, event: &TableEvent, window, cx| {
+                    if let TableEvent::DoubleClickedRow(row) = event
+                        && let Some(row) = table.read(cx).delegate().trucks.get(*row)
+                    {
+                        let vehicle = row.vehicle.clone();
+                        details::open_vehicle(this.session.clone(), &vehicle, window, cx);
+                    }
+                },
+            ),
         ];
         let mut page = Self {
             session,
@@ -265,16 +278,18 @@ enum TruckColumn {
     Odometer,
     Fuel,
     Wear,
+    Details,
 }
 
 impl TruckColumn {
-    const ALL: [TruckColumn; 6] = [
+    const ALL: [TruckColumn; 7] = [
         TruckColumn::Truck,
         TruckColumn::Plate,
         TruckColumn::Garage,
         TruckColumn::Odometer,
         TruckColumn::Fuel,
         TruckColumn::Wear,
+        TruckColumn::Details,
     ];
 }
 
@@ -301,6 +316,7 @@ impl TruckTable {
                 TruckColumn::Odometer => a.odometer_km.cmp(&b.odometer_km),
                 TruckColumn::Fuel => a.fuel.unwrap_or(0.0).total_cmp(&b.fuel.unwrap_or(0.0)),
                 TruckColumn::Wear => a.wear.worst().total_cmp(&b.wear.worst()),
+                TruckColumn::Details => std::cmp::Ordering::Equal,
             };
             if sort == ColumnSort::Descending {
                 ordering.reverse()
@@ -339,6 +355,7 @@ impl TruckTable {
                 .fuel
                 .map(|fuel| t!(cx, "percent", amount = (fuel * 100.0).floor() as i64))
                 .unwrap_or_default(),
+            TruckColumn::Details => SharedString::default(),
             // Rounded up, so any wear at all shows (and matches the "need repairs" count).
             TruckColumn::Wear => t!(
                 cx,
@@ -361,13 +378,13 @@ impl TableDelegate for TruckTable {
     fn column(&self, col_ix: usize, cx: &App) -> Column {
         match TruckColumn::ALL.get(col_ix) {
             Some(TruckColumn::Truck) => Column::new("truck", t!(cx, "column-truck"))
-                .width(230.)
+                .width(210.)
                 .sortable(),
             Some(TruckColumn::Plate) => Column::new("plate", t!(cx, "column-plate"))
                 .width(100.)
                 .sortable(),
             Some(TruckColumn::Garage) => Column::new("garage", t!(cx, "column-garage"))
-                .width(140.)
+                .width(130.)
                 .sortable(),
             Some(TruckColumn::Odometer) => Column::new("odometer", t!(cx, "column-odometer"))
                 .width(120.)
@@ -377,8 +394,9 @@ impl TableDelegate for TruckTable {
                 .width(70.)
                 .text_right()
                 .sortable(),
+            Some(TruckColumn::Details) => Column::new("details", "").width(80.),
             Some(TruckColumn::Wear) | None => Column::new("wear", t!(cx, "column-wear"))
-                .width(150.)
+                .width(140.)
                 .text_right()
                 .sortable(),
         }
@@ -458,6 +476,23 @@ impl TableDelegate for TruckTable {
                 });
                 cell.justify_end().children(repair).child(text)
             }
+            // Opens the vehicle's panel: always shown, so it's found without hovering, and
+            // reachable with Tab.
+            TruckColumn::Details => match truck.cloned() {
+                Some(vehicle) => {
+                    let session = self.session.clone();
+                    cell.justify_end().child(
+                        Button::new(("details", row_ix))
+                            .xsmall()
+                            .ghost()
+                            .label(t!(cx, "details"))
+                            .on_click(move |_, window, cx| {
+                                details::open_vehicle(session.clone(), &vehicle, window, cx)
+                            }),
+                    )
+                }
+                None => cell,
+            },
             // Numbers line up on the right, like their headings.
             TruckColumn::Odometer | TruckColumn::Fuel => cell.justify_end().child(text),
             _ => cell.child(text),
