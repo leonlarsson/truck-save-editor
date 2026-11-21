@@ -125,6 +125,7 @@ newer-game-warning = This save is from a newer version of the game than this edi
 
 undo = Undo
 redo = Redo
+save-tooltip = Review the changes and save (Ctrl+S)
 undo-tooltip = Undo (Ctrl+Z)
 redo-tooltip = Redo (Ctrl+Shift+Z)
 

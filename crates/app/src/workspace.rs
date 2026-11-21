@@ -50,6 +50,8 @@ gpui_kit::actions!(
     [
         Undo,
         Redo,
+        /// Ctrl+S: review the changes and save, as the Save… button does.
+        SaveChanges,
         /// Enter on a table row: open its detail panel.
         OpenDetails,
         GoToPage1,
@@ -70,7 +72,8 @@ pub const KEY_CONTEXT: &str = "Workspace";
 /// a dialog included: those are drawn above the workspace, not inside it, so a handler on the
 /// workspace would never hear them. (A focused text field's own Undo still wins: its binding is
 /// more specific.)
-struct ActiveWorkspace(WeakEntity<Workspace>);
+/// Its window too, for shortcuts that open a dialog.
+struct ActiveWorkspace(WeakEntity<Workspace>, gpui_kit::AnyWindowHandle);
 
 impl Global for ActiveWorkspace {}
 
@@ -78,6 +81,22 @@ impl Global for ActiveWorkspace {}
 pub fn init(cx: &mut App) {
     cx.on_action(|_: &Undo, cx| step_history(cx, true));
     cx.on_action(|_: &Redo, cx| step_history(cx, false));
+    // App-wide, like Undo, so it works with a detail panel open too (the panel isn't inside
+    // the workspace's element, so an action handler there wouldn't hear it).
+    cx.on_action(|_: &SaveChanges, cx| {
+        let Some((workspace, window)) = cx
+            .try_global::<ActiveWorkspace>()
+            .and_then(|active| Some((active.0.upgrade()?, active.1)))
+        else {
+            return;
+        };
+        // Just after: the key is being handled inside the window, which is busy until then.
+        cx.defer(move |cx| {
+            let _ = window.update(cx, |_, window, cx| {
+                workspace.update(cx, |this, cx| this.save_from_shortcut(window, cx));
+            });
+        });
+    });
 }
 
 fn step_history(cx: &mut App, is_undo: bool) {
@@ -149,7 +168,7 @@ impl Workspace {
         );
         // A separate line: `set_global` borrows `cx` mutably, `entity` immutably.
         let this = cx.entity().downgrade();
-        cx.set_global(ActiveWorkspace(this));
+        cx.set_global(ActiveWorkspace(this, window.window_handle()));
         let focus_handle = cx.focus_handle();
         // Keyboard shortcuts (Ctrl+K) reach the workspace when nothing inside it has focus yet.
         focus_handle.focus(window, cx);
@@ -585,6 +604,17 @@ impl Workspace {
         }
     }
 
+    /// Ctrl+S: the save dialog, when there's something to save and no save under way.
+    fn save_from_shortcut(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(opened) = &self.opened else {
+            return;
+        };
+        let session = opened.session.read(cx);
+        if session.change_count() > 0 && !session.is_saving() {
+            self.confirm_save(window, cx);
+        }
+    }
+
     fn confirm_save(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(opened) = &self.opened else {
             return;
@@ -934,6 +964,7 @@ impl Workspace {
                     })
                     .loading(is_saving)
                     .disabled(changes == 0 || is_saving)
+                    .tooltip(t!(cx, "save-tooltip"))
                     .on_click(cx.listener(|this, _, window, cx| this.confirm_save(window, cx))),
             )
     }

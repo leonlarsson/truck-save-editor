@@ -2,6 +2,7 @@
 
 use std::path::PathBuf;
 
+use gpui_kit::component::WindowExt as _;
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{
     AnyWindowHandle, AppContext as _, Bounds, Entity, TestAppContext, WindowBounds, WindowOptions,
@@ -324,4 +325,28 @@ fn a_search_with_no_matches_offers_to_clear_it(cx: &mut TestAppContext) {
             "the truck is back"
         );
     });
+}
+
+/// Whether a dialog is open in the window.
+fn has_dialog(cx: &mut TestAppContext, handle: AnyWindowHandle) -> bool {
+    cx.update_window(handle, |_, window, cx| window.has_active_dialog(cx))
+        .expect("the window is open")
+}
+
+#[gpui_kit::test]
+fn ctrl_s_opens_the_save_dialog_only_when_there_is_something_to_save(cx: &mut TestAppContext) {
+    let slot = TempSlot::new("ctrl-s");
+    let (handle, workspace) = open(cx, &slot);
+
+    act(cx, handle, |window, cx| window.press("ctrl-s", cx));
+    assert!(!has_dialog(cx, handle), "nothing to save, no dialog");
+
+    run_command(cx, handle, "visit");
+    act(cx, handle, |window, cx| window.press("ctrl-s", cx));
+    assert!(has_dialog(cx, handle), "the save dialog opened");
+
+    // Escape leaves it without saving: the change is still waiting.
+    act(cx, handle, |window, cx| window.press("escape", cx));
+    assert!(!has_dialog(cx, handle));
+    assert_eq!(change_count(&workspace, cx), 1);
 }

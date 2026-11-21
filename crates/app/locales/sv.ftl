@@ -125,6 +125,7 @@ newer-game-warning = Den här sparfilen kommer från en nyare version av spelet 
 
 undo = Ångra
 redo = Gör om
+save-tooltip = Granska ändringarna och spara (Ctrl+S)
 undo-tooltip = Ångra (Ctrl+Z)
 redo-tooltip = Gör om (Ctrl+Skift+Z)
 

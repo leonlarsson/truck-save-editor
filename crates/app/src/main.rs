@@ -34,6 +34,8 @@ pub fn bind_keys(cx: &mut gpui_kit::App) {
     cx.bind_keys([
         KeyBinding::new("ctrl-k", palette::OpenPalette, None),
         KeyBinding::new("cmd-k", palette::OpenPalette, None),
+        KeyBinding::new("ctrl-s", workspace::SaveChanges, None),
+        KeyBinding::new("cmd-s", workspace::SaveChanges, None),
         KeyBinding::new("ctrl-z", workspace::Undo, workspace),
         KeyBinding::new("cmd-z", workspace::Undo, workspace),
         KeyBinding::new("ctrl-shift-z", workspace::Redo, workspace),
