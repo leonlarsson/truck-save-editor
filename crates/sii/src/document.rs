@@ -1,6 +1,6 @@
 //! A SII document: units in file order, each with its fields in file order.
 //!
-//! Values are kept in their text form (`2480350`, `"Hauler"`, `&3e98ae14`, `(1, 2, 3)`,
+//! Values are kept in their text form (`2480350`, `"My save"`, `&3e98ae14`, `(1, 2, 3)`,
 //! `_nameless.1ec.ab8c.2808`), exactly as text SII writes them. That keeps writing back exact
 //! (nothing is reformatted or rounded), and binary saves decode into the same form. The `value`
 //! module reads and writes the typed values inside.

@@ -228,7 +228,7 @@ fn add_field(unit: &mut Unit, name: &str, value: &str) -> std::result::Result<()
 mod tests {
     use super::*;
 
-    const SAMPLE: &str = "SiiNunit\r\n{\r\nbank : _nameless.1.2 {\r\n money_account: 2480350\r\n name: \"HAULER BACKUP\"\r\n loans: 2\r\n loans[0]: a\r\n loans[1]: b\r\n trucks: 0\r\n}\r\n\r\n}\r\n";
+    const SAMPLE: &str = "SiiNunit\r\n{\r\nbank : _nameless.1.2 {\r\n money_account: 2480350\r\n name: \"My save\"\r\n loans: 2\r\n loans[0]: a\r\n loans[1]: b\r\n trucks: 0\r\n}\r\n\r\n}\r\n";
 
     #[test]
     fn parses_and_writes_back_the_same() {

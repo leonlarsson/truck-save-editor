@@ -406,7 +406,7 @@ pub(crate) mod tests {
         b.u32(1).u8(0xFF).u64(0x0000_01ec_ab8c_2808);
         b.u32(-5i32 as u32);
         b.u8(1);
-        b.string("HAULER \"BACKUP\"");
+        b.string("My \"best\" save");
         b.f32(0.3);
         b.u32(2).token_id("loan_a").u8(0);
         b.u32(0);
@@ -424,7 +424,7 @@ pub(crate) mod tests {
         assert_eq!(bank.kind, "bank");
         assert_eq!(bank.single("money_account"), Some("-5"));
         assert_eq!(bank.single("overdraft"), Some("true"));
-        assert_eq!(bank.single("name"), Some("\"HAULER \\\"BACKUP\\\"\""));
+        assert_eq!(bank.single("name"), Some("\"My \\\"best\\\" save\""));
         assert_eq!(bank.single("rate"), Some("&3e99999a"));
         assert_eq!(bank.items("loans"), ["loan_a", "null"]);
         assert_eq!(bank.get("history"), Some(&Value::Array(vec![])));

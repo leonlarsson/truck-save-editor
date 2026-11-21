@@ -85,7 +85,7 @@ Dependencies point downward: `app` → `save` → `sii`. **`sii` and `save` have
 - Saves live on Windows, reached from WSL through `/mnt/c`: Steam Cloud saves under `…\Steam\userdata\<steam id>\227300\remote\profiles\<hex name>\save\<slot>\`, local ones under `Documents\Euro Truck Simulator 2\profiles\`.
 - **Never write to real save folders during development.** Copy saves into `fixtures/` (gitignored; `$ETS2_FIXTURES` points to it) and work on the copies. Write to a real slot only with the owner's explicit go-ahead, and back it up first.
 - **`profile.sii` holds the World of Trucks login and an encrypted password.** Never print it, log it, copy it into fixtures or commit it.
-- **Commit nothing from a real save**: no save files, decoded text, snippets, unit ids, Steam ids or profile names. Committed tests use small synthetic samples; tests on real fixtures skip when `$ETS2_FIXTURES` is missing or empty.
+- **Commit nothing from a real save**: no save files, decoded text, snippets, unit ids, Steam ids or profile names, and no values copied out of one (save names, money, XP, timestamps, plates, home city), not even into test samples, doc comments or commit messages. Invent sample values instead. Committed tests use small synthetic samples; tests on real fixtures skip when `$ETS2_FIXTURES` is missing or empty, and print nothing personal.
 - The game overwrites saves when it exits, so edits made while it runs are lost.
 - Run Python on save data with `python3 -I`.
 

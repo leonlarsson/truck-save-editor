@@ -3,7 +3,7 @@
 //! - integers: `2480350`, `-5`
 //! - floats: `0.5`, `16`, or the raw bits as `&3e98ae14` (exact; what the game writes)
 //! - booleans: `true`, `false`
-//! - strings: `"HAULER BACKUP"`, or bare when they're a plain word (`Hauler`)
+//! - strings: `"Before the long haul"`, or bare when they're a plain word (`Rotterdam`)
 //! - ids and tokens: `economy`, `_nameless.1ec.ab8c.2808`, `null`
 
 use std::borrow::Cow;
@@ -151,8 +151,8 @@ mod tests {
     #[test]
     fn strings_round_trip() {
         for value in [
-            "Hauler",
-            "HAULER BACKUP",
+            "Rotterdam",
+            "Before the long haul",
             "",
             "say \"hi\"",
             "back\\slash",
@@ -160,7 +160,7 @@ mod tests {
         ] {
             assert_eq!(parse_string(&format_string(value)), value);
         }
-        assert_eq!(parse_string("Hauler"), "Hauler");
+        assert_eq!(parse_string("Rotterdam"), "Rotterdam");
         assert_eq!(parse_string("\"a\\x41b\""), "aAb");
     }
 
@@ -168,7 +168,7 @@ mod tests {
     fn knows_plain_tokens() {
         assert!(is_plain_token("economy"));
         assert!(is_plain_token("long_dist_2"));
-        assert!(!is_plain_token("Hauler"));
+        assert!(!is_plain_token("Rotterdam"));
         assert!(!is_plain_token("a b"));
         assert!(!is_plain_token(""));
     }
