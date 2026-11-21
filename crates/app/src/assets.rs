@@ -19,6 +19,7 @@ gpui_kit::assets::icon_assets!(
         Map,
         Moon,
         Redo2,
+        Rocket,
         Save,
         Search,
         Sun,

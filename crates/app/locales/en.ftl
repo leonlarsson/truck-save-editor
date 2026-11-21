@@ -121,6 +121,21 @@ redo = Redo
 undo-tooltip = Undo (Ctrl+Z)
 redo-tooltip = Redo (Ctrl+Shift+Z)
 
+## Quick start
+
+quick-start = Quick start
+quick-start-open = Quick start…
+quick-start-description = The usual changes for a fresh career, in one go. Start a new profile in the game, open its save here, and pick what you want. One Undo takes it all back, and nothing is written until you save.
+quick-start-rich = Rich start
+quick-start-everything = Everything unlocked
+quick-start-money = Set money
+quick-start-hq-garage = A large garage in { $city }
+quick-start-apply = Apply
+quick-start-no-coaches = This save has no coach career (Coaches DLC).
+quick-start-no-hq = This save has no headquarters city yet.
+quick-start-hq-large = Your headquarters garage is already large.
+quick-start-needs-game = Needs the game installed on this PC: its data says which cities have them.
+
 ## Command palette
 
 palette-open = Commands

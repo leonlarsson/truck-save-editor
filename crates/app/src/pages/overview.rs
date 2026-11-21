@@ -1,8 +1,9 @@
 //! Overview: the big levers first. Money, experience, skills and ADR, each one click from maxed.
 
+use gpui_kit::assets::IconName;
 use gpui_kit::component::{
-    ActiveTheme as _, Sizable as _, StyledExt as _, button::Button, checkbox::Checkbox, h_flex,
-    progress::Progress, v_flex,
+    ActiveTheme as _, Icon, Sizable as _, StyledExt as _, button::Button, checkbox::Checkbox,
+    h_flex, progress::Progress, v_flex,
 };
 use gpui_kit::{
     App, AppContext as _, Context, Entity, Hsla, InteractiveElement as _, IntoElement,
@@ -438,6 +439,18 @@ impl Render for OverviewPage {
             v_flex()
                 .gap_6()
                 .max_w(rems(60.))
+                .child(
+                    h_flex().justify_end().child(
+                        Button::new("quick-start")
+                            .small()
+                            .outline()
+                            .icon(Icon::new(IconName::Rocket))
+                            .label(t!(cx, "quick-start-open"))
+                            .on_click(cx.listener(|this, _, window, cx| {
+                                crate::quick_start::open(this.session.clone(), window, cx)
+                            })),
+                    ),
+                )
                 .child({
                     // The big levers side by side, at the same height; they wrap on narrow windows.
                     let mut cards = vec![self.render_money(cx), self.render_experience(cx)];

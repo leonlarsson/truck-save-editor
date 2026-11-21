@@ -21,6 +21,7 @@ gpui_kit::actions!(palette, [OpenPalette]);
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum PaletteCommand {
     Go(Page),
+    QuickStart,
     MaxTruckSkills,
     MaxCoachSkills,
     AllAdr,
@@ -48,6 +49,7 @@ fn groups(has_coaches: bool) -> Vec<Vec<PaletteCommand>> {
         .map(|page| PaletteCommand::Go(*page))
         .collect();
     let mut actions = vec![
+        PaletteCommand::QuickStart,
         PaletteCommand::MaxTruckSkills,
         PaletteCommand::AllAdr,
         PaletteCommand::Repair(VehicleKind::Truck),
@@ -59,7 +61,7 @@ fn groups(has_coaches: bool) -> Vec<Vec<PaletteCommand>> {
         PaletteCommand::UnlockRecruitments,
     ];
     if has_coaches {
-        actions.insert(1, PaletteCommand::MaxCoachSkills);
+        actions.insert(2, PaletteCommand::MaxCoachSkills);
         actions.push(PaletteCommand::Repair(VehicleKind::Coach));
     }
     let app = vec![
@@ -80,6 +82,11 @@ fn item(command: PaletteCommand, cx: &App) -> CommandItem {
             t!(cx, "palette-go", page = page.title(cx)),
             page.icon(),
             &["page", "open", "show"],
+        ),
+        PaletteCommand::QuickStart => (
+            t!(cx, "quick-start-open"),
+            IconName::Rocket,
+            &["preset", "fresh", "new", "rich", "unlock"],
         ),
         PaletteCommand::MaxTruckSkills => (
             t!(cx, "palette-max-truck-skills"),

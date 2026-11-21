@@ -91,6 +91,21 @@ impl Pending {
 /// How many steps Undo remembers.
 const UNDO_LIMIT: usize = 200;
 
+/// A set of changes made together, for a fresh start (see `quick_start.rs`): one step of Undo.
+#[derive(Clone, Debug, Default)]
+pub struct QuickStartPlan {
+    pub money: Option<i64>,
+    pub truck_skills: bool,
+    pub adr: bool,
+    pub coach_skills: bool,
+    /// Buy (or make large) the garage in the headquarters city.
+    pub hq_garage: bool,
+    pub visit_cities: bool,
+    /// Dealers and agencies to unlock (the cities the game has them in), when asked for.
+    pub dealers: Option<BTreeSet<String>>,
+    pub recruitments: Option<BTreeSet<String>>,
+}
+
 /// One change, for the list shown before saving.
 pub struct Change {
     pub what: SharedString,
@@ -202,6 +217,52 @@ impl Session {
                 truck
             })
             .collect()
+    }
+
+    /// Applies a quick-start plan: everything in it is one change.
+    pub fn apply_quick_start(&mut self, plan: QuickStartPlan, cx: &mut Context<Self>) {
+        self.change(cx, |pending, this| {
+            let career = &mut pending.career;
+            if let Some(money) = plan.money {
+                career.money = money;
+            }
+            if plan.truck_skills {
+                career.skills = save::Skills {
+                    adr: career.skills.adr,
+                    ..save::Skills::maxed()
+                };
+            }
+            if plan.adr {
+                career.skills.adr = save::ADR_ALL;
+            }
+            if plan.coach_skills && career.coach_skills.is_some() {
+                career.coach_skills = Some(save::CoachSkills::maxed());
+            }
+            if plan.hq_garage {
+                let hq = career.hq_city.clone();
+                if let Some(garage) = this
+                    .saved_garages
+                    .iter()
+                    .find(|garage| garage.city == hq && !garage.is_large())
+                {
+                    pending.upgraded_garages.insert(garage.id.clone());
+                }
+            }
+            if plan.visit_cities {
+                pending.visit_all_cities = true;
+            }
+            for (place, cities) in [
+                (Place::Dealer, &plan.dealers),
+                (Place::Recruitment, &plan.recruitments),
+            ] {
+                if let Some(cities) = cities {
+                    let saved: BTreeSet<String> = save::unlocked(&this.loaded.game, place)
+                        .into_iter()
+                        .collect();
+                    *pending.unlocks_mut(place) = cities.difference(&saved).cloned().collect();
+                }
+            }
+        });
     }
 
     /// Marks one vehicle for repair.
@@ -779,6 +840,30 @@ mod tests {
                 save::unlocked(&prepared.game, Place::Dealer),
                 ["berlin", "lyon"]
             );
+        });
+    }
+
+    #[gpui_kit::test]
+    fn quick_start_is_one_step(cx: &mut TestAppContext) {
+        let session = session(cx);
+        let plan = QuickStartPlan {
+            money: Some(10_000_000),
+            truck_skills: true,
+            adr: true,
+            visit_cities: true,
+            ..QuickStartPlan::default()
+        };
+        session.update(cx, |session, cx| session.apply_quick_start(plan, cx));
+        cx.update(|cx| {
+            let session = session.read(cx);
+            assert_eq!(session.career().money, 10_000_000);
+            assert_eq!(session.career().skills, save::Skills::maxed());
+        });
+        session.update(cx, |session, cx| session.undo(cx));
+        cx.update(|cx| {
+            let session = session.read(cx);
+            assert_eq!(session.change_count(), 0);
+            assert!(!session.can_undo());
         });
     }
 }

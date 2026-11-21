@@ -37,6 +37,7 @@ use crate::pages::{
     overview::OverviewPage,
 };
 use crate::palette::{self, OpenPalette, PaletteCommand};
+use crate::quick_start;
 use crate::session::Session;
 use crate::theme;
 use crate::ui::PageHeader;
@@ -178,6 +179,7 @@ impl Workspace {
                 self.page = page;
                 cx.notify();
             }
+            PaletteCommand::QuickStart => quick_start::open(session.clone(), window, cx),
             PaletteCommand::MaxTruckSkills => edit(
                 cx,
                 Box::new(|career| {

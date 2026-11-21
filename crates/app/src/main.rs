@@ -10,6 +10,7 @@ mod i18n;
 mod labels;
 mod pages;
 mod palette;
+mod quick_start;
 mod session;
 mod theme;
 mod ui;
