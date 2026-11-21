@@ -47,6 +47,19 @@ impl DriversPage {
         let _subscriptions = vec![
             cx.observe(&session, |this, _, cx| this.reload(cx)),
             cx.subscribe(&filter, |this, _, _: &FilterChanged, cx| this.reload(cx)),
+            // A click on a column's heading sorts by it (the table itself would select the
+            // column, which nothing here uses).
+            cx.subscribe_in(&table, window, |_, table, event: &TableEvent, _, cx| {
+                if let TableEvent::SelectColumn(col_ix) = event {
+                    let col_ix = *col_ix;
+                    table.update(cx, |table, cx| {
+                        table.delegate_mut().sort_by_header(col_ix, cx);
+                        table.clear_selection(cx);
+                        table.refresh(cx);
+                        cx.notify();
+                    });
+                }
+            }),
             cx.subscribe_in(
                 &table,
                 window,
@@ -152,12 +165,19 @@ impl Render for DriversPage {
                             details::open_driver(this.session.clone(), &item, window, cx);
                         }
                     }))
-                    .child(
+                    .child(crate::ui::table_or_empty(
+                        &self.filter,
                         DataTable::new(&self.table)
                             .stripe(true)
                             .bordered(true)
-                            .accessibility_label(t!(cx, "drivers-table")),
-                    ),
+                            .accessibility_label(t!(cx, "drivers-table"))
+                            .into_any_element(),
+                        Some(
+                            crate::ui::EmptyState::new(t!(cx, "drivers-none"))
+                                .description(t!(cx, "drivers-none-body")),
+                        ),
+                        cx,
+                    )),
             )
     }
 }
@@ -199,6 +219,49 @@ fn adr_count(skills: &Skills) -> u32 {
 }
 
 impl DriverTable {
+    /// Each column as it is, before the sort arrow (see `column`).
+    fn base_column(&self, col_ix: usize, cx: &App) -> Column {
+        match DriverColumn::ALL.get(col_ix) {
+            Some(DriverColumn::Hometown) => Column::new("hometown", t!(cx, "column-hometown"))
+                .width(200.)
+                .sortable(),
+            Some(DriverColumn::Location) => Column::new("location", t!(cx, "column-location"))
+                .width(170.)
+                .sortable(),
+            Some(DriverColumn::Experience) => {
+                Column::new("experience", t!(cx, "column-experience"))
+                    .width(140.)
+                    .text_right()
+                    .sortable()
+            }
+            Some(DriverColumn::Skills) => Column::new("skills", t!(cx, "column-skills"))
+                .width(150.)
+                .sortable(),
+            Some(DriverColumn::Details) => Column::new("details", "").width(80.),
+            Some(DriverColumn::Adr) | None => Column::new("adr", t!(cx, "column-adr"))
+                .width(90.)
+                .sortable(),
+        }
+    }
+
+    /// A click on a column's heading: sort by it, ascending first, then the other way. Columns
+    /// that can't be sorted (Details) are left alone.
+    fn sort_by_header(&mut self, col_ix: usize, cx: &App) {
+        let Some(column) = DriverColumn::ALL.get(col_ix).copied() else {
+            return;
+        };
+        if self.base_column(col_ix, cx).sort.is_none() {
+            return;
+        }
+        let current = self
+            .sort
+            .filter(|(sorted, _)| *sorted == column)
+            .map(|(_, order)| order);
+        let order = crate::ui::next_sort(current);
+        self.sort = Some((column, order));
+        self.sort_by(column, order);
+    }
+
     fn set_drivers(&mut self, drivers: Vec<Driver>) {
         self.drivers = drivers;
         if let Some((column, sort)) = self.sort {
@@ -271,26 +334,11 @@ impl TableDelegate for DriverTable {
     }
 
     fn column(&self, col_ix: usize, cx: &App) -> Column {
-        match DriverColumn::ALL.get(col_ix) {
-            Some(DriverColumn::Hometown) => Column::new("hometown", t!(cx, "column-hometown"))
-                .width(200.)
-                .sortable(),
-            Some(DriverColumn::Location) => Column::new("location", t!(cx, "column-location"))
-                .width(170.)
-                .sortable(),
-            Some(DriverColumn::Experience) => {
-                Column::new("experience", t!(cx, "column-experience"))
-                    .width(140.)
-                    .text_right()
-                    .sortable()
-            }
-            Some(DriverColumn::Skills) => Column::new("skills", t!(cx, "column-skills"))
-                .width(150.)
-                .sortable(),
-            Some(DriverColumn::Details) => Column::new("details", "").width(80.),
-            Some(DriverColumn::Adr) | None => Column::new("adr", t!(cx, "column-adr"))
-                .width(90.)
-                .sortable(),
+        // The sorted column shows its arrow; the others show they can be sorted.
+        let column = self.base_column(col_ix, cx);
+        match (DriverColumn::ALL.get(col_ix), self.sort) {
+            (Some(this), Some((sorted, order))) if *this == sorted => column.sort(order),
+            _ => column,
         }
     }
 
@@ -342,7 +390,7 @@ impl TableDelegate for DriverTable {
                 .into_any_element();
         }
         if column != DriverColumn::Hometown {
-            return div().child(text).into_any_element();
+            return div().child(crate::ui::cell_text(text)).into_any_element();
         }
         // The driver's face from the game, in a slot of its own so
         // rows line up while faces load.
@@ -365,7 +413,7 @@ impl TableDelegate for DriverTable {
                         }),
                     ),
             )
-            .child(text)
+            .child(crate::ui::cell_text(text))
             .into_any_element()
     }
 

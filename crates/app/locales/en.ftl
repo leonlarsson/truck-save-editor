@@ -192,6 +192,12 @@ garage-buy-large = Buy it, large
 ## Filters
 
 filter-count = { $shown } of { $total }
+filter-no-matches = Nothing matches
+filter-no-matches-body = Try a different search, or clear the filters.
+drivers-none = No drivers hired yet
+drivers-none-body = Hire drivers at a recruitment agency in the game, and they show up here.
+jobs-none = No job offers
+jobs-none-body = The game fills the job market as you drive; this save has none yet.
 filter-clear = Clear filters
 fleet-search = Search by model, plate or garage
 fleet-filter-worn = Needs repair

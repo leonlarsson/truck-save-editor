@@ -192,6 +192,12 @@ garage-buy-large = Köp det, stort
 ## Filters
 
 filter-count = { $shown } av { $total }
+filter-no-matches = Inget matchar
+filter-no-matches-body = Prova en annan sökning, eller rensa filtren.
+drivers-none = Inga förare anställda än
+drivers-none-body = Anställ förare på en rekryteringsbyrå i spelet, så syns de här.
+jobs-none = Inga uppdrag
+jobs-none-body = Spelet fyller uppdragsmarknaden medan du kör; den här sparfilen har inga än.
 filter-clear = Rensa filter
 fleet-search = Sök på modell, registreringsnummer eller garage
 fleet-filter-worn = Behöver reparation

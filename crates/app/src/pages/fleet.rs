@@ -53,6 +53,19 @@ impl FleetPage {
             cx.observe(&session, |this, _, cx| this.reload(cx)),
             game_data::observe(cx, |this, cx| this.reload(cx)),
             cx.subscribe(&filter, |this, _, _: &FilterChanged, cx| this.reload(cx)),
+            // A click on a column's heading sorts by it (the table itself would select the
+            // column, which nothing here uses).
+            cx.subscribe_in(&table, window, |_, table, event: &TableEvent, _, cx| {
+                if let TableEvent::SelectColumn(col_ix) = event {
+                    let col_ix = *col_ix;
+                    table.update(cx, |table, cx| {
+                        table.delegate_mut().sort_by_header(col_ix, cx);
+                        table.clear_selection(cx);
+                        table.refresh(cx);
+                        cx.notify();
+                    });
+                }
+            }),
             cx.subscribe_in(
                 &table,
                 window,
@@ -263,12 +276,16 @@ impl Render for FleetPage {
                             details::open_vehicle(this.session.clone(), &item, window, cx);
                         }
                     }))
-                    .child(
+                    .child(crate::ui::table_or_empty(
+                        &self.filter,
                         DataTable::new(&self.table)
                             .stripe(true)
                             .bordered(true)
-                            .accessibility_label(t!(cx, "trucks-table")),
-                    ),
+                            .accessibility_label(t!(cx, "trucks-table"))
+                            .into_any_element(),
+                        None,
+                        cx,
+                    )),
             )
     }
 }
@@ -314,6 +331,52 @@ impl TruckColumn {
 }
 
 impl TruckTable {
+    /// Each column as it is, before the sort arrow (see `column`).
+    fn base_column(&self, col_ix: usize, cx: &App) -> Column {
+        match TruckColumn::ALL.get(col_ix) {
+            Some(TruckColumn::Truck) => Column::new("truck", t!(cx, "column-truck"))
+                .width(210.)
+                .sortable(),
+            Some(TruckColumn::Plate) => Column::new("plate", t!(cx, "column-plate"))
+                .width(100.)
+                .sortable(),
+            Some(TruckColumn::Garage) => Column::new("garage", t!(cx, "column-garage"))
+                .width(130.)
+                .sortable(),
+            Some(TruckColumn::Odometer) => Column::new("odometer", t!(cx, "column-odometer"))
+                .width(120.)
+                .text_right()
+                .sortable(),
+            Some(TruckColumn::Fuel) => Column::new("fuel", t!(cx, "column-fuel"))
+                .width(70.)
+                .text_right()
+                .sortable(),
+            Some(TruckColumn::Details) => Column::new("details", "").width(80.),
+            Some(TruckColumn::Wear) | None => Column::new("wear", t!(cx, "column-wear"))
+                .width(140.)
+                .text_right()
+                .sortable(),
+        }
+    }
+
+    /// A click on a column's heading: sort by it, ascending first, then the other way. Columns
+    /// that can't be sorted (Details) are left alone.
+    fn sort_by_header(&mut self, col_ix: usize, cx: &App) {
+        let Some(column) = TruckColumn::ALL.get(col_ix).copied() else {
+            return;
+        };
+        if self.base_column(col_ix, cx).sort.is_none() {
+            return;
+        }
+        let current = self
+            .sort
+            .filter(|(sorted, _)| *sorted == column)
+            .map(|(_, order)| order);
+        let order = crate::ui::next_sort(current);
+        self.sort = Some((column, order));
+        self.sort_by(column, order);
+    }
+
     fn set_trucks(&mut self, trucks: Vec<Row>) {
         self.trucks = trucks;
         if let Some((column, sort)) = self.sort {
@@ -396,29 +459,11 @@ impl TableDelegate for TruckTable {
     }
 
     fn column(&self, col_ix: usize, cx: &App) -> Column {
-        match TruckColumn::ALL.get(col_ix) {
-            Some(TruckColumn::Truck) => Column::new("truck", t!(cx, "column-truck"))
-                .width(210.)
-                .sortable(),
-            Some(TruckColumn::Plate) => Column::new("plate", t!(cx, "column-plate"))
-                .width(100.)
-                .sortable(),
-            Some(TruckColumn::Garage) => Column::new("garage", t!(cx, "column-garage"))
-                .width(130.)
-                .sortable(),
-            Some(TruckColumn::Odometer) => Column::new("odometer", t!(cx, "column-odometer"))
-                .width(120.)
-                .text_right()
-                .sortable(),
-            Some(TruckColumn::Fuel) => Column::new("fuel", t!(cx, "column-fuel"))
-                .width(70.)
-                .text_right()
-                .sortable(),
-            Some(TruckColumn::Details) => Column::new("details", "").width(80.),
-            Some(TruckColumn::Wear) | None => Column::new("wear", t!(cx, "column-wear"))
-                .width(140.)
-                .text_right()
-                .sortable(),
+        // The sorted column shows its arrow; the others show they can be sorted.
+        let column = self.base_column(col_ix, cx);
+        match (TruckColumn::ALL.get(col_ix), self.sort) {
+            (Some(this), Some((sorted, order))) if *this == sorted => column.sort(order),
+            _ => column,
         }
     }
 
@@ -480,7 +525,7 @@ impl TableDelegate for TruckTable {
                                 .channel(gamedata::RED, cx.theme().muted_foreground)
                         })),
                 )
-                .child(text),
+                .child(crate::ui::cell_text(text)),
             // The wear, and Repair for a worn vehicle: always shown, not only on hover.
             TruckColumn::Wear => {
                 let repair = truck.filter(|truck| truck.wear.worst() > 0.0).map(|truck| {
@@ -494,7 +539,9 @@ impl TableDelegate for TruckTable {
                             session.update(cx, |session, cx| session.repair(&id, cx));
                         })
                 });
-                cell.justify_end().children(repair).child(text)
+                cell.justify_end()
+                    .children(repair)
+                    .child(crate::ui::cell_text(text))
             }
             // Opens the vehicle's panel: always shown, so it's found without hovering, and
             // reachable with Tab.
@@ -514,8 +561,10 @@ impl TableDelegate for TruckTable {
                 None => cell,
             },
             // Numbers line up on the right, like their headings.
-            TruckColumn::Odometer | TruckColumn::Fuel => cell.justify_end().child(text),
-            _ => cell.child(text),
+            TruckColumn::Odometer | TruckColumn::Fuel => {
+                cell.justify_end().child(crate::ui::cell_text(text))
+            }
+            _ => cell.child(crate::ui::cell_text(text)),
         }
         .into_any_element()
     }

@@ -303,3 +303,25 @@ fn escape_leaves_a_field_then_closes_its_panel(cx: &mut TestAppContext) {
         );
     });
 }
+
+#[gpui_kit::test]
+fn a_search_with_no_matches_offers_to_clear_it(cx: &mut TestAppContext) {
+    let slot = TempSlot::new("no-matches");
+    let (handle, _) = open(cx, &slot);
+    act(cx, handle, |window, cx| window.press("ctrl-2", cx));
+    act(cx, handle, |window, cx| window.click("filter-search", cx));
+    act(cx, handle, |window, cx| window.input("no such truck", cx));
+    act(cx, handle, |window, _| {
+        assert!(window.try_find("empty-clear-filters").is_some());
+    });
+    act(cx, handle, |window, cx| {
+        window.click("empty-clear-filters", cx)
+    });
+    act(cx, handle, |window, _| {
+        assert!(window.try_find("empty-clear-filters").is_none());
+        assert!(
+            window.try_find(("details", 0usize)).is_some(),
+            "the truck is back"
+        );
+    });
+}

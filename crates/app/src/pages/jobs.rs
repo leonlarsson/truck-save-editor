@@ -7,7 +7,7 @@ use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Sizable as _,
     button::Button,
     h_flex,
-    table::{Column, ColumnSort, DataTable, TableDelegate, TableState},
+    table::{Column, ColumnSort, DataTable, TableDelegate, TableEvent, TableState},
     v_flex,
 };
 use gpui_kit::{
@@ -80,6 +80,19 @@ impl JobsPage {
             cx.observe(&session, |this, _, cx| this.reload(cx)),
             game_data::observe(cx, |this, cx| this.reload(cx)),
             cx.subscribe(&filter, |this, _, _: &FilterChanged, cx| this.reload(cx)),
+            // A click on a column's heading sorts by it (the table itself would select the
+            // column, which nothing here uses).
+            cx.subscribe_in(&table, window, |_, table, event: &TableEvent, _, cx| {
+                if let TableEvent::SelectColumn(col_ix) = event {
+                    let col_ix = *col_ix;
+                    table.update(cx, |table, cx| {
+                        table.delegate_mut().sort_by_header(col_ix, cx);
+                        table.clear_selection(cx);
+                        table.refresh(cx);
+                        cx.notify();
+                    });
+                }
+            }),
         ];
         let mut page = Self {
             session,
@@ -218,12 +231,19 @@ impl Render for JobsPage {
             )
             .child(self.filter.clone())
             .child(
-                div().flex_1().min_h_0().child(
+                div().flex_1().min_h_0().child(crate::ui::table_or_empty(
+                    &self.filter,
                     DataTable::new(&self.table)
                         .stripe(true)
                         .bordered(true)
-                        .accessibility_label(t!(cx, "jobs-table")),
-                ),
+                        .accessibility_label(t!(cx, "jobs-table"))
+                        .into_any_element(),
+                    Some(
+                        crate::ui::EmptyState::new(t!(cx, "jobs-none"))
+                            .description(t!(cx, "jobs-none-body")),
+                    ),
+                    cx,
+                )),
             )
     }
 }
@@ -255,6 +275,49 @@ impl JobColumn {
 }
 
 impl JobTable {
+    /// Each column as it is, before the sort arrow (see `column`).
+    fn base_column(&self, col_ix: usize, cx: &App) -> Column {
+        match JobColumn::ALL.get(col_ix) {
+            Some(JobColumn::From) => Column::new("from", t!(cx, "column-from"))
+                .width(190.)
+                .sortable(),
+            Some(JobColumn::To) => Column::new("to", t!(cx, "column-to"))
+                .width(190.)
+                .sortable(),
+            Some(JobColumn::Cargo) => Column::new("cargo", t!(cx, "column-cargo"))
+                .width(140.)
+                .sortable(),
+            Some(JobColumn::Distance) => Column::new("distance", t!(cx, "column-distance"))
+                .width(120.)
+                .text_right()
+                .sortable(),
+            Some(JobColumn::Expires) => Column::new("expires", t!(cx, "column-expires"))
+                .width(105.)
+                .sortable(),
+            Some(JobColumn::Urgency) | None => Column::new("urgency", t!(cx, "column-urgency"))
+                .width(100.)
+                .sortable(),
+        }
+    }
+
+    /// A click on a column's heading: sort by it, ascending first, then the other way. Columns
+    /// that can't be sorted (Details) are left alone.
+    fn sort_by_header(&mut self, col_ix: usize, cx: &App) {
+        let Some(column) = JobColumn::ALL.get(col_ix).copied() else {
+            return;
+        };
+        if self.base_column(col_ix, cx).sort.is_none() {
+            return;
+        }
+        let current = self
+            .sort
+            .filter(|(sorted, _)| *sorted == column)
+            .map(|(_, order)| order);
+        let order = crate::ui::next_sort(current);
+        self.sort = Some((column, order));
+        self.sort_by(column, order);
+    }
+
     fn set_rows(&mut self, rows: Vec<Row>) {
         self.rows = rows;
         if let Some((column, sort)) = self.sort {
@@ -309,26 +372,11 @@ impl TableDelegate for JobTable {
     }
 
     fn column(&self, col_ix: usize, cx: &App) -> Column {
-        match JobColumn::ALL.get(col_ix) {
-            Some(JobColumn::From) => Column::new("from", t!(cx, "column-from"))
-                .width(190.)
-                .sortable(),
-            Some(JobColumn::To) => Column::new("to", t!(cx, "column-to"))
-                .width(190.)
-                .sortable(),
-            Some(JobColumn::Cargo) => Column::new("cargo", t!(cx, "column-cargo"))
-                .width(140.)
-                .sortable(),
-            Some(JobColumn::Distance) => Column::new("distance", t!(cx, "column-distance"))
-                .width(120.)
-                .text_right()
-                .sortable(),
-            Some(JobColumn::Expires) => Column::new("expires", t!(cx, "column-expires"))
-                .width(105.)
-                .sortable(),
-            Some(JobColumn::Urgency) | None => Column::new("urgency", t!(cx, "column-urgency"))
-                .width(100.)
-                .sortable(),
+        // The sorted column shows its arrow; the others show they can be sorted.
+        let column = self.base_column(col_ix, cx);
+        match (JobColumn::ALL.get(col_ix), self.sort) {
+            (Some(this), Some((sorted, order))) if *this == sorted => column.sort(order),
+            _ => column,
         }
     }
 
@@ -373,7 +421,7 @@ impl TableDelegate for JobTable {
                 None => h_flex()
                     .w_full()
                     .items_center()
-                    .child(text.clone())
+                    .child(crate::ui::cell_text(text.clone()))
                     .into_any_element(),
             };
         let Some(row) = self.rows.get(row_ix) else {
@@ -398,19 +446,19 @@ impl TableDelegate for JobTable {
                             .flex_shrink_0()
                             .children(icon.map(|icon| GameIconView::new(icon).size(1.1))),
                     )
-                    .child(text)
+                    .child(crate::ui::cell_text(text))
                     .into_any_element();
             }
             _ => {}
         }
         match column {
-            JobColumn::Distance => cell.justify_end().child(text),
+            JobColumn::Distance => cell.justify_end().child(crate::ui::cell_text(text)),
             // Urgent offers stand out in the theme's danger colour (readable on both themes), with
             // the word saying it too.
-            JobColumn::Urgency if self.rows.get(row_ix).is_some_and(|row| row.urgency >= 2) => {
-                cell.text_color(cx.theme().danger).child(text)
-            }
-            _ => cell.child(text),
+            JobColumn::Urgency if self.rows.get(row_ix).is_some_and(|row| row.urgency >= 2) => cell
+                .text_color(cx.theme().danger)
+                .child(crate::ui::cell_text(text)),
+            _ => cell.child(crate::ui::cell_text(text)),
         }
         .into_any_element()
     }

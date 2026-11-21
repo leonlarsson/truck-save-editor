@@ -77,6 +77,11 @@ impl FilterBar {
             .all(|word| haystack.iter().any(|text| text.contains(word)))
     }
 
+    /// How many rows matched the last time the page filtered.
+    pub fn shown(&self) -> usize {
+        self.shown
+    }
+
     /// How many rows matched, of how many there are.
     pub fn set_counts(&mut self, shown: usize, total: usize, cx: &mut Context<Self>) {
         if (self.shown, self.total) != (shown, total) {
@@ -86,7 +91,8 @@ impl FilterBar {
         }
     }
 
-    fn is_filtering(&self, cx: &gpui_kit::App) -> bool {
+    /// Whether a search or a toggle is narrowing the list.
+    pub fn is_filtering(&self, cx: &gpui_kit::App) -> bool {
         !self.active.is_empty() || !self.search.read(cx).value().trim().is_empty()
     }
 
@@ -98,7 +104,8 @@ impl FilterBar {
         cx.notify();
     }
 
-    fn clear(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    /// Clears the search and every toggle.
+    pub fn clear(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.active.clear();
         self.search
             .update(cx, |search, cx| search.set_value("", window, cx));
@@ -143,6 +150,7 @@ impl Render for FilterBar {
             .child(
                 div().w(rems(16.)).child(
                     Input::new(&self.search)
+                        .id("filter-search")
                         .small()
                         .cleanable(true)
                         .prefix(Icon::new(IconName::Search).small()),
@@ -187,6 +195,39 @@ pub fn fold(text: &str) -> String {
             other => other,
         })
         .collect()
+}
+
+/// The table, or what to say instead when the filters leave nothing: the empty state, with Clear
+/// filters. `empty` is what to show when there's nothing even without filters (no drivers yet).
+pub fn table_or_empty(
+    filter: &gpui_kit::Entity<FilterBar>,
+    table: gpui_kit::AnyElement,
+    empty: Option<crate::ui::EmptyState>,
+    cx: &gpui_kit::App,
+) -> gpui_kit::AnyElement {
+    let bar = filter.read(cx);
+    if bar.shown() > 0 {
+        return table;
+    }
+    if bar.is_filtering(cx) {
+        let filter = filter.clone();
+        return crate::ui::EmptyState::new(t!(cx, "filter-no-matches"))
+            .description(t!(cx, "filter-no-matches-body"))
+            .action(
+                Button::new("empty-clear-filters")
+                    .small()
+                    .outline()
+                    .label(t!(cx, "filter-clear"))
+                    .on_click(move |_, window, cx| {
+                        filter.update(cx, |filter, cx| filter.clear(window, cx));
+                    }),
+            )
+            .into_any_element();
+    }
+    match empty {
+        Some(empty) => empty.into_any_element(),
+        None => table,
+    }
 }
 
 #[cfg(test)]

@@ -58,6 +58,19 @@ impl GaragesPage {
                 this.sync_headquarters(window, cx);
             }),
             cx.subscribe(&filter, |this, _, _: &FilterChanged, cx| this.reload(cx)),
+            // A click on a column's heading sorts by it (the table itself would select the
+            // column, which nothing here uses).
+            cx.subscribe_in(&table, window, |_, table, event: &TableEvent, _, cx| {
+                if let TableEvent::SelectColumn(col_ix) = event {
+                    let col_ix = *col_ix;
+                    table.update(cx, |table, cx| {
+                        table.delegate_mut().sort_by_header(col_ix, cx);
+                        table.clear_selection(cx);
+                        table.refresh(cx);
+                        cx.notify();
+                    });
+                }
+            }),
             cx.subscribe_in(
                 &table,
                 window,
@@ -239,12 +252,16 @@ impl Render for GaragesPage {
                             details::open_garage(this.session.clone(), &item, window, cx);
                         }
                     }))
-                    .child(
+                    .child(crate::ui::table_or_empty(
+                        &self.filter,
                         DataTable::new(&self.table)
                             .stripe(true)
                             .bordered(true)
-                            .accessibility_label(t!(cx, "garages-table")),
-                    ),
+                            .accessibility_label(t!(cx, "garages-table"))
+                            .into_any_element(),
+                        None,
+                        cx,
+                    )),
             )
     }
 }
@@ -276,6 +293,45 @@ impl GarageColumn {
 }
 
 impl GarageTable {
+    /// Each column as it is, before the sort arrow (see `column`).
+    fn base_column(&self, col_ix: usize, cx: &App) -> Column {
+        match GarageColumn::ALL.get(col_ix) {
+            Some(GarageColumn::City) => Column::new("city", t!(cx, "column-city"))
+                .width(220.)
+                .sortable(),
+            Some(GarageColumn::Size) => Column::new("size", t!(cx, "column-garage-size"))
+                .width(150.)
+                .sortable(),
+            Some(GarageColumn::Trucks) => Column::new("trucks", t!(cx, "column-trucks"))
+                .width(110.)
+                .text_right()
+                .sortable(),
+            Some(GarageColumn::Details) => Column::new("details", "").width(80.),
+            Some(GarageColumn::Drivers) | None => Column::new("drivers", t!(cx, "column-drivers"))
+                .width(110.)
+                .text_right()
+                .sortable(),
+        }
+    }
+
+    /// A click on a column's heading: sort by it, ascending first, then the other way. Columns
+    /// that can't be sorted (Details) are left alone.
+    fn sort_by_header(&mut self, col_ix: usize, cx: &App) {
+        let Some(column) = GarageColumn::ALL.get(col_ix).copied() else {
+            return;
+        };
+        if self.base_column(col_ix, cx).sort.is_none() {
+            return;
+        }
+        let current = self
+            .sort
+            .filter(|(sorted, _)| *sorted == column)
+            .map(|(_, order)| order);
+        let order = crate::ui::next_sort(current);
+        self.sort = Some((column, order));
+        self.sort_by(column, order);
+    }
+
     fn set_garages(&mut self, garages: Vec<Garage>) {
         self.garages = garages;
         if let Some((column, sort)) = self.sort {
@@ -337,22 +393,11 @@ impl TableDelegate for GarageTable {
     }
 
     fn column(&self, col_ix: usize, cx: &App) -> Column {
-        match GarageColumn::ALL.get(col_ix) {
-            Some(GarageColumn::City) => Column::new("city", t!(cx, "column-city"))
-                .width(220.)
-                .sortable(),
-            Some(GarageColumn::Size) => Column::new("size", t!(cx, "column-garage-size"))
-                .width(150.)
-                .sortable(),
-            Some(GarageColumn::Trucks) => Column::new("trucks", t!(cx, "column-trucks"))
-                .width(110.)
-                .text_right()
-                .sortable(),
-            Some(GarageColumn::Details) => Column::new("details", "").width(80.),
-            Some(GarageColumn::Drivers) | None => Column::new("drivers", t!(cx, "column-drivers"))
-                .width(110.)
-                .text_right()
-                .sortable(),
+        // The sorted column shows its arrow; the others show they can be sorted.
+        let column = self.base_column(col_ix, cx);
+        match (GarageColumn::ALL.get(col_ix), self.sort) {
+            (Some(this), Some((sorted, order))) if *this == sorted => column.sort(order),
+            _ => column,
         }
     }
 
@@ -407,10 +452,10 @@ impl TableDelegate for GarageTable {
         if is_muted {
             div()
                 .text_color(cx.theme().muted_foreground)
-                .child(text)
+                .child(crate::ui::cell_text(text))
                 .into_any_element()
         } else {
-            div().child(text).into_any_element()
+            div().child(crate::ui::cell_text(text)).into_any_element()
         }
     }
 
