@@ -1,16 +1,53 @@
-use gpui_kit::{component::label::Label, *};
+//! Truck Save Editor: the desktop app.
+//!
+//! For now this is a design preview running on made-up data (`sample.rs`), to settle how the app
+//! looks and feels in GPUI before real saves load.
 
-struct Hello;
+mod assets;
+mod format;
+mod pages;
+mod sample;
+mod theme;
+mod ui;
+mod workspace;
 
-impl Render for Hello {
-    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        div().child(Label::new("Hello, World!"))
-    }
-}
+use gpui_kit::{AppContext as _, Bounds, TitlebarOptions, WindowBounds, WindowOptions, px, size};
+
+use crate::workspace::Workspace;
+
+/// The product name. Never hard-code it anywhere else.
+pub const APP_NAME: &str = "Truck Save Editor";
 
 fn main() {
-    gpui_kit::application().run(|cx| {
-        gpui_kit::init(cx);
-        let _ = gpui_kit::open_window(WindowOptions::default(), cx, |_, cx| cx.new(|_| Hello));
-    });
+    gpui_kit::application()
+        .with_assets(assets::AppAssets)
+        .run(|cx| {
+            // GPUI Kit first, then our theme on top of it.
+            gpui_kit::init(cx);
+            theme::init(cx);
+
+            let options = WindowOptions {
+                window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
+                    None,
+                    size(px(1200.), px(800.)),
+                    cx,
+                ))),
+                window_min_size: Some(size(px(880.), px(560.))),
+                titlebar: Some(TitlebarOptions {
+                    title: Some(APP_NAME.into()),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            };
+
+            // `open_window` wraps our view in GPUI Kit's `Root`, which draws dialogs,
+            // notifications and tooltips above it.
+            let opened = gpui_kit::open_window(options, cx, |window, cx| {
+                cx.new(|cx| Workspace::new(window, cx))
+            });
+            if let Err(error) = opened {
+                eprintln!("{APP_NAME} could not open its window: {error}");
+                cx.quit();
+            }
+        });
 }

@@ -35,6 +35,7 @@ Agreed work, in order. Each step should end with something the owner can see or 
 
 - [ ] Fleet (trucks and trailers: repair, odometer, plates), Garages (sizes, upgrade all), Drivers (skills, max all), Map (visited cities, unlock dealers and recruitment agencies), Jobs.
 - [ ] All data: every unit and field, searchable and editable.
+- [ ] The game's own icons (skills, ADR classes, brands, cities), read at runtime from the player's installed game: an SCS archive (HashFS) reader and a texture (.tobj/.dds) decoder. Never commit or bundle SCS artwork; fall back to Lucide icons when the game isn't found.
 
 ## Later
 

@@ -4,6 +4,7 @@ description = "The ETS2/ATS save: profiles and slots, the document model, typed 
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 
 [features]
 default = ["native"]

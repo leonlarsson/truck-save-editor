@@ -28,7 +28,7 @@ The bar: **the best save editor anyone has used.** The ones out there are broken
 
 ## Commands (mise)
 
-Tools are managed by [mise](https://mise.jdx.dev/) (`mise.toml`): Rust, its Windows target and `cargo-xwin`. Don't install tools with rustup or `cargo install`; add them to `mise.toml`.
+Tools are managed by [mise](https://mise.jdx.dev/) (`mise.toml`). The Windows build uses Windows' own Rust (rustup, pinned by `rust-toolchain.toml`) and Visual Studio Build Tools. Don't install tools with rustup or `cargo install`; add them to `mise.toml`.
 
 | Command | What it does |
 |---|---|
@@ -36,7 +36,7 @@ Tools are managed by [mise](https://mise.jdx.dev/) (`mise.toml`): Rust, its Wind
 | `mise run test` | `cargo test` for the workspace |
 | `mise run fmt` | Format everything |
 | `mise run app` | Run the desktop app in WSL (WSLg, software rendering: slow, fine for checking looks) |
-| `mise run win` | Build the Windows `.exe` from WSL with `cargo-xwin` |
+| `mise run win` / `mise run win-run` | Build the Windows `.exe` on Windows, driven from WSL (`scripts/windows.sh`), and start it |
 
 Before finishing a change, run `mise run check`, and add or update tests for what changed.
 
@@ -92,7 +92,8 @@ Dependencies point downward: `app` → `save` → `sii`. **`sii` and `save` have
 ## Verifying
 
 - **Formats:** round-trip tests (decrypt → decode → write text → parse gives an equal document) on synthetic samples, and on fixtures when present.
-- **UI:** `mise run app` under WSLg for looks and flow. Windows behaviour (paths, fonts, DPI, speed) is only real in the Windows build.
+- **UI:** `mise run app` under WSLg for looks and flow. In development builds, `TSE_PAGE=fleet` opens a page on launch and `TSE_THEME=dark` (or `light`) picks the theme, so screenshots can show any page in either theme without clicking. Windows behaviour (paths, fonts, DPI, speed) is only real in the Windows build.
+- **Design:** check every changed screen in both themes, and run the Design Guides' review checklist (`.claude/skills/gpui-kit-design-guides`).
 - **In game:** only the owner can check. Ask with the exact slot, what was changed and what to look for, and say how to restore the backup.
 
 ## Reference prototypes
