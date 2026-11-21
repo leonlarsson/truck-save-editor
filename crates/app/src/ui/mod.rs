@@ -2,6 +2,7 @@
 //! whole app shares one look. A component a screen is missing goes here, not into the screen.
 
 mod amount_field;
+mod filter_bar;
 mod game_icon;
 mod level_picker;
 mod page;
@@ -10,6 +11,7 @@ mod step_buttons;
 mod text_table;
 
 pub use amount_field::{AmountChanged, AmountField};
+pub use filter_bar::{FilterBar, FilterChanged};
 pub use game_icon::GameIconView;
 pub use level_picker::LevelPicker;
 pub use page::{PageHeader, page_body};

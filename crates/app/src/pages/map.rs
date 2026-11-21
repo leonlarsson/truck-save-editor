@@ -20,6 +20,7 @@ use save::Place;
 use crate::game_data;
 use crate::i18n::t;
 use crate::session::Session;
+use crate::ui::{FilterBar, FilterChanged};
 use crate::ui::{RowLook, TextColumn, TextRow, TextTable};
 
 pub struct MapPage {
@@ -29,8 +30,14 @@ pub struct MapPage {
     count: usize,
     dealers: PlaceCount,
     recruitments: PlaceCount,
+    filter: Entity<FilterBar>,
     _subscriptions: Vec<Subscription>,
 }
+
+/// The Map filter's toggles, in order.
+const FILTER_NOT_VISITED: usize = 0;
+const FILTER_DEALER_LOCKED: usize = 1;
+const FILTER_RECRUITMENT_LOCKED: usize = 2;
 
 /// How many of a kind of place are unlocked, of how many there are (`None` without the game).
 #[derive(Clone, Copy, Default)]
@@ -70,9 +77,17 @@ impl MapPage {
             },
         ];
         let table = cx.new(|cx| TableState::new(TextTable::new(columns), window, cx));
+        let toggles = vec![
+            t!(cx, "map-filter-not-visited"),
+            t!(cx, "map-filter-dealer-locked"),
+            t!(cx, "map-filter-recruitment-locked"),
+        ];
+        let placeholder = t!(cx, "map-search");
+        let filter = cx.new(|cx| FilterBar::new(placeholder, toggles, window, cx));
         let _subscriptions = vec![
             cx.observe(&session, |this, _, cx| this.reload(cx)),
             game_data::observe(cx, |this, cx| this.reload(cx)),
+            cx.subscribe(&filter, |this, _, _: &FilterChanged, cx| this.reload(cx)),
         ];
         let mut page = Self {
             session,
@@ -81,6 +96,7 @@ impl MapPage {
             count: 0,
             dealers: PlaceCount::default(),
             recruitments: PlaceCount::default(),
+            filter,
             _subscriptions,
         };
         page.reload(cx);
@@ -118,6 +134,23 @@ impl MapPage {
         cities.sort_by(|a, b| a.0.cmp(&b.0));
         self.count = cities.len();
         self.visited = cities.iter().filter(|city| city.1 > 0).count();
+        // "Not found yet" is what the cell says when the city has one that's still locked.
+        let locked = t!(cx, "map-place-locked");
+        let cities: Vec<_> = {
+            let filter = self.filter.read(cx);
+            cities
+                .into_iter()
+                .filter(|(name, visits, dealer, recruitment)| {
+                    (!filter.is_on(FILTER_NOT_VISITED) || *visits == 0)
+                        && (!filter.is_on(FILTER_DEALER_LOCKED) || *dealer == locked)
+                        && (!filter.is_on(FILTER_RECRUITMENT_LOCKED) || *recruitment == locked)
+                        && filter.matches(&[name], cx)
+                })
+                .collect()
+        };
+        let (shown, total) = (cities.len(), self.count);
+        self.filter
+            .update(cx, |filter, cx| filter.set_counts(shown, total, cx));
         let rows = cities
             .into_iter()
             .map(|(name, visits, dealer, recruitment)| TextRow {
@@ -277,6 +310,7 @@ impl Render for MapPage {
                             ),
                     ),
             )
+            .child(self.filter.clone())
             // Not hidden, and not just a disabled button: say why, and what makes it work.
             .children((!has_game_data).then(|| {
                 div()

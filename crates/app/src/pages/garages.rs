@@ -18,35 +18,46 @@ use save::Garage;
 use crate::game_data;
 use crate::i18n::t;
 use crate::session::Session;
+use crate::ui::{FilterBar, FilterChanged};
 
 pub struct GaragesPage {
     session: Entity<Session>,
     table: Entity<TableState<GarageTable>>,
     /// The headquarters: one of the cities with an owned garage.
     headquarters: Entity<SelectState<SearchableVec<CityOption>>>,
+    filter: Entity<FilterBar>,
     _subscriptions: Vec<Subscription>,
 }
+
+/// The Garages filter's toggles, in order.
+const FILTER_OWNED: usize = 0;
+const FILTER_NOT_LARGE: usize = 1;
 
 impl GaragesPage {
     pub fn new(session: Entity<Session>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let delegate = GarageTable {
-            garages: session.read(cx).garages(),
+            garages: Vec::new(),
             sort: None,
         };
+        let toggles = vec![
+            t!(cx, "garages-filter-owned"),
+            t!(cx, "garages-filter-not-large"),
+        ];
+        let placeholder = t!(cx, "garages-search");
+        let filter = cx.new(|cx| FilterBar::new(placeholder, toggles, window, cx));
         let table = cx.new(|cx| TableState::new(delegate, window, cx).sortable(true));
         let headquarters = cx.new(|cx| {
             SelectState::new(SearchableVec::new(Vec::new()), None, window, cx).searchable(true)
         });
         let _subscriptions = vec![
-            cx.observe_in(&session, window, |this, session, window, cx| {
-                let garages = session.read(cx).garages();
-                this.table.update(cx, |table, cx| {
-                    table.delegate_mut().set_garages(garages);
-                    table.refresh(cx);
-                    cx.notify();
-                });
+            cx.observe_in(&session, window, |this, _, window, cx| {
+                this.reload(cx);
                 this.sync_headquarters(window, cx);
-                cx.notify();
+            }),
+            cx.subscribe(&filter, |this, _, _: &FilterChanged, cx| this.reload(cx)),
+            game_data::observe_in(window, cx, |this, window, cx| {
+                this.reload(cx);
+                this.sync_headquarters(window, cx);
             }),
             cx.subscribe_in(
                 &headquarters,
@@ -65,10 +76,38 @@ impl GaragesPage {
             session,
             table,
             headquarters,
+            filter,
             _subscriptions,
         };
+        page.reload(cx);
         page.sync_headquarters(window, cx);
         page
+    }
+
+    /// Puts the garages that match the filter into the table.
+    fn reload(&mut self, cx: &mut Context<Self>) {
+        let all = self.session.read(cx).garages();
+        let total = all.len();
+        let garages: Vec<Garage> = {
+            let filter = self.filter.read(cx);
+            all.into_iter()
+                .filter(|garage| {
+                    let city = game_data::city_name(cx, &garage.city);
+                    (!filter.is_on(FILTER_OWNED) || garage.is_owned)
+                        && (!filter.is_on(FILTER_NOT_LARGE) || !garage.is_large())
+                        && filter.matches(&[&city], cx)
+                })
+                .collect()
+        };
+        let shown = garages.len();
+        self.filter
+            .update(cx, |filter, cx| filter.set_counts(shown, total, cx));
+        self.table.update(cx, |table, cx| {
+            table.delegate_mut().set_garages(garages);
+            table.refresh(cx);
+            cx.notify();
+        });
+        cx.notify();
     }
 
     /// Puts the owned garages' cities in the HQ picker, the current HQ selected.
@@ -99,7 +138,8 @@ impl GaragesPage {
 
 impl Render for GaragesPage {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let garages = &self.table.read(cx).delegate().garages;
+        // The summary counts every garage, whatever the filter shows.
+        let garages = self.session.read(cx).garages();
         let count = garages.len();
         let owned = garages.iter().filter(|g| g.is_owned).count();
         let large = garages.iter().filter(|g| g.is_large()).count();
@@ -170,6 +210,7 @@ impl Render for GaragesPage {
                             ),
                     ),
             )
+            .child(self.filter.clone())
             .child(
                 div().flex_1().min_h_0().child(
                     DataTable::new(&self.table)

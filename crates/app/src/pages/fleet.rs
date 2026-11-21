@@ -17,42 +17,77 @@ use crate::format::thousands;
 use crate::game_data;
 use crate::i18n::t;
 use crate::session::Session;
-use crate::ui::GameIconView;
+use crate::ui::{FilterBar, FilterChanged, GameIconView};
 
 pub struct FleetPage {
     session: Entity<Session>,
     /// Which vehicles the table shows: trucks or coaches.
     kind: VehicleKind,
     table: Entity<TableState<TruckTable>>,
+    filter: Entity<FilterBar>,
     _subscriptions: Vec<Subscription>,
 }
+
+/// The Fleet filter's toggles, in order.
+const FILTER_WORN: usize = 0;
+const FILTER_NO_GARAGE: usize = 1;
 
 impl FleetPage {
     pub fn new(session: Entity<Session>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let kind = VehicleKind::Truck;
         let delegate = TruckTable {
-            trucks: rows(of_kind(session.read(cx).vehicles(), kind), cx),
+            trucks: Vec::new(),
             session: session.clone(),
             sort: None,
         };
         let table = cx.new(|cx| TableState::new(delegate, window, cx).sortable(true));
+        let toggles = vec![
+            t!(cx, "fleet-filter-worn"),
+            t!(cx, "fleet-filter-no-garage"),
+        ];
+        let placeholder = t!(cx, "fleet-search");
+        let filter = cx.new(|cx| FilterBar::new(placeholder, toggles, window, cx));
         let _subscriptions = vec![
             cx.observe(&session, |this, _, cx| this.reload(cx)),
             game_data::observe(cx, |this, cx| this.reload(cx)),
+            cx.subscribe(&filter, |this, _, _: &FilterChanged, cx| this.reload(cx)),
         ];
-        Self {
+        let mut page = Self {
             session,
             kind,
             table,
+            filter,
             _subscriptions,
-        }
+        };
+        page.reload(cx);
+        page
     }
 }
 
 impl FleetPage {
     /// Puts the session's current vehicles of the shown kind into the table.
     fn reload(&mut self, cx: &mut Context<Self>) {
-        let vehicles = rows(of_kind(self.session.read(cx).vehicles(), self.kind), cx);
+        let all = rows(of_kind(self.session.read(cx).vehicles(), self.kind), cx);
+        let total = all.len();
+        let vehicles: Vec<Row> = {
+            let filter = self.filter.read(cx);
+            all.into_iter()
+                .filter(|row| {
+                    let truck = &row.vehicle;
+                    let garage = truck
+                        .garage_city
+                        .as_deref()
+                        .map(|city| game_data::city_name(cx, city))
+                        .unwrap_or_default();
+                    (!filter.is_on(FILTER_WORN) || truck.wear.worst() > 0.0)
+                        && (!filter.is_on(FILTER_NO_GARAGE) || truck.garage_city.is_none())
+                        && filter.matches(&[&row.name, &truck.plate, &garage], cx)
+                })
+                .collect()
+        };
+        let shown = vehicles.len();
+        self.filter
+            .update(cx, |filter, cx| filter.set_counts(shown, total, cx));
         self.table.update(cx, |table, cx| {
             table.delegate_mut().set_trucks(vehicles);
             table.refresh(cx);
@@ -86,11 +121,12 @@ fn rows(vehicles: Vec<Vehicle>, cx: &App) -> Vec<Row> {
 
 impl Render for FleetPage {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let trucks = &self.table.read(cx).delegate().trucks;
+        // The summary counts every vehicle of the kind, whatever the filter shows.
+        let trucks = of_kind(self.session.read(cx).vehicles(), self.kind);
         let truck_count = trucks.len();
         let worn_count = trucks
             .iter()
-            .filter(|row| row.vehicle.wear.worst() > 0.0)
+            .filter(|truck| truck.wear.worst() > 0.0)
             .count();
         let count = thousands(truck_count as i64);
         let vehicles = match self.kind {
@@ -163,6 +199,7 @@ impl Render for FleetPage {
                             })),
                     ),
             )
+            .child(self.filter.clone())
             .child(
                 div().flex_1().min_h_0().child(
                     DataTable::new(&self.table)

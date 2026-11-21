@@ -19,40 +19,74 @@ use crate::game_data;
 use crate::i18n::t;
 use crate::labels::ADR_CLASS_COUNT;
 use crate::session::Session;
+use crate::ui::{FilterBar, FilterChanged};
 
 pub struct DriversPage {
     session: Entity<Session>,
     table: Entity<TableState<DriverTable>>,
+    filter: Entity<FilterBar>,
     _subscriptions: Vec<Subscription>,
 }
+
+/// The Drivers filter's toggles, in order.
+const FILTER_NOT_MAXED: usize = 0;
 
 impl DriversPage {
     pub fn new(session: Entity<Session>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let delegate = DriverTable {
-            drivers: session.read(cx).drivers(),
+            drivers: Vec::new(),
             sort: None,
         };
         let table = cx.new(|cx| TableState::new(delegate, window, cx).sortable(true));
-        let _subscriptions = vec![cx.observe(&session, |this, session, cx| {
-            let drivers = session.read(cx).drivers();
-            this.table.update(cx, |table, cx| {
-                table.delegate_mut().set_drivers(drivers);
-                table.refresh(cx);
-                cx.notify();
-            });
-            cx.notify();
-        })];
-        Self {
+        let toggles = vec![t!(cx, "drivers-filter-not-maxed")];
+        let placeholder = t!(cx, "drivers-search");
+        let filter = cx.new(|cx| FilterBar::new(placeholder, toggles, window, cx));
+        let _subscriptions = vec![
+            cx.observe(&session, |this, _, cx| this.reload(cx)),
+            cx.subscribe(&filter, |this, _, _: &FilterChanged, cx| this.reload(cx)),
+            game_data::observe(cx, |this, cx| this.reload(cx)),
+        ];
+        let mut page = Self {
             session,
             table,
+            filter,
             _subscriptions,
-        }
+        };
+        page.reload(cx);
+        page
+    }
+
+    /// Puts the drivers that match the filter into the table.
+    fn reload(&mut self, cx: &mut Context<Self>) {
+        let all = self.session.read(cx).drivers();
+        let total = all.len();
+        let drivers: Vec<Driver> = {
+            let filter = self.filter.read(cx);
+            all.into_iter()
+                .filter(|driver| {
+                    let hometown = game_data::city_name(cx, &driver.hometown);
+                    let location = game_data::city_name(cx, &driver.current_city);
+                    (!filter.is_on(FILTER_NOT_MAXED) || driver.skills != Skills::maxed())
+                        && filter.matches(&[&hometown, &location], cx)
+                })
+                .collect()
+        };
+        let shown = drivers.len();
+        self.filter
+            .update(cx, |filter, cx| filter.set_counts(shown, total, cx));
+        self.table.update(cx, |table, cx| {
+            table.delegate_mut().set_drivers(drivers);
+            table.refresh(cx);
+            cx.notify();
+        });
+        cx.notify();
     }
 }
 
 impl Render for DriversPage {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let drivers = &self.table.read(cx).delegate().drivers;
+        // The summary counts every driver, whatever the filter shows.
+        let drivers = self.session.read(cx).drivers();
         let count = drivers.len();
         let maxed = drivers
             .iter()
@@ -89,6 +123,7 @@ impl Render for DriversPage {
                             })),
                     ),
             )
+            .child(self.filter.clone())
             .child(
                 div().flex_1().min_h_0().child(
                     DataTable::new(&self.table)

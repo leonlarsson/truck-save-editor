@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use gamedata::{GameData, GameIcon};
-use gpui_kit::{App, AppContext as _, Context, Global, Subscription};
+use gpui_kit::{App, AppContext as _, Context, Global, Subscription, Window};
 use save::{Game, LevelTable};
 
 #[derive(Default)]
@@ -108,4 +108,13 @@ pub fn model_name(cx: &App, vehicle: &save::Vehicle) -> Option<String> {
 pub fn brand_logo(cx: &App, vehicle: &save::Vehicle) -> Option<Arc<GameIcon>> {
     let brand = vehicle.model_id.as_deref()?.split('.').next()?;
     data(cx)?.brand_logo(brand, vehicle.kind == save::VehicleKind::Coach)
+}
+
+/// Like `observe`, for views that need the window to remake what they show (a picker's items).
+pub fn observe_in<V: 'static>(
+    window: &mut Window,
+    cx: &mut Context<V>,
+    on_loaded: impl Fn(&mut V, &mut Window, &mut Context<V>) + 'static,
+) -> Subscription {
+    cx.observe_global_in::<Loaded>(window, on_loaded)
 }

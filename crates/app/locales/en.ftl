@@ -121,6 +121,23 @@ redo = Redo
 undo-tooltip = Undo (Ctrl+Z)
 redo-tooltip = Redo (Ctrl+Shift+Z)
 
+## Filters
+
+filter-count = { $shown } of { $total }
+filter-clear = Clear filters
+fleet-search = Search by model, plate or garage
+fleet-filter-worn = Needs repair
+fleet-filter-no-garage = No garage
+garages-search = Search by city
+garages-filter-owned = Owned
+garages-filter-not-large = Not large
+drivers-search = Search by hometown or where they are
+drivers-filter-not-maxed = Not maxed
+map-search = Search by city
+map-filter-not-visited = Not visited
+map-filter-dealer-locked = Dealer not found yet
+map-filter-recruitment-locked = Agency not found yet
+
 ## Quick start
 
 quick-start = Quick start
