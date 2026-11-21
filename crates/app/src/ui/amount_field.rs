@@ -22,6 +22,8 @@ use crate::format::{parse_amount, thousands};
 pub struct AmountChanged(pub i64);
 
 pub struct AmountField {
+    /// Small, to sit in a row of other small fields (detail panels); large otherwise.
+    is_compact: bool,
     /// The field's own focus, outside the text box: where focus goes when it leaves editing, so it
     /// stays inside whatever holds the field (a panel still hears Esc to close).
     focus_handle: FocusHandle,
@@ -67,6 +69,7 @@ impl AmountField {
         Self {
             input,
             focus_handle: cx.focus_handle(),
+            is_compact: false,
             value,
             min: None,
             label: label.into(),
@@ -76,6 +79,12 @@ impl AmountField {
             is_cancelling: false,
             _subscriptions: vec![subscription],
         }
+    }
+
+    /// The small size, matching the other fields in a detail panel.
+    pub fn compact(mut self) -> Self {
+        self.is_compact = true;
+        self
     }
 
     pub fn min(mut self, min: i64) -> Self {
@@ -188,7 +197,8 @@ impl Render for AmountField {
             .child(
                 Input::new(&self.input)
                     .id("amount-input")
-                    .large()
+                    .when(self.is_compact, |input| input.small())
+                    .when(!self.is_compact, |input| input.large())
                     .aria_label(self.label.clone())
                     .when_some(self.prefix.clone(), |input, prefix| {
                         input.prefix(div().text_color(muted).child(prefix))

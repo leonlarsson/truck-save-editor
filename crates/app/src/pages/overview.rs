@@ -134,6 +134,17 @@ impl OverviewPage {
         }
     }
 
+    fn quick_start_button(&self, cx: &mut Context<Self>) -> Button {
+        Button::new("quick-start")
+            .small()
+            .outline()
+            .icon(Icon::new(IconName::Rocket))
+            .label(t!(cx, "quick-start-open"))
+            .on_click(cx.listener(|this, _, window, cx| {
+                crate::quick_start::open(this.session.clone(), window, cx)
+            }))
+    }
+
     fn edit(&self, cx: &mut Context<Self>, edit: impl FnOnce(&mut save::Career)) {
         self.session
             .update(cx, |session, cx| session.edit_career(cx, edit));
@@ -469,23 +480,26 @@ impl Render for OverviewPage {
             v_flex()
                 .gap_6()
                 .max_w(rems(60.))
-                .child(
-                    h_flex().justify_end().child(
-                        Button::new("quick-start")
-                            .small()
-                            .outline()
-                            .icon(Icon::new(IconName::Rocket))
-                            .label(t!(cx, "quick-start-open"))
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                crate::quick_start::open(this.session.clone(), window, cx)
-                            })),
-                    ),
-                )
-                .children(self.company.clone().map(|input| {
-                    Section::new(t!(cx, "company-name"))
+                // The company, with Quick start beside it (a fresh career's changes, for this
+                // company). Without a readable profile file there's no name to edit, and Quick
+                // start keeps a row of its own.
+                .child(match self.company.clone() {
+                    Some(input) => Section::new(t!(cx, "company-section"))
                         .description(t!(cx, "company-name-description"))
-                        .child(div().max_w(rems(24.)).child(Input::new(&input)))
-                }))
+                        .action(self.quick_start_button(cx))
+                        .child(
+                            v_flex()
+                                .gap_1p5()
+                                .max_w(rems(24.))
+                                .child(div().text_sm().child(t!(cx, "company-name")))
+                                .child(Input::new(&input)),
+                        )
+                        .into_any_element(),
+                    None => h_flex()
+                        .justify_end()
+                        .child(self.quick_start_button(cx))
+                        .into_any_element(),
+                })
                 .child({
                     // The big levers side by side, at the same height; they wrap on narrow windows.
                     let mut cards = vec![self.render_money(cx), self.render_experience(cx)];

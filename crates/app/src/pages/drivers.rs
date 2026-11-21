@@ -131,6 +131,9 @@ impl Render for DriversPage {
                     .justify_between()
                     .items_center()
                     .gap_4()
+                    // On a narrow window the buttons move to a line of their own.
+                    .flex_wrap()
+                    .gap_y_2()
                     .child(
                         div()
                             .text_sm()

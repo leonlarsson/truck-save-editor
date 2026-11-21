@@ -257,11 +257,14 @@ impl Render for MapPage {
                     .justify_between()
                     .items_center()
                     .gap_4()
+                    // On a narrow window the buttons move to a line of their own.
+                    .flex_wrap()
+                    .gap_y_2()
                     // The summary wraps; the buttons keep their size.
                     .child(
                         h_flex()
                             .flex_1()
-                            .min_w_0()
+                            .min_w(gpui_kit::rems(18.))
                             .flex_wrap()
                             .gap_x_4()
                             .text_sm()

@@ -52,6 +52,7 @@ impl VehicleDetail {
             AmountField::new(odometer_km, label, window, cx)
                 .min(0)
                 .suffix("km")
+                .compact()
         });
         let plate_text = vehicle
             .as_ref()

@@ -33,7 +33,12 @@ impl DriverDetail {
     ) -> Self {
         let xp = find(&session, &id, cx).map_or(0, |driver| driver.experience);
         let label = t!(cx, "column-experience");
-        let experience = cx.new(|cx| AmountField::new(xp, label, window, cx).min(0).suffix("XP"));
+        let experience = cx.new(|cx| {
+            AmountField::new(xp, label, window, cx)
+                .min(0)
+                .suffix("XP")
+                .compact()
+        });
         let _subscriptions = vec![
             cx.subscribe(&experience, |this, _, AmountChanged(xp), cx| {
                 let xp = (*xp).max(0).to_string();

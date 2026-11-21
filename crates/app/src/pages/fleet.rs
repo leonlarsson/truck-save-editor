@@ -39,6 +39,7 @@ impl FleetPage {
         let kind = VehicleKind::Truck;
         let delegate = TruckTable {
             trucks: Vec::new(),
+            columns: TruckColumn::ALL.to_vec(),
             session: session.clone(),
             sort: None,
         };
@@ -125,6 +126,22 @@ impl FleetPage {
 
     fn show(&mut self, kind: VehicleKind, cx: &mut Context<Self>) {
         self.kind = kind;
+        let columns: Vec<TruckColumn> = TruckColumn::ALL
+            .into_iter()
+            .filter(|column| kind != VehicleKind::Trailer || *column != TruckColumn::Fuel)
+            .collect();
+        self.table.update(cx, |table, cx| {
+            let delegate = table.delegate_mut();
+            delegate.columns = columns;
+            // A sort by a column that's gone is dropped.
+            if delegate
+                .sort
+                .is_some_and(|(column, _)| !delegate.columns.contains(&column))
+            {
+                delegate.sort = None;
+            }
+            table.refresh(cx);
+        });
         self.reload(cx);
     }
 }
@@ -217,6 +234,9 @@ impl Render for FleetPage {
                     .justify_between()
                     .items_center()
                     .gap_4()
+                    // On a narrow window the buttons move to a line of their own.
+                    .flex_wrap()
+                    .gap_y_2()
                     .child(
                         h_flex().gap_4().items_center().children(switch).child(
                             div()
@@ -301,6 +321,8 @@ struct Row {
 /// Feeds the trucks to GPUI Kit's table. Only the visible rows are ever rendered.
 struct TruckTable {
     trucks: Vec<Row>,
+    /// The columns shown: every one, less Fuel for trailers (they have no tank).
+    columns: Vec<TruckColumn>,
     /// Asks for one vehicle's repair (by id); the page passes it to the session.
     session: Entity<Session>,
     /// The sort in effect, kept so new data (after a repair) stays in the same order.
@@ -333,7 +355,7 @@ impl TruckColumn {
 impl TruckTable {
     /// Each column as it is, before the sort arrow (see `column`).
     fn base_column(&self, col_ix: usize, cx: &App) -> Column {
-        match TruckColumn::ALL.get(col_ix) {
+        match self.columns.get(col_ix) {
             Some(TruckColumn::Truck) => Column::new("truck", t!(cx, "column-truck"))
                 .width(210.)
                 .sortable(),
@@ -362,7 +384,7 @@ impl TruckTable {
     /// A click on a column's heading: sort by it, ascending first, then the other way. Columns
     /// that can't be sorted (Details) are left alone.
     fn sort_by_header(&mut self, col_ix: usize, cx: &App) {
-        let Some(column) = TruckColumn::ALL.get(col_ix).copied() else {
+        let Some(column) = self.columns.get(col_ix).copied() else {
             return;
         };
         if self.base_column(col_ix, cx).sort.is_none() {
@@ -451,7 +473,7 @@ impl TruckTable {
 
 impl TableDelegate for TruckTable {
     fn columns_count(&self, _: &App) -> usize {
-        TruckColumn::ALL.len()
+        self.columns.len()
     }
 
     fn rows_count(&self, _: &App) -> usize {
@@ -461,7 +483,7 @@ impl TableDelegate for TruckTable {
     fn column(&self, col_ix: usize, cx: &App) -> Column {
         // The sorted column shows its arrow; the others show they can be sorted.
         let column = self.base_column(col_ix, cx);
-        match (TruckColumn::ALL.get(col_ix), self.sort) {
+        match (self.columns.get(col_ix), self.sort) {
             (Some(this), Some((sorted, order))) if *this == sorted => column.sort(order),
             _ => column,
         }
@@ -474,7 +496,7 @@ impl TableDelegate for TruckTable {
         _: &mut Window,
         _: &mut Context<TableState<Self>>,
     ) {
-        let Some(column) = TruckColumn::ALL.get(col_ix).copied() else {
+        let Some(column) = self.columns.get(col_ix).copied() else {
             return;
         };
         self.sort = (sort != ColumnSort::Default).then_some((column, sort));
@@ -488,7 +510,8 @@ impl TableDelegate for TruckTable {
         _: &mut Window,
         cx: &mut Context<TableState<Self>>,
     ) -> impl IntoElement {
-        let column = TruckColumn::ALL
+        let column = self
+            .columns
             .get(col_ix)
             .copied()
             .unwrap_or(TruckColumn::Truck);
@@ -570,12 +593,12 @@ impl TableDelegate for TruckTable {
     }
 
     fn cell_label(&self, row_ix: usize, col_ix: usize, cx: &App) -> Option<SharedString> {
-        let column = TruckColumn::ALL.get(col_ix).copied()?;
+        let column = self.columns.get(col_ix).copied()?;
         Some(self.text(row_ix, column, cx))
     }
 
     fn cell_text(&self, row_ix: usize, col_ix: usize, cx: &App) -> String {
-        TruckColumn::ALL
+        self.columns
             .get(col_ix)
             .map(|column| self.text(row_ix, *column, cx).to_string())
             .unwrap_or_default()

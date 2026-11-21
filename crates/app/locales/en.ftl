@@ -108,7 +108,7 @@ save-prepare-failed = Couldn't prepare the save
 save-no-backup-folder-title = Couldn't save
 save-no-backup-folder = There's no folder to keep backups in, so nothing was written.
 saved-title = Saved and checked “{ $name }”
-saved-backup = The old version is backed up in { $path }
+saved-backup = The previous version is in Backups.
 save-failed = Couldn't save “{ $name }”
 save-profile-failed = The save was written, but the company name couldn't be: it's still waiting to be saved
 
@@ -296,6 +296,7 @@ restore-failed = Couldn't restore “{ $name }”
 ## Overview
 
 amount-hint = Try 2.5m, 10k, +1m or -500k.
+company-section = Your company
 company-name = Company name
 company-name-description = Your company's name, for the whole profile: every save in it. It's kept in the profile file, which is backed up before it's written.
 money = Money

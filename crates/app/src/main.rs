@@ -52,6 +52,17 @@ pub fn bind_keys(cx: &mut gpui_kit::App) {
     ]);
 }
 
+/// Development builds only: `TSE_WINDOW=880x560` opens the window at that size, to check layouts
+/// at the smallest size the window allows.
+fn dev_window_size() -> Option<gpui_kit::Size<gpui_kit::Pixels>> {
+    if !cfg!(debug_assertions) {
+        return None;
+    }
+    let text = std::env::var("TSE_WINDOW").ok()?;
+    let (width, height) = text.split_once('x')?;
+    Some(size(px(width.parse().ok()?), px(height.parse().ok()?)))
+}
+
 fn main() {
     gpui_kit::application()
         .with_assets(assets::AppAssets)
@@ -67,7 +78,7 @@ fn main() {
             let options = WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
                     None,
-                    size(px(1200.), px(800.)),
+                    dev_window_size().unwrap_or(size(px(1200.), px(800.))),
                     cx,
                 ))),
                 window_min_size: Some(size(px(880.), px(560.))),

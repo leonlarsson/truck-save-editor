@@ -544,25 +544,31 @@ impl Workspace {
 
         window.open_alert_dialog(cx, move |alert, _, cx| {
             let session = session.clone();
-            let list = v_flex().gap_1().children(changes.iter().map(|change| {
-                h_flex()
-                    .gap_2()
-                    .text_sm()
-                    .child(
-                        div()
-                            .w(rems(9.))
-                            .flex_shrink_0()
-                            .font_medium()
-                            .child(change.what.clone()),
-                    )
-                    .child(
-                        div()
-                            .text_color(cx.theme().muted_foreground)
-                            .child(change.before.clone()),
-                    )
-                    .child(div().text_color(cx.theme().muted_foreground).child("→"))
-                    .child(div().child(change.after.clone()))
-            }));
+            // A long list (a big Quick start) scrolls, so the buttons stay in view.
+            let list = v_flex()
+                .id("save-changes")
+                .max_h(rems(18.))
+                .overflow_y_scroll()
+                .gap_1()
+                .children(changes.iter().map(|change| {
+                    h_flex()
+                        .gap_2()
+                        .text_sm()
+                        .child(
+                            div()
+                                .w(rems(9.))
+                                .flex_shrink_0()
+                                .font_medium()
+                                .child(change.what.clone()),
+                        )
+                        .child(
+                            div()
+                                .text_color(cx.theme().muted_foreground)
+                                .child(change.before.clone()),
+                        )
+                        .child(div().text_color(cx.theme().muted_foreground).child("→"))
+                        .child(div().child(change.after.clone()))
+                }));
             alert
                 .title(t!(cx, "save-confirm-title", name = &name))
                 .description(
@@ -1047,7 +1053,7 @@ fn start_save(session: Entity<Session>, window: &mut Window, cx: &mut App) {
                 })
                 .await;
             let _ = cx.update(|window, cx| match result {
-                Ok((written, backup, profile)) => {
+                Ok((written, _backup, profile)) => {
                     let profile_written = report_profile(profile, window, cx);
                     session.update(cx, |session, cx| {
                         session.mark_saved(written, profile_written, cx)
@@ -1056,11 +1062,8 @@ fn start_save(session: Entity<Session>, window: &mut Window, cx: &mut App) {
                         Notification::new()
                             .with_type(NotificationType::Success)
                             .title(t!(cx, "saved-title", name = &name))
-                            .message(t!(
-                                cx,
-                                "saved-backup",
-                                path = backup.dir.display().to_string()
-                            )),
+                            // Short: the Backups panel lists it, with Show in folder.
+                            .message(t!(cx, "saved-backup")),
                         cx,
                     );
                 }

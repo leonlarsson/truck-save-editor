@@ -157,12 +157,13 @@ impl Render for FilterBar {
                 ),
             )
             .children(toggles)
-            .child(
+            // Only while filtering: an empty element would still take a line when the bar wraps.
+            .children(is_filtering.then(|| {
                 div()
                     .text_sm()
                     .text_color(cx.theme().muted_foreground)
-                    .child(count),
-            )
+                    .child(count)
+            }))
             .children(is_filtering.then(|| {
                 Button::new("clear-filters")
                     .small()
