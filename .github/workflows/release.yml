@@ -38,7 +38,7 @@ jobs:
           "version=$version" >> $env:GITHUB_OUTPUT
       - run: cargo test --locked -p sii -p save -p hashfs -p gamedata -p app
       - run: cargo build --locked -p app --release
-      - name: Check the .exe needs no C runtime DLL
+      - name: Check the .exe (no C runtime DLL, no console window)
         shell: pwsh
         run: |
           # .cargo/config.toml links the runtime in; without it the .exe won't start on a PC
@@ -46,6 +46,14 @@ jobs:
           $bytes = [System.IO.File]::ReadAllBytes("target/release/truck-save-editor.exe")
           if ([System.Text.Encoding]::ASCII.GetString($bytes) -match 'VCRUNTIME140') {
             Write-Error "The .exe needs VCRUNTIME140.dll. Is the crt-static setting in .cargo/config.toml in effect?"
+            exit 1
+          }
+          # The PE header's subsystem: 2 is a Windows app, 3 a console program (which opens a
+          # terminal window next to the app). main.rs sets it for release builds.
+          $header = [System.BitConverter]::ToInt32($bytes, 0x3C)
+          $subsystem = [System.BitConverter]::ToUInt16($bytes, $header + 4 + 20 + 68)
+          if ($subsystem -ne 2) {
+            Write-Error "The .exe is a console program (subsystem $subsystem): it would open a terminal window. Check windows_subsystem in main.rs."
             exit 1
           }
       - name: Package

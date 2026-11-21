@@ -1,6 +1,10 @@
 //! Truck Save Editor: the desktop app. It finds the game's saves, opens one into a `Session`, and
 //! shows it in the `Workspace`: the pages, the sidebar and the header with the pending changes.
 
+// A Windows app, not a console program: release builds open without a terminal window. Debug
+// builds keep theirs, for log output while developing.
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 mod assets;
 mod format;
 mod game_data;
