@@ -68,3 +68,7 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Considered:** patching GPUI's build script to call `fxc.exe` through WSL interop. Rejected: a fork of a dependency that changes weekly.
 
 **Replaces:** the `cargo-xwin` plan in "mise manages the tools" (it's removed from `mise.toml`).
+
+## 2026-11-21: GPUI passes its test
+
+**Decided:** GPUI (through GPUI Kit) stays. The test app (sidebar shell, Overview with amount fields and level meters, Fleet with a 2,000-row sortable table, light and dark themes) builds and runs on Windows through `scripts/windows.sh`, and under WSLg. Tauri is no longer the fallback.
