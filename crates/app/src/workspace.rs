@@ -7,6 +7,7 @@ use gpui_kit::assets::IconName;
 use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Icon, Sizable as _, StyledExt as _, WindowExt as _,
     button::{Button, ButtonVariants as _},
+    command::CommandState,
     h_flex,
     notification::{Notification, NotificationType},
     sidebar::{Sidebar, SidebarGroup, SidebarMenu, SidebarMenuItem},
@@ -14,7 +15,7 @@ use gpui_kit::component::{
     v_flex,
 };
 use gpui_kit::{
-    App, AppContext as _, Context, Entity, InteractiveElement as _, IntoElement,
+    App, AppContext as _, Context, Entity, FocusHandle, InteractiveElement as _, IntoElement,
     ParentElement as _, Render, SharedString, StatefulInteractiveElement as _, Styled as _,
     Subscription, Window, div, prelude::FluentBuilder as _, px, rems,
 };
@@ -33,12 +34,15 @@ use crate::pages::{
     open_save::{OpenSavePage, OpenSlot},
     overview::OverviewPage,
 };
+use crate::palette::{self, OpenPalette, PaletteCommand};
 use crate::session::Session;
 use crate::theme;
 use crate::ui::PageHeader;
 
 pub struct Workspace {
     page: Page,
+    focus_handle: FocusHandle,
+    palette: Entity<CommandState>,
     open_save: Entity<OpenSavePage>,
     opened: Option<Opened>,
     /// The save being opened, while it loads.
@@ -68,8 +72,13 @@ impl Workspace {
                 this.open(event.profile.clone(), event.slot.clone(), window, cx);
             },
         );
+        let focus_handle = cx.focus_handle();
+        // Keyboard shortcuts (Ctrl+K) reach the workspace when nothing inside it has focus yet.
+        focus_handle.focus(window, cx);
         let mut workspace = Self {
             page: dev_start_page().unwrap_or(Page::Overview),
+            focus_handle,
+            palette: cx.new(|cx| CommandState::new(window, cx)),
             open_save,
             opened: None,
             opening: None,
@@ -131,6 +140,81 @@ impl Workspace {
             map,
             _observe,
         });
+    }
+
+    /// Opens the command palette (only while a save is open: every command acts on it).
+    fn open_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(opened) = &self.opened else {
+            return;
+        };
+        let has_coaches = opened.session.read(cx).career().coach_experience.is_some();
+        palette::open(
+            cx.entity().downgrade(),
+            self.palette.clone(),
+            has_coaches,
+            window,
+            cx,
+        );
+    }
+
+    /// Carries out a palette command.
+    pub fn run(&mut self, command: PaletteCommand, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(session) = self.opened.as_ref().map(|opened| opened.session.clone()) else {
+            return;
+        };
+        let edit = |cx: &mut Context<Self>, edit: Box<dyn FnOnce(&mut save::Career)>| {
+            session.update(cx, |session, cx| session.edit_career(cx, edit));
+        };
+        match command {
+            PaletteCommand::Go(page) => {
+                self.page = page;
+                cx.notify();
+            }
+            PaletteCommand::MaxTruckSkills => edit(
+                cx,
+                Box::new(|career| {
+                    career.skills = save::Skills {
+                        adr: career.skills.adr,
+                        ..save::Skills::maxed()
+                    };
+                }),
+            ),
+            PaletteCommand::MaxCoachSkills => edit(
+                cx,
+                Box::new(|career| {
+                    if career.coach_skills.is_some() {
+                        career.coach_skills = Some(save::CoachSkills::maxed());
+                    }
+                }),
+            ),
+            PaletteCommand::AllAdr => {
+                edit(cx, Box::new(|career| career.skills.adr = save::ADR_ALL))
+            }
+            PaletteCommand::Repair(kind) => {
+                session.update(cx, |session, cx| session.repair_all(kind, cx));
+            }
+            PaletteCommand::BuyAllGarages => {
+                session.update(cx, |session, cx| session.upgrade_garages(true, cx));
+            }
+            PaletteCommand::UpgradeOwnedGarages => {
+                session.update(cx, |session, cx| session.upgrade_garages(false, cx));
+            }
+            PaletteCommand::MaxAllDrivers => {
+                session.update(cx, |session, cx| session.max_all_drivers(cx));
+            }
+            PaletteCommand::VisitEveryCity => {
+                session.update(cx, |session, cx| session.visit_all_cities(cx));
+            }
+            PaletteCommand::Save => {
+                if session.read(cx).change_count() > 0 {
+                    self.confirm_save(window, cx);
+                }
+            }
+            PaletteCommand::Discard => session.update(cx, |session, cx| session.discard(cx)),
+            PaletteCommand::Backups => self.open_backups(window, cx),
+            PaletteCommand::SwitchSave => self.close(window, cx),
+            PaletteCommand::ToggleTheme => theme::toggle_mode(window, cx),
+        }
     }
 
     /// Shows the open slot's backups, newest first, each with Restore.
@@ -396,31 +480,50 @@ impl Workspace {
             .w(px(232.))
             .header(
                 // Plain content, not `SidebarHeader`: that one is a menu trigger and lights up on hover.
-                h_flex()
-                    .p_2()
+                v_flex()
+                    .w_full()
                     .gap_2()
                     .child(
-                        div()
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .size_8()
-                            .flex_shrink_0()
-                            .rounded(cx.theme().radius)
-                            .bg(cx.theme().sidebar_primary)
-                            .text_color(cx.theme().sidebar_primary_foreground)
-                            .child(Icon::new(IconName::Truck)),
-                    )
-                    .child(
-                        v_flex()
-                            .min_w_0()
-                            .child(div().text_sm().font_semibold().truncate().child(slot_name))
+                        h_flex()
+                            .p_2()
+                            .gap_2()
                             .child(
                                 div()
-                                    .text_xs()
-                                    .truncate()
-                                    .text_color(cx.theme().muted_foreground)
-                                    .child(profile_name),
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .size_8()
+                                    .flex_shrink_0()
+                                    .rounded(cx.theme().radius)
+                                    .bg(cx.theme().sidebar_primary)
+                                    .text_color(cx.theme().sidebar_primary_foreground)
+                                    .child(Icon::new(IconName::Truck)),
+                            )
+                            .child(
+                                v_flex()
+                                    .min_w_0()
+                                    .child(
+                                        div().text_sm().font_semibold().truncate().child(slot_name),
+                                    )
+                                    .child(
+                                        div()
+                                            .text_xs()
+                                            .truncate()
+                                            .text_color(cx.theme().muted_foreground)
+                                            .child(profile_name),
+                                    ),
+                            ),
+                    )
+                    .child(
+                        Button::new("open-palette")
+                            .outline()
+                            .small()
+                            .w_full()
+                            .icon(Icon::new(IconName::Search))
+                            .label(t!(cx, "palette-open"))
+                            .tooltip(t!(cx, "palette-shortcut"))
+                            .on_click(
+                                cx.listener(|this, _, window, cx| this.open_palette(window, cx)),
                             ),
                     ),
             )
@@ -584,6 +687,10 @@ impl Render for Workspace {
         let session = opened.session.clone();
         h_flex()
             .size_full()
+            .track_focus(&self.focus_handle)
+            .on_action(
+                cx.listener(|this, _: &OpenPalette, window, cx| this.open_palette(window, cx)),
+            )
             .bg(cx.theme().background)
             .text_color(cx.theme().foreground)
             .child(self.render_sidebar(&session, cx))

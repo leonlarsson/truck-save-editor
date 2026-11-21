@@ -9,6 +9,7 @@ mod game_data;
 mod i18n;
 mod labels;
 mod pages;
+mod palette;
 mod session;
 mod theme;
 mod ui;
@@ -30,6 +31,10 @@ fn main() {
             i18n::init(cx);
             theme::init(cx);
             game_data::init(cx);
+            cx.bind_keys([
+                gpui_kit::KeyBinding::new("ctrl-k", palette::OpenPalette, None),
+                gpui_kit::KeyBinding::new("cmd-k", palette::OpenPalette, None),
+            ]);
 
             let options = WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(Bounds::centered(

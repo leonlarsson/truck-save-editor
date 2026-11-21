@@ -19,6 +19,7 @@ gpui_kit::assets::icon_assets!(
         Map,
         Moon,
         Save,
+        Search,
         Sun,
         Truck,
         Undo2,

@@ -110,6 +110,26 @@ saved-title = Saved “{ $name }”
 saved-backup = The old version is backed up in { $path }
 save-failed = Couldn't save “{ $name }”
 
+## Command palette
+
+palette-open = Commands
+palette-shortcut = Ctrl+K
+palette-placeholder = Type a command or a page…
+palette-group-pages = Go to
+palette-group-actions = Actions
+palette-group-app = Save and app
+palette-go = { $page }
+palette-max-truck-skills = Max all truck skills
+palette-max-coach-skills = Max all coach skills
+palette-all-adr = All ADR classes
+palette-repair-trucks = Repair all trucks
+palette-repair-coaches = Repair all coaches
+palette-save = Save…
+palette-buy-all-garages = Buy every garage, all large
+palette-upgrade-owned-garages = Upgrade owned garages to large
+palette-discard = Discard changes
+palette-theme = Switch light or dark mode
+
 ## Backups
 
 backups = Backups
