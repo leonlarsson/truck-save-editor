@@ -46,10 +46,11 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [x] Brand logos and the game's model names in Fleet.
 - [ ] Cargo icons (Jobs), company logos, from the same decoder.
 - [ ] Use the game's language for its names when the app gets more languages (gamedata already takes a language code).
-- [ ] Coach garages: coaches show "No garage"; find where the save keeps them.
+- [x] Coach garages: coaches have none. Fleet says where each is: driven now (`player.assigned_vehicles`) or parked in a city (`player.my_vehicles[]` → `stored_vehicle_city`).
 - [x] HQ city: pick from the cities the company has garages in (Garages page).
 - [x] City names from the game's city definitions (`city_name_localized`), not only by token: a few tokens (`vasteraas`) differ from their text keys.
-- [ ] Driver names (not found in `def/` yet; maybe generated or in another archive).
+- [x] Driver faces: `driver.<n>` shows the game's face `material/ui/driver/<n>.mat`.
+- [ ] Driver names: the game reads `/locale/<lang>/driver_names.sii` when there is one, but ships none, and the default names aren't in any data file. Look again (maybe inside the executable's resources).
 
 ## Keeping up with the game
 

@@ -37,6 +37,10 @@ pub struct Vehicle {
     pub fuel: Option<f32>,
     /// A trailer's body type (`refrigerated`, `curtainside`), from its `trailer_def`.
     pub body_type: Option<String>,
+    /// Where it's parked when it has no garage (coaches have none): a city token.
+    pub parked_city: Option<String>,
+    /// Whether the player is driving it now.
+    pub is_in_use: bool,
 }
 
 impl Vehicle {
@@ -150,6 +154,28 @@ pub fn vehicles(document: &Document) -> Vec<Vehicle> {
         }
     }
 
+    // The player's own vehicles, one per mode (truck, coach, car), each parked somewhere
+    // (`my_vehicles[]`), and the one being driven now (`assigned_vehicles`).
+    let stored = |id: &str| -> Option<(String, Option<String>)> {
+        let slot = document.unit(id)?;
+        let vehicle = slot.single("vehicle").filter(|v| *v != "null")?;
+        let city = slot
+            .single("stored_vehicle_city")
+            .filter(|c| *c != "null")
+            .map(|c| c.strip_prefix("city.").unwrap_or(c).to_string());
+        Some((vehicle.to_string(), city))
+    };
+    let mut parked_in: HashMap<String, String> = HashMap::new();
+    for slot in player.items("my_vehicles") {
+        if let Some((vehicle, Some(city))) = stored(slot) {
+            parked_in.insert(vehicle, city);
+        }
+    }
+    let in_use = player
+        .single("assigned_vehicles")
+        .and_then(stored)
+        .map(|(vehicle, _)| vehicle);
+
     let trucks = player
         .items("trucks")
         .iter()
@@ -193,6 +219,8 @@ pub fn vehicles(document: &Document) -> Vec<Vehicle> {
                 fuel: (kind != VehicleKind::Trailer)
                     .then(|| vehicle.single("fuel_relative").and_then(value::parse_f32))
                     .flatten(),
+                parked_city: parked_in.get(&vehicle.id).cloned(),
+                is_in_use: in_use.as_deref() == Some(vehicle.id.as_str()),
                 body_type: vehicle
                     .single("trailer_definition")
                     .and_then(|id| document.unit(id))

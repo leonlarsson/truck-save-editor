@@ -19,6 +19,9 @@ pub struct GameIcon {
     pub masks: [Vec<u8>; 4],
     /// The material's colour for each channel, as sRGB red, green, blue, alpha (0–255).
     pub colours: [[u8; 4]; 4],
+    /// A plain picture (`ui.rfx`, a driver's face), not shapes to colour: its channels are its
+    /// own red, green, blue and alpha.
+    pub is_picture: bool,
 }
 
 /// A channel of an icon, named for what it is in the game's textures.
@@ -41,6 +44,7 @@ impl GameIcon {
         let material_path = format!("{folder}/{name}.mat");
         let material = archive.read(&material_path).ok().flatten()?;
         let material = String::from_utf8_lossy(&material);
+        let is_picture = !material.contains("ui.sdf.rfx");
         let (source, colours) = parse_material(&material)?;
         let texture_path = if source.starts_with('/') {
             source
@@ -64,7 +68,27 @@ impl GameIcon {
             height: texture.height,
             masks,
             colours,
+            is_picture,
         })
+    }
+
+    /// A copy shrunk to fit `size` pixels (keeping its shape), to keep many pictures in memory
+    /// cheaply. Not grown when smaller already.
+    pub fn shrunk(&self, size: u32) -> GameIcon {
+        let scale = (size as f32 / self.width.max(self.height) as f32).min(1.0);
+        let width = ((self.width as f32 * scale).round() as u32).max(1);
+        let height = ((self.height as f32 * scale).round() as u32).max(1);
+        GameIcon {
+            name: self.name.clone(),
+            width,
+            height,
+            masks: self
+                .masks
+                .each_ref()
+                .map(|mask| self.shrink(mask, width, height)),
+            colours: self.colours,
+            is_picture: self.is_picture,
+        }
     }
 
     /// The icon at `width`×`height` pixels, as blue, green, red, alpha bytes (what GPUI draws).
@@ -87,6 +111,17 @@ impl GameIcon {
             .each_ref()
             .map(|mask| self.shrink(mask, width, height));
         let mut bgra = vec![0u8; (width * height * 4) as usize];
+        if self.is_picture {
+            for (index, pixel) in bgra.as_chunks_mut::<4>().0.iter_mut().enumerate() {
+                *pixel = [
+                    masks[BLUE][index],
+                    masks[GREEN][index],
+                    masks[RED][index],
+                    masks[ALPHA][index],
+                ];
+            }
+            return bgra;
+        }
         if let Some(backdrop) = backdrop {
             let shapes: Vec<&Vec<u8>> = (0..4)
                 .filter(|channel| !self.masks[*channel].iter().all(|coverage| *coverage > 250))
@@ -239,6 +274,7 @@ mod tests {
                 [0, 0, 0, 0],
                 [0, 0, 255, 255],
             ],
+            is_picture: false,
         }
     }
 
@@ -266,5 +302,15 @@ mod tests {
         let bgra = icon.render(2, 2, [None; 4], Some([10, 20, 30, 255]));
         assert_eq!(&bgra[0..4], &[30, 20, 10, 255]);
         assert_eq!(&bgra[4..8], &[0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn draws_pictures_as_they_are() {
+        let mut picture = icon();
+        picture.is_picture = true;
+        let bgra = picture.render(2, 2, [None; 4], None);
+        // Pixel 0: red 0, green 255, blue 0, alpha 255.
+        assert_eq!(&bgra[0..4], &[0, 255, 0, 255]);
+        assert_eq!(picture.shrunk(1).width, 1);
     }
 }

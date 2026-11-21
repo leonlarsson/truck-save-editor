@@ -33,6 +33,8 @@ pub struct GameIconView {
     colours: [Option<Hsla>; 4],
     backdrop: Option<Hsla>,
     opacity: f32,
+    /// Corner radius, for pictures (faces); icons keep their own shape.
+    corner_radius: Option<gpui_kit::Pixels>,
 }
 
 impl GameIconView {
@@ -43,6 +45,7 @@ impl GameIconView {
             colours: [None; 4],
             backdrop: None,
             opacity: 1.,
+            corner_radius: None,
         }
     }
 
@@ -64,6 +67,12 @@ impl GameIconView {
     /// Paints the dark panel the game draws this icon on, in the icon's shape.
     pub fn backdrop(mut self, colour: Hsla) -> Self {
         self.backdrop = Some(colour);
+        self
+    }
+
+    /// Rounds the picture's corners.
+    pub fn rounded(mut self, radius: gpui_kit::Pixels) -> Self {
+        self.corner_radius = Some(radius);
         self
     }
 
@@ -119,7 +128,14 @@ impl RenderOnce for GameIconView {
             .flex_shrink_0()
             .opacity(self.opacity);
         match image {
-            Some(image) => frame.child(img(image).size_full()),
+            Some(image) => {
+                let image = img(image).size_full();
+                let image = match self.corner_radius {
+                    Some(radius) => image.rounded(radius),
+                    None => image,
+                };
+                frame.child(image)
+            }
             None => frame,
         }
     }

@@ -322,11 +322,17 @@ impl TruckTable {
         match column {
             TruckColumn::Truck => name.clone(),
             TruckColumn::Plate => truck.plate.clone().into(),
-            TruckColumn::Garage => truck
-                .garage_city
-                .as_deref()
-                .map(|city| SharedString::from(game_data::city_name(cx, city)))
-                .unwrap_or_else(|| t!(cx, "no-garage")),
+            // Coaches have no garage: they're driven, or parked in a city.
+            TruckColumn::Garage => {
+                match (&truck.garage_city, truck.is_in_use, &truck.parked_city) {
+                    (Some(city), _, _) => game_data::city_name(cx, city).into(),
+                    (None, true, _) => t!(cx, "vehicle-in-use"),
+                    (None, false, Some(city)) => {
+                        t!(cx, "vehicle-parked", city = game_data::city_name(cx, city))
+                    }
+                    (None, false, None) => t!(cx, "no-garage"),
+                }
+            }
             TruckColumn::Odometer => t!(cx, "distance-km", amount = thousands(truck.odometer_km)),
             // Rounded down, so only a full tank says 100%. Trailers have none.
             TruckColumn::Fuel => truck
@@ -406,7 +412,9 @@ impl TableDelegate for TruckTable {
         let row = self.trucks.get(row_ix);
         let truck = row.map(|row| &row.vehicle);
         let is_muted = match column {
-            TruckColumn::Garage => truck.is_some_and(|truck| truck.garage_city.is_none()),
+            TruckColumn::Garage => truck.is_some_and(|truck| {
+                truck.garage_city.is_none() && !truck.is_in_use && truck.parked_city.is_none()
+            }),
             TruckColumn::Wear => truck.is_some_and(|truck| truck.wear.worst() == 0.0),
             _ => false,
         };

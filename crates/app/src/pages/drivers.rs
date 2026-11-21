@@ -10,7 +10,7 @@ use gpui_kit::component::{
 };
 use gpui_kit::{
     App, AppContext as _, Context, Entity, IntoElement, ParentElement as _, Render, SharedString,
-    Styled as _, Subscription, Window, div,
+    Styled as _, Subscription, Window, div, rems,
 };
 use save::{Driver, Skills};
 
@@ -19,7 +19,7 @@ use crate::game_data;
 use crate::i18n::t;
 use crate::labels::ADR_CLASS_COUNT;
 use crate::session::Session;
-use crate::ui::{FilterBar, FilterChanged};
+use crate::ui::{FilterBar, FilterChanged, GameIconView};
 
 pub struct DriversPage {
     session: Entity<Session>,
@@ -240,7 +240,7 @@ impl TableDelegate for DriverTable {
     fn column(&self, col_ix: usize, cx: &App) -> Column {
         match DriverColumn::ALL.get(col_ix) {
             Some(DriverColumn::Hometown) => Column::new("hometown", t!(cx, "column-hometown"))
-                .width(170.)
+                .width(200.)
                 .sortable(),
             Some(DriverColumn::Location) => Column::new("location", t!(cx, "column-location"))
                 .width(170.)
@@ -285,7 +285,33 @@ impl TableDelegate for DriverTable {
             .get(col_ix)
             .copied()
             .unwrap_or(DriverColumn::Hometown);
-        div().child(self.text(row_ix, column, cx))
+        let text = self.text(row_ix, column, cx);
+        if column != DriverColumn::Hometown {
+            return div().child(text).into_any_element();
+        }
+        // The driver's face from the game, in a slot of its own so
+        // rows line up while faces load.
+        let face = self
+            .drivers
+            .get(row_ix)
+            .and_then(|driver| game_data::driver_face(cx, &driver.id));
+        h_flex()
+            .gap_2()
+            .items_center()
+            .child(
+                div()
+                    .size(rems(1.6))
+                    .flex_shrink_0()
+                    .rounded(cx.theme().radius)
+                    .bg(cx.theme().muted)
+                    .children(
+                        face.map(|face| {
+                            GameIconView::new(face).size(1.6).rounded(cx.theme().radius)
+                        }),
+                    ),
+            )
+            .child(text)
+            .into_any_element()
     }
 
     fn cell_label(&self, row_ix: usize, col_ix: usize, cx: &App) -> Option<SharedString> {

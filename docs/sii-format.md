@@ -162,3 +162,8 @@ Saves can hold tokens for cities that no longer have one (a leftover from an old
 - Owned trailers are `player.trailers[]`, each a `trailer` unit: `trailer_definition` (a `trailer_def` with `body_type`, `axles`, `chain_type`), `license_plate`, `odometer`, and wear in `trailer_body_wear`, `chassis_wear` and `wheels_wear` (each with an `_unfixable` part the garage can't repair). A double or B-double links its next trailer through `slave_trailer` (`null` at the end); `player.trailers[]` lists only the first. A garage lists the trailers kept there in `trailers[]`.
 - The trailer's model is the accessory whose `data_path` is `/def/vehicle/trailer_owned/<brand.model>/data.sii`. SCS's own trailers have no brand text and a terse series (`STD`), so the editor names them by body type (the text key is the `body_type` token: `refrigerated` → "Refrigerated").
 - A truck's or coach's fuel is `fuel_relative`, from 0 to 1 of its tank, whatever the tank's size.
+
+## Where vehicles are, and drivers' faces
+
+- Trucks and trailers live in garages (`garage.vehicles[]`, `garage.trailers[]`). Coaches have no garage. The player has one own vehicle slot per mode in `player.my_vehicles[]` (`player_vehicles` units: `vehicle`, `stored_vehicle_city`, where it's parked while another mode is in use), and `player.assigned_vehicles` is the one being driven now.
+- Hired drivers are `driver_ai : driver.<n>` units with no name field. Their face is the game's `material/ui/driver/<n>.mat` (a plain 256×256 picture). The game reads names from `/locale/<lang>/driver_names.sii` when there is one; 1.62 ships none.

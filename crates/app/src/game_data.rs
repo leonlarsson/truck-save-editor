@@ -1,8 +1,8 @@
 //! The installed game's own data (level tables, rank names, city names, icons), loaded in the background
 //! at startup. Until it arrives, or if the game isn't found, the app uses built-in fallbacks.
 
-use std::collections::BTreeSet;
-use std::sync::Arc;
+use std::collections::{BTreeSet, HashMap};
+use std::sync::{Arc, Mutex};
 
 use gamedata::{GameData, GameIcon};
 use gpui_kit::{App, AppContext as _, Context, Global, Subscription, Window};
@@ -125,4 +125,58 @@ pub fn observe_in<V: 'static>(
     on_loaded: impl Fn(&mut V, &mut Window, &mut Context<V>) + 'static,
 ) -> Subscription {
     cx.observe_global_in::<Loaded>(window, on_loaded)
+}
+
+/// Drivers' faces, loaded one by one as they're first shown (there are hundreds, and a page shows
+/// a few dozen), each shrunk to a small copy so a big company doesn't cost much memory.
+#[derive(Default)]
+struct Faces {
+    /// `base.scs`, opened once on first use, shared with the background loads.
+    archive: Arc<Mutex<Option<hashfs::Archive>>>,
+    /// By face number: the face, or `None` while loading or if the game has none.
+    loaded: HashMap<u32, Option<Arc<GameIcon>>>,
+}
+
+impl Global for Faces {}
+
+/// The pixel size faces are kept at: sharp at 2× for the table's 1.6rem.
+const FACE_PIXELS: u32 = 64;
+
+/// A hired driver's face (`driver.59` → the game's face 59). The first ask starts loading it in
+/// the background and returns `None`; the window redraws when it's there.
+pub fn driver_face(cx: &mut App, driver_id: &str) -> Option<Arc<GameIcon>> {
+    let number: u32 = driver_id.strip_prefix("driver.")?.parse().ok()?;
+    if !cx.has_global::<Faces>() {
+        cx.set_global(Faces::default());
+    }
+    if let Some(face) = cx.global::<Faces>().loaded.get(&number) {
+        return face.clone();
+    }
+    let install_dir = data(cx)?.install_dir.clone();
+    let faces = cx.global_mut::<Faces>();
+    faces.loaded.insert(number, None);
+    let archive = faces.archive.clone();
+    cx.spawn(async move |cx| {
+        let face = cx
+            .background_spawn(async move {
+                // A poisoned lock only means an earlier load panicked; the archive is still fine.
+                let mut archive = archive
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                if archive.is_none() {
+                    *archive = hashfs::Archive::open(install_dir.join("base.scs")).ok();
+                }
+                let archive = archive.as_mut()?;
+                let name = number.to_string();
+                GameIcon::load(archive, "/material/ui/driver", &name)
+                    .map(|face| Arc::new(face.shrunk(FACE_PIXELS)))
+            })
+            .await;
+        cx.update(|cx| {
+            cx.global_mut::<Faces>().loaded.insert(number, face);
+            cx.refresh_windows();
+        });
+    })
+    .detach();
+    None
 }
