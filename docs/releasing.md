@@ -24,7 +24,7 @@ To try the whole thing without releasing, run the workflow by hand (Actions → 
 
 ## Repository settings
 
-- **Immutable releases** (Settings → General → Releases): once published, a release's files and tag can't be changed or deleted, and GitHub attests the release itself. The draft-then-publish flow above works with it.
+- **Immutable releases** are on (Settings → General → Releases, turned on 2026-11-22): once published, a release's files and tag can't be changed or deleted, and GitHub attests the release itself. A draft can still be edited, replaced or deleted, so try it before publishing. A published release with a mistake is fixed by a new version (0.1.1), never by replacing files; its tag can't be used again.
 
 ## Code signing
 
