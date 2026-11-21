@@ -38,8 +38,9 @@ Tools are managed by [mise](https://mise.jdx.dev/) (`mise.toml`). The Windows bu
 | `mise run fmt` | Format everything |
 | `mise run app` | Run the desktop app in WSL (WSLg, software rendering: slow, fine for checking looks) |
 | `mise run win` / `mise run win-run` | Build the Windows `.exe` on Windows, driven from WSL (`scripts/windows.sh`), and start it |
+| `mise run release-notes` | Preview the next release's notes, drafted from the commits (`cliff.toml`) |
 
-Before finishing a change, run `mise run check`, and add or update tests for what changed. CI (`.github/workflows/ci.yml`) checks the save-format crates on Linux and builds and tests the app on Windows on every push; each build's `.exe` is downloadable from the run. `.github/workflows/release.yml` builds a version tag (`v*`) into a draft release for the owner to publish; tags and releases are the owner's call. `.github/workflows/game-update.yml` checks weekly for a new game version (`scripts/check-game-update.sh`) and opens an issue with the checklist.
+Before finishing a change, run `mise run check`, and add or update tests for what changed. CI (`.github/workflows/ci.yml`) checks the save-format crates on Linux and builds and tests the app on Windows on every push; each build's `.exe` is downloadable from the run. `.github/workflows/release.yml` builds a version tag (`v*`) into a draft release for the owner to publish (steps in `docs/releasing.md`; `mise run release-notes` previews the notes); tags and releases are the owner's call. `.github/workflows/game-update.yml` checks weekly for a new game version (`scripts/check-game-update.sh`) and opens an issue with the checklist.
 
 ## Layout
 
@@ -66,7 +67,7 @@ Dependencies point downward: `app` → `gamedata` → `save` → `sii`, and `gam
 - **`gpui-kit` is the only UI dependency, pinned to an exact version** (`=0.10.0`; it pins the matching GPUI itself). Its API changes between releases (they come weekly). Learn it from the skills, examples and source *for the pinned version*, not from memory or blog posts. Upgrading is a change of its own, and copies the skills again from the matching tag.
 - **Clear over clever.** The owner is learning Rust alongside this project. Prefer plain code to macro tricks, write types out where they help reading, and comment the *why* (including Rust-specific whys, like a borrow that forces a clone).
 - Names say what they hold. Booleans read as statements: `is_running`, `has_loans`, `needs_backup`.
-- The product name lives in one constant, `APP_NAME`. Never hard-code it elsewhere.
+- The product name is written in one place, `PRODUCT_NAME` in `crates/app/build.rs`; code reads it as `APP_NAME`, and the Windows .exe carries it in its details. Never hard-code it elsewhere.
 
 ## The save model
 

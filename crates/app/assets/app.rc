@@ -1,3 +1,0 @@
-// The app icon: resource 1 is the one GPUI loads for its windows on Windows, and Explorer
-// shows the first icon resource for the .exe.
-1 ICON "icon.ico"

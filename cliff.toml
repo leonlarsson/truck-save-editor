@@ -1,0 +1,30 @@
+# Release notes from the commit history (git-cliff): the draft each release starts from. Commits
+# use conventional prefixes; only the ones players notice make the notes. The owner edits the
+# draft before publishing.
+
+[changelog]
+header = ""
+body = """
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | striptags | trim }}
+{% for commit in commits %}
+- {{ commit.message | upper_first }}\
+{% endfor %}
+{% endfor %}
+"""
+trim = true
+footer = ""
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+split_commits = false
+commit_parsers = [
+  { message = "^feat", group = "<!-- 0 -->New" },
+  { message = "^fix", group = "<!-- 1 -->Fixed" },
+  { message = "^polish", group = "<!-- 2 -->Polished" },
+  # docs, chore, refactor, test, ci: not in the notes.
+  { message = ".*", skip = true },
+]
+tag_pattern = "v[0-9].*"
+sort_commits = "oldest"

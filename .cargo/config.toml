@@ -1,0 +1,5 @@
+# The Windows .exe carries the C runtime inside it (as Zed's does), so it starts on any Windows 10
+# or 11, with or without the Visual C++ Redistributable installed. Without this it needs
+# VCRUNTIME140.dll, and fails to start where that's missing.
+[target.'cfg(all(windows, target_env = "msvc"))']
+rustflags = ["-C", "target-feature=+crt-static"]

@@ -1,6 +1,8 @@
 [tools]
 # Keep the Rust version in step with rust-toolchain.toml (used by the Windows build).
 rust = { version = "1.100.0", components = "clippy,rustfmt" }
+# Release notes from the commits (cliff.toml); the release workflow uses the same version.
+git-cliff = "2.14.2"
 
 [env]
 # Real save files used as test fixtures (personal data, never commit)
@@ -33,3 +35,7 @@ run = "scripts/windows.sh build"
 [tasks.win-run]
 description = "Build the Windows .exe and start it"
 run = "scripts/windows.sh run"
+
+[tasks.release-notes]
+description = "Preview the next release's notes, written from the commits since the last tag"
+run = "git-cliff --unreleased --strip all"

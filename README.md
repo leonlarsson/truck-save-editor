@@ -19,6 +19,10 @@ A save editor for **Euro Truck Simulator 2** and **American Truck Simulator**: f
 
 Built in Rust with [GPUI](https://www.gpui.rs/) through [GPUI Kit](https://gpui-kit.com). Windows first; ETS2 first, then ATS.
 
+## Download
+
+Get the latest version from [Releases](https://github.com/leonlarsson/truck-save-editor/releases): unzip it and run `truck-save-editor.exe` (Windows 10 or 11, nothing to install). It isn't code-signed yet, so Windows may show "Windows protected your PC" at first: choose **More info**, then **Run anyway**. Each release lists checksums, and its files can be checked with `gh attestation verify` (see the release notes).
+
 ## Staying compatible
 
 Game updates have broken other editors. This one keeps every part of a save it doesn't understand exactly as it was, stops instead of guessing at anything new, and checks every week whether the game has updated. How, and why, is in [`docs/compatibility.md`](docs/compatibility.md).

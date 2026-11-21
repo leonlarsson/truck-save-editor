@@ -21,8 +21,9 @@ use gpui_kit::{AppContext as _, Bounds, TitlebarOptions, WindowBounds, WindowOpt
 
 use crate::workspace::Workspace;
 
-/// The product name. Never hard-code it anywhere else.
-pub const APP_NAME: &str = "Truck Save Editor";
+/// The product name, from `build.rs` (which also puts it in the Windows .exe's details). Never
+/// hard-code it anywhere else.
+pub const APP_NAME: &str = env!("APP_NAME");
 
 /// Every keyboard shortcut, in one place, and the app-wide handlers for the ones that work
 /// everywhere (Undo, Redo).
