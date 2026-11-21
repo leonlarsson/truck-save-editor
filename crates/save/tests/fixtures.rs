@@ -35,6 +35,23 @@ fn real_saves_have_a_career_and_a_fleet() {
                 .all(|truck| (0.0..=1.0).contains(&truck.wear.worst()))
         );
 
+        // Every field the editor writes is there.
+        assert_eq!(
+            save::missing_edited_fields(&slot.game),
+            Vec::<(&str, &str)>::new(),
+            "{}: fields the editor writes are missing",
+            dir.display()
+        );
+
+        // Every truck's wear is in a format the editor knows.
+        assert!(
+            trucks
+                .iter()
+                .all(|truck| save::wear_is_known(&slot.game, &truck.id)),
+            "{}: a truck's wear is in an unknown format",
+            dir.display()
+        );
+
         // Writing the unchanged career back leaves the save exactly as it was.
         let before = sii::to_text(&slot.game);
         career.write(&mut slot.game).expect("writes");

@@ -18,7 +18,7 @@ mod time;
 
 pub use career::{ADR_ALL, Career, MAX_SKILL_LEVEL, Skills};
 pub use error::{Error, Result};
-pub use fleet::{Truck, Wear, model_display_name, repair, trucks};
+pub use fleet::{Truck, Wear, model_display_name, repair, trucks, wear_is_known};
 pub use game::Game;
 pub use info::{SlotInfo, read_info, update_info};
 #[cfg(feature = "native")]
@@ -30,6 +30,37 @@ pub use profiles::{
 pub use store::{Backup, LoadedSlot, back_up, backups, is_game_running, load, restore, save};
 #[cfg(feature = "native")]
 pub use time::{utc_parts, utc_timestamp};
+
+/// The newest save format version (`version` in `info.sii`) the editor has been tested with.
+/// Newer saves still open, with a warning (see `docs/compatibility.md`).
+pub const NEWEST_TESTED_SAVE_VERSION: i64 = 105;
+
+/// Every career field the editor writes, by unit kind. (Truck wear comes in two formats; see
+/// `wear_is_known`.) If a game update renames or removes one, editing
+/// it must stop: `missing_edited_fields` finds them, and the fixture tests check every save.
+pub const EDITED_FIELDS: &[(&str, &str)] = &[
+    ("bank", "money_account"),
+    ("economy", "experience_points"),
+    ("economy", "adr"),
+    ("economy", "long_dist"),
+    ("economy", "heavy"),
+    ("economy", "fragile"),
+    ("economy", "urgent"),
+    ("economy", "mechanical"),
+    ("player", "hq_city"),
+];
+
+/// Edited fields the save doesn't have (for kinds it has at least one unit of).
+pub fn missing_edited_fields(document: &sii::Document) -> Vec<(&'static str, &'static str)> {
+    EDITED_FIELDS
+        .iter()
+        .copied()
+        .filter(|(kind, field)| {
+            let mut units = document.units_of_kind(kind).peekable();
+            units.peek().is_some() && !units.any(|unit| unit.get(field).is_some())
+        })
+        .collect()
+}
 
 /// Turns a city token into a name to show: `berlin` → `Berlin`, `la_coruna` → `La Coruna`.
 /// (The game's own names, with accents, come from its files; this is the fallback.)

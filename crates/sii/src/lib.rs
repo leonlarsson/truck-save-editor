@@ -16,6 +16,7 @@
 mod bsii;
 mod document;
 mod error;
+pub mod inventory;
 mod scsc;
 mod text;
 pub mod token;

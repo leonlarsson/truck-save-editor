@@ -90,12 +90,6 @@ pub fn trucks(document: &Document) -> Vec<Truck> {
         .iter()
         .filter_map(|id| document.unit(id))
         .map(|vehicle| {
-            let float = |field: &str| {
-                vehicle
-                    .single(field)
-                    .and_then(value::parse_f32)
-                    .unwrap_or(0.0)
-            };
             let (plate, plate_country) = split_plate(vehicle.single("license_plate").unwrap_or(""));
             Truck {
                 id: vehicle.id.clone(),
@@ -106,17 +100,7 @@ pub fn trucks(document: &Document) -> Vec<Truck> {
                     .single("odometer")
                     .and_then(value::parse_i64)
                     .unwrap_or(0),
-                wear: Wear {
-                    engine: float("engine_wear"),
-                    transmission: float("transmission_wear"),
-                    cabin: float("cabin_wear"),
-                    chassis: float("chassis_wear"),
-                    wheels: vehicle
-                        .items("wheels_wear")
-                        .iter()
-                        .filter_map(|text| value::parse_f32(text))
-                        .fold(0.0, f32::max),
-                },
+                wear: read_wear(document, vehicle),
                 garage_city: garage_of.get(vehicle.id.as_str()).cloned(),
                 driver: driver_of.get(vehicle.id.as_str()).cloned(),
             }
@@ -127,6 +111,24 @@ pub fn trucks(document: &Document) -> Vec<Truck> {
 /// Repairs a truck: all wear the game's garage can fix goes to zero. With `including_permanent`,
 /// the wear a garage can't fix goes too, making it like new.
 pub fn repair(document: &mut Document, truck_id: &str, including_permanent: bool) -> bool {
+    let Some(vehicle) = document.unit(truck_id) else {
+        return false;
+    };
+    if vehicle.get("engine_wear").is_none() {
+        // The older format: each part (accessory) holds its own `wear`.
+        let parts: Vec<String> = vehicle.items("accessories").to_vec();
+        let mut repaired = false;
+        for part in parts {
+            if let Some(mut accessory) = document.unit_mut(&part)
+                && accessory.get("wear").is_some()
+            {
+                accessory.set("wear", Value::single("0"));
+                repaired = true;
+            }
+        }
+        return repaired;
+    }
+
     let Some(mut vehicle) = document.unit_mut(truck_id) else {
         return false;
     };
@@ -150,6 +152,73 @@ pub fn repair(document: &mut Document, truck_id: &str, including_permanent: bool
         }
     }
     true
+}
+
+/// A truck's wear, in either format the game has used:
+/// - current: `engine_wear`, `transmission_wear`, `cabin_wear`, `chassis_wear` and `wheels_wear[]`
+///   on the vehicle;
+/// - older (until about 2021): a `wear` on each part's accessory, the part told by its
+///   definition path (`…/engine/…`), and on each wheel accessory.
+fn read_wear(document: &Document, vehicle: &sii::Unit) -> Wear {
+    let float = |unit: &sii::Unit, field: &str| {
+        unit.single(field).and_then(value::parse_f32).unwrap_or(0.0)
+    };
+    if vehicle.get("engine_wear").is_some() {
+        return Wear {
+            engine: float(vehicle, "engine_wear"),
+            transmission: float(vehicle, "transmission_wear"),
+            cabin: float(vehicle, "cabin_wear"),
+            chassis: float(vehicle, "chassis_wear"),
+            wheels: vehicle
+                .items("wheels_wear")
+                .iter()
+                .filter_map(|text| value::parse_f32(text))
+                .fold(0.0, f32::max),
+        };
+    }
+
+    let mut wear = Wear::default();
+    for accessory in vehicle
+        .items("accessories")
+        .iter()
+        .filter_map(|id| document.unit(id))
+    {
+        let Some(part_wear) = accessory.single("wear").and_then(value::parse_f32) else {
+            continue;
+        };
+        let path = accessory
+            .single("data_path")
+            .map(value::parse_string)
+            .unwrap_or_default();
+        let slot = if accessory.kind == "vehicle_wheel_accessory" {
+            &mut wear.wheels
+        } else if path.contains("/engine/") {
+            &mut wear.engine
+        } else if path.contains("/transmission/") {
+            &mut wear.transmission
+        } else if path.contains("/cabin/") {
+            &mut wear.cabin
+        } else if path.contains("/chassis/") {
+            &mut wear.chassis
+        } else {
+            continue;
+        };
+        *slot = slot.max(part_wear);
+    }
+    wear
+}
+
+/// Whether a truck's wear is in a format the editor knows (see `read_wear`).
+pub fn wear_is_known(document: &Document, truck_id: &str) -> bool {
+    let Some(vehicle) = document.unit(truck_id) else {
+        return false;
+    };
+    vehicle.get("engine_wear").is_some()
+        || vehicle
+            .items("accessories")
+            .iter()
+            .filter_map(|id| document.unit(id))
+            .any(|accessory| accessory.get("wear").is_some())
 }
 
 fn player(document: &Document) -> Option<&sii::Unit> {
@@ -264,6 +333,21 @@ mod tests {
         let vehicle = document.unit("_nameless.10").expect("vehicle");
         assert_eq!(vehicle.single("engine_wear_unfixable"), Some("0"));
         assert!(!repair(&mut document, "nope", false));
+    }
+
+    const OLDER_SAVE: &str = "SiiNunit\r\n{\r\neconomy : e {\r\n player: p\r\n}\r\n\r\nplayer : p {\r\n trucks: 1\r\n trucks[0]: _nameless.10\r\n}\r\n\r\nvehicle : _nameless.10 {\r\n accessories: 3\r\n accessories[0]: _nameless.11\r\n accessories[1]: _nameless.12\r\n accessories[2]: _nameless.13\r\n odometer: 500\r\n}\r\n\r\nvehicle_accessory : _nameless.11 {\r\n wear: &3e800000\r\n data_path: \"/def/vehicle/truck/scania.r/engine/dc16.sii\"\r\n}\r\n\r\nvehicle_wheel_accessory : _nameless.12 {\r\n wear: &3e4ccccd\r\n data_path: \"/def/vehicle/t_wheel/plain.sii\"\r\n}\r\n\r\nvehicle_accessory : _nameless.13 {\r\n wear: 0\r\n data_path: \"/def/vehicle/truck/scania.r/data.sii\"\r\n}\r\n\r\n}\r\n";
+
+    #[test]
+    fn reads_and_repairs_wear_in_the_older_format() {
+        let mut document = sii::parse_text(OLDER_SAVE).expect("parses");
+        assert!(wear_is_known(&document, "_nameless.10"));
+        let truck = &trucks(&document)[0];
+        assert_eq!(truck.wear.engine, 0.25);
+        assert_eq!(truck.wear.wheels, 0.2);
+        assert_eq!(truck.wear.worst(), 0.25);
+
+        assert!(repair(&mut document, "_nameless.10", false));
+        assert_eq!(trucks(&document)[0].wear.worst(), 0.0);
     }
 
     #[test]
