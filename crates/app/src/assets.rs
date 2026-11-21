@@ -15,6 +15,7 @@ gpui_kit::assets::icon_assets!(
         FolderOpen,
         FlaskConical,
         Gauge,
+        ArchiveRestore,
         Map,
         Moon,
         Save,

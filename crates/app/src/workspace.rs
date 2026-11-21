@@ -133,6 +133,116 @@ impl Workspace {
         });
     }
 
+    /// Shows the open slot's backups, newest first, each with Restore.
+    fn open_backups(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(opened) = &self.opened else {
+            return;
+        };
+        let session = opened.session.clone();
+        let (profile_folder, slot_folder) = {
+            let session = session.read(cx);
+            (session.profile_folder(), session.slot().folder.clone())
+        };
+        let backups = backups_root()
+            .map(|root| save::backups(&root, &profile_folder, &slot_folder))
+            .unwrap_or_default();
+        let this = cx.entity().downgrade();
+
+        window.open_sheet(cx, move |sheet, _, cx| {
+            let rows = backups.iter().enumerate().map(|(index, backup)| {
+                let made = std::fs::metadata(&backup.dir)
+                    .and_then(|m| m.modified())
+                    .map(|time| labels::ago(cx, time))
+                    .unwrap_or_default();
+                let restore = backup.clone();
+                let reveal = backup.dir.clone();
+                let this = this.clone();
+                let session = session.clone();
+                h_flex()
+                    .justify_between()
+                    .gap_3()
+                    .py_2()
+                    .border_b_1()
+                    .border_color(cx.theme().border)
+                    .child(
+                        v_flex()
+                            .min_w_0()
+                            .child(div().text_sm().font_medium().child(made))
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(cx.theme().muted_foreground)
+                                    .child(t!(cx, "backup-made-at", time = &backup.made_at)),
+                            ),
+                    )
+                    .child(
+                        h_flex()
+                            .gap_1()
+                            .child(
+                                Button::new(("reveal-backup", index))
+                                    .ghost()
+                                    .small()
+                                    .icon(Icon::new(IconName::FolderOpen))
+                                    .tooltip(t!(cx, "backup-show"))
+                                    .on_click(move |_, _, cx| cx.reveal_path(&reveal)),
+                            )
+                            .child(
+                                Button::new(("restore-backup", index))
+                                    .outline()
+                                    .small()
+                                    .label(t!(cx, "backup-restore"))
+                                    .on_click(move |_, window, cx| {
+                                        confirm_restore(
+                                            this.clone(),
+                                            session.clone(),
+                                            restore.clone(),
+                                            window,
+                                            cx,
+                                        );
+                                    }),
+                            ),
+                    )
+            });
+            let body = if backups.is_empty() {
+                v_flex()
+                    .gap_2()
+                    .child(div().text_sm().font_medium().child(t!(cx, "backups-none")))
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(cx.theme().muted_foreground)
+                            .child(t!(cx, "backups-none-body")),
+                    )
+                    .into_any_element()
+            } else {
+                v_flex().children(rows).into_any_element()
+            };
+            sheet.title(t!(cx, "backups")).size(px(420.)).child(
+                v_flex()
+                    .gap_4()
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(cx.theme().muted_foreground)
+                            .child(t!(cx, "backups-intro")),
+                    )
+                    .child(body),
+            )
+        });
+    }
+
+    /// Opens a slot again from disk (after restoring a backup into it).
+    fn reopen(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(opened) = self.opened.take() else {
+            return;
+        };
+        let (profile, slot) = {
+            let session = opened.session.read(cx);
+            (session.profile().clone(), session.slot().clone())
+        };
+        self.open(profile, slot, window, cx);
+    }
+
     /// Back to the start screen. Unsaved changes are asked about first.
     fn close(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(opened) = &self.opened else {
@@ -328,12 +438,28 @@ impl Workspace {
                     .w_full()
                     .justify_between()
                     .child(
-                        Button::new("switch-save")
-                            .ghost()
-                            .small()
-                            .icon(Icon::new(IconName::FolderOpen))
-                            .label(t!(cx, "switch-save"))
-                            .on_click(cx.listener(|this, _, window, cx| this.close(window, cx))),
+                        h_flex()
+                            .gap_1()
+                            .child(
+                                Button::new("switch-save")
+                                    .ghost()
+                                    .small()
+                                    .icon(Icon::new(IconName::FolderOpen))
+                                    .label(t!(cx, "switch-save"))
+                                    .on_click(
+                                        cx.listener(|this, _, window, cx| this.close(window, cx)),
+                                    ),
+                            )
+                            .child(
+                                Button::new("backups")
+                                    .ghost()
+                                    .small()
+                                    .icon(Icon::new(IconName::ArchiveRestore))
+                                    .tooltip(t!(cx, "backups"))
+                                    .on_click(cx.listener(|this, _, window, cx| {
+                                        this.open_backups(window, cx)
+                                    })),
+                            ),
                     )
                     .child(
                         Button::new("toggle-theme")
@@ -601,6 +727,94 @@ fn start_save_as_new_slot(session: Entity<Session>, window: &mut Window, cx: &mu
                         cx,
                     );
                 }
+            });
+        })
+        .detach();
+}
+
+/// Asks before restoring a backup (what's in the slot now is backed up first, and unsaved changes
+/// are dropped), then restores it in the background and opens the slot again.
+fn confirm_restore(
+    workspace: gpui_kit::WeakEntity<Workspace>,
+    session: Entity<Session>,
+    backup: save::Backup,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    let (name, changes) = {
+        let session = session.read(cx);
+        (
+            labels::slot_name(cx, session.slot()),
+            session.change_count(),
+        )
+    };
+    window.open_alert_dialog(cx, move |alert, _, cx| {
+        let workspace = workspace.clone();
+        let session = session.clone();
+        let backup = backup.clone();
+        alert
+            .title(t!(cx, "restore-title", name = &name))
+            .description(t!(cx, "restore-body", changes = changes))
+            .confirm()
+            .ok_text(t!(cx, "backup-restore"))
+            .on_ok(move |_, window, cx| {
+                start_restore(
+                    workspace.clone(),
+                    session.clone(),
+                    backup.clone(),
+                    window,
+                    cx,
+                );
+                true
+            })
+    });
+}
+
+fn start_restore(
+    workspace: gpui_kit::WeakEntity<Workspace>,
+    session: Entity<Session>,
+    backup: save::Backup,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    let Some(root) = backups_root() else {
+        return;
+    };
+    let (game, profile_folder, slot_dir, name) = {
+        let session = session.read(cx);
+        (
+            session.game(),
+            session.profile_folder(),
+            session.slot().dir.clone(),
+            labels::slot_name(cx, session.slot()),
+        )
+    };
+    window
+        .spawn(cx, async move |cx| {
+            let result = cx
+                .background_spawn(async move {
+                    save::restore(game, &backup, &slot_dir, &root, &profile_folder)
+                })
+                .await;
+            let _ = cx.update(|window, cx| match result {
+                Ok(_) => {
+                    window.close_sheet(cx);
+                    let _ = workspace.update(cx, |workspace, cx| workspace.reopen(window, cx));
+                    window.push_notification(
+                        Notification::new()
+                            .with_type(NotificationType::Success)
+                            .title(t!(cx, "restored-title", name = &name))
+                            .message(t!(cx, "restored-body")),
+                        cx,
+                    );
+                }
+                Err(error) => window.push_notification(
+                    Notification::new()
+                        .with_type(NotificationType::Error)
+                        .title(t!(cx, "restore-failed", name = &name))
+                        .message(error.to_string()),
+                    cx,
+                ),
             });
         })
         .detach();

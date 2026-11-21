@@ -110,6 +110,25 @@ saved-title = Saved “{ $name }”
 saved-backup = The old version is backed up in { $path }
 save-failed = Couldn't save “{ $name }”
 
+## Backups
+
+backups = Backups
+backups-intro = A backup of the slot is made every time you save, kept outside the game's folders. Restoring one backs up what's there now first, so it can be undone too.
+backups-none = No backups yet
+backups-none-body = One is made the first time you save this slot.
+backup-made-at = Made { $time } (UTC)
+backup-show = Show in folder
+backup-restore = Restore
+restore-title = Restore “{ $name }” from this backup?
+restore-body = { $changes ->
+    [0] What's in the slot now is backed up first.
+    [one] What's in the slot now is backed up first. Your unsaved change will be lost.
+   *[other] What's in the slot now is backed up first. Your { $changes } unsaved changes will be lost.
+}
+restored-title = Restored “{ $name }”
+restored-body = The slot is open again as it was in the backup.
+restore-failed = Couldn't restore “{ $name }”
+
 ## Overview
 
 amount-hint = Try 2.5m, 10k, +1m or -500k.
