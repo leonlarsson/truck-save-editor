@@ -101,7 +101,13 @@ impl Workspace {
     }
 
     /// Loads a slot in the background, then shows it.
-    fn open(&mut self, profile: Profile, slot: Slot, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn open(
+        &mut self,
+        profile: Profile,
+        slot: Slot,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if self.opening.is_some() {
             return;
         }
@@ -150,6 +156,12 @@ impl Workspace {
             map,
             _observe,
         });
+    }
+
+    /// The open save's session, if a save is open.
+    #[cfg(test)]
+    pub(crate) fn session(&self) -> Option<Entity<Session>> {
+        self.opened.as_ref().map(|opened| opened.session.clone())
     }
 
     /// Opens the command palette (only while a save is open: every command acts on it).

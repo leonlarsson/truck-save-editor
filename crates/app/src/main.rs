@@ -1,7 +1,5 @@
-//! Truck Save Editor: the desktop app.
-//!
-//! For now this is a design preview running on made-up data (`sample.rs`), to settle how the app
-//! looks and feels in GPUI before real saves load.
+//! Truck Save Editor: the desktop app. It finds the game's saves, opens one into a `Session`, and
+//! shows it in the `Workspace`: the pages, the sidebar and the header with the pending changes.
 
 mod assets;
 mod format;
@@ -12,6 +10,8 @@ mod pages;
 mod palette;
 mod quick_start;
 mod session;
+#[cfg(test)]
+mod tests;
 mod theme;
 mod ui;
 mod workspace;
@@ -23,6 +23,21 @@ use crate::workspace::Workspace;
 /// The product name. Never hard-code it anywhere else.
 pub const APP_NAME: &str = "Truck Save Editor";
 
+/// Every keyboard shortcut, in one place.
+pub fn bind_keys(cx: &mut gpui_kit::App) {
+    use gpui_kit::KeyBinding;
+    let workspace = Some(workspace::KEY_CONTEXT);
+    cx.bind_keys([
+        KeyBinding::new("ctrl-k", palette::OpenPalette, None),
+        KeyBinding::new("cmd-k", palette::OpenPalette, None),
+        KeyBinding::new("ctrl-z", workspace::Undo, workspace),
+        KeyBinding::new("cmd-z", workspace::Undo, workspace),
+        KeyBinding::new("ctrl-shift-z", workspace::Redo, workspace),
+        KeyBinding::new("ctrl-y", workspace::Redo, workspace),
+        KeyBinding::new("cmd-shift-z", workspace::Redo, workspace),
+    ]);
+}
+
 fn main() {
     gpui_kit::application()
         .with_assets(assets::AppAssets)
@@ -32,23 +47,7 @@ fn main() {
             i18n::init(cx);
             theme::init(cx);
             game_data::init(cx);
-            cx.bind_keys([
-                gpui_kit::KeyBinding::new("ctrl-k", palette::OpenPalette, None),
-                gpui_kit::KeyBinding::new("cmd-k", palette::OpenPalette, None),
-                gpui_kit::KeyBinding::new("ctrl-z", workspace::Undo, Some(workspace::KEY_CONTEXT)),
-                gpui_kit::KeyBinding::new("cmd-z", workspace::Undo, Some(workspace::KEY_CONTEXT)),
-                gpui_kit::KeyBinding::new(
-                    "ctrl-shift-z",
-                    workspace::Redo,
-                    Some(workspace::KEY_CONTEXT),
-                ),
-                gpui_kit::KeyBinding::new("ctrl-y", workspace::Redo, Some(workspace::KEY_CONTEXT)),
-                gpui_kit::KeyBinding::new(
-                    "cmd-shift-z",
-                    workspace::Redo,
-                    Some(workspace::KEY_CONTEXT),
-                ),
-            ]);
+            bind_keys(cx);
 
             let options = WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
