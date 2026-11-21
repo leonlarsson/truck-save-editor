@@ -218,6 +218,7 @@ name = "app"
 version = "0.1.0"
 dependencies = [
  "dirs 7.0.0",
+ "embed-resource",
  "fluent-bundle",
  "gamedata",
  "gpui-kit",

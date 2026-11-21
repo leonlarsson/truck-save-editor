@@ -27,3 +27,6 @@ gpui-kit = { workspace = true, features = ["test-support"] }
 
 [lints]
 workspace = true
+
+[build-dependencies]
+embed-resource = "3"

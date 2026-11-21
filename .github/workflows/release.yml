@@ -1,0 +1,36 @@
+# Builds the Windows app for a version tag (v0.1.0 …) and puts it in a DRAFT release, for the
+# owner to read over and publish by hand. Nothing is published by this workflow.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Windows release
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust (rust-toolchain.toml)
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test -p sii -p save -p hashfs -p gamedata -p app
+      - run: cargo build -p app --release
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory dist | Out-Null
+          Copy-Item target/release/truck-save-editor.exe dist/
+          Copy-Item LICENSE, THIRD_PARTY_NOTICES.md, README.md dist/
+          Compress-Archive -Path dist/* -DestinationPath "truck-save-editor-${{ github.ref_name }}-windows.zip"
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          gh release create "${{ github.ref_name }}" "truck-save-editor-${{ github.ref_name }}-windows.zip" `
+            --draft --generate-notes --title "Truck Save Editor ${{ github.ref_name }}"

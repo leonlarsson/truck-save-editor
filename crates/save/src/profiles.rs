@@ -108,9 +108,10 @@ pub fn find_profiles(game: Game) -> Vec<Profile> {
             });
         }
     }
-    // The same profile can be reached two ways (e.g. a symlinked Documents); keep one.
-    profiles.sort_by(|a, b| a.dir.cmp(&b.dir));
-    profiles.dedup_by(|a, b| a.dir == b.dir);
+    // The same profile can be reached two ways (a symlinked Documents, or Steam's folder written
+    // two ways: the registry says `c:/program files (x86)/steam`); keep one.
+    profiles.sort_by_key(|profile| same_place_key(&profile.dir));
+    profiles.dedup_by(|a, b| same_place_key(&a.dir) == same_place_key(&b.dir));
     profiles.sort_by_key(|profile| std::cmp::Reverse(profile.last_saved));
     profiles
 }
@@ -244,9 +245,21 @@ fn steam_dirs() -> Vec<PathBuf> {
         }
     }
     dirs.retain(|dir| dir.is_dir());
-    dirs.sort();
-    dirs.dedup();
+    dirs.sort_by_key(|dir| same_place_key(dir));
+    dirs.dedup_by(|a, b| same_place_key(a) == same_place_key(b));
     dirs
+}
+
+/// What tells two paths to the same folder apart from two folders: the resolved path (links,
+/// `..` and slashes worked out), and on Windows, whose paths ignore case, in one case.
+fn same_place_key(path: &Path) -> String {
+    let resolved = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let key = resolved.to_string_lossy().into_owned();
+    if cfg!(windows) {
+        key.to_lowercase()
+    } else {
+        key
+    }
 }
 
 #[cfg(test)]
