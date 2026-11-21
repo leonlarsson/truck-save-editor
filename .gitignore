@@ -1,0 +1,14 @@
+/target
+/fixtures
+
+# Save files and anything decoded from them (personal data)
+*.sii
+*.dec
+*.bsii
+*.bak-*
+
+# Local agent settings
+.claude/settings.local.json
+
+# Synthetic samples written for tests are fine to commit
+!crates/*/tests/samples/**

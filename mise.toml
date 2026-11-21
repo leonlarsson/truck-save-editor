@@ -1,0 +1,31 @@
+[tools]
+rust = { version = "1.100.0", components = "clippy,rustfmt", targets = "x86_64-pc-windows-msvc" }
+"github:rust-cross/cargo-xwin" = "latest"
+
+[env]
+# Real save files used as test fixtures (personal data, never commit)
+ETS2_FIXTURES = "{{config_root}}/fixtures"
+
+[tasks.check]
+description = "Format check, Clippy (warnings are errors) and all tests"
+run = [
+  "cargo fmt --all --check",
+  "cargo clippy --workspace --all-targets -- -D warnings",
+  "cargo test --workspace",
+]
+
+[tasks.test]
+description = "Run all tests"
+run = "cargo test --workspace"
+
+[tasks.fmt]
+description = "Format everything"
+run = "cargo fmt --all"
+
+[tasks.app]
+description = "Run the desktop app in WSL (WSLg)"
+run = "cargo run -p app"
+
+[tasks.win]
+description = "Build the Windows .exe from WSL"
+run = "cargo xwin build --release --target x86_64-pc-windows-msvc -p app"
