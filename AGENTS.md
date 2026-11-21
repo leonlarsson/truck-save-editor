@@ -39,7 +39,7 @@ Tools are managed by [mise](https://mise.jdx.dev/) (`mise.toml`). The Windows bu
 | `mise run app` | Run the desktop app in WSL (WSLg, software rendering: slow, fine for checking looks) |
 | `mise run win` / `mise run win-run` | Build the Windows `.exe` on Windows, driven from WSL (`scripts/windows.sh`), and start it |
 
-Before finishing a change, run `mise run check`, and add or update tests for what changed.
+Before finishing a change, run `mise run check`, and add or update tests for what changed. CI (`.github/workflows/ci.yml`) checks the save-format crates on Linux and builds and tests the app on Windows on every push; each build's `.exe` is downloadable from the run. `.github/workflows/game-update.yml` checks weekly for a new game version (`scripts/check-game-update.sh`) and opens an issue with the checklist.
 
 ## Layout
 

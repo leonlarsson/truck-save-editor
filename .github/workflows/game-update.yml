@@ -1,0 +1,21 @@
+name: Game update check
+
+# Weekly: is there a game version newer than the one the editor was last verified with?
+# If so, opens an issue with the checklist (scripts/check-game-update.sh, docs/compatibility.md).
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: scripts/check-game-update.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
