@@ -4,7 +4,7 @@ Guide for AI agents (and humans) working in this repo.
 
 ## What this is
 
-**Truck Save Editor** (a working name) is a save editor for **Euro Truck Simulator 2**: a desktop app written in Rust with [GPUI](https://www.gpui.rs/) (Zed's UI framework). Windows is the platform that matters, because that's where the game and its saves are. American Truck Simulator runs on the same engine and uses the same file formats, so the code is written for both from the start (a `Game` value carries what differs: folders, Steam app id, currency, units, names), while ETS2 ships first.
+**Truck Save Editor** (a working name) is a save editor for **Euro Truck Simulator 2**: a desktop app written in Rust with [GPUI](https://www.gpui.rs/) (Zed's UI framework) through [GPUI Kit](https://gpui-kit.com) (`gpui-kit`: GPUI plus a styled component library). Windows is the platform that matters, because that's where the game and its saves are. American Truck Simulator runs on the same engine and uses the same file formats, so the code is written for both from the start (a `Game` value carries what differs: folders, Steam app id, currency, units, names), while ETS2 ships first.
 
 The bar: **the best save editor anyone has used.** The ones out there are broken or ugly. Polish, safety and ease of use come before the number of features.
 
@@ -12,6 +12,7 @@ The bar: **the best save editor anyone has used.** The ones out there are broken
 
 - `docs/sii-format.md`: the game's file formats (encryption, binary and text SII), which the whole app rests on.
 - `docs/decisions.md`: why things are the way they are. **Check it before structural changes.**
+- **Before any UI work**, the two GPUI Kit skills in `.claude/skills/` (copied from the pinned release): `gpui-kit` (API, Coding Guides) and `gpui-kit-design-guides` (Design Guides). They are rules, not inspiration. Never invent an API: check the source of the pinned version in `~/.cargo/registry/src/*/gpui-component-<version>/`.
 - `TODO.md`: agreed, planned work, in order.
 
 ## Product principles
@@ -58,7 +59,7 @@ Dependencies point downward: `app` → `save` → `sii`. **`sii` and `save` have
 - Edition 2024, `rustfmt` defaults, Clippy clean with `-D warnings`.
 - **No `unwrap`, `expect` or `panic!` in `sii` and `save`** outside tests: return `Result` with typed errors (`thiserror`). A damaged or unexpected save must give a clear message ("Unknown value type 0x44 in unit `vehicle` at byte 120,331"), never a crash. In `app`, only for real invariants, with a comment saying why it can't fail.
 - No `unsafe`.
-- **Pin `gpui` and `gpui-component` to exact versions** (`=0.2.2`): their APIs change between releases. Learn the API from their examples and source *for the pinned version*, not from memory or blog posts. Upgrading them is a change of its own.
+- **`gpui-kit` is the only UI dependency, pinned to an exact version** (`=0.10.0`; it pins the matching GPUI itself). Its API changes between releases (they come weekly). Learn it from the skills, examples and source *for the pinned version*, not from memory or blog posts. Upgrading is a change of its own, and copies the skills again from the matching tag.
 - **Clear over clever.** The owner is learning Rust alongside this project. Prefer plain code to macro tricks, write types out where they help reading, and comment the *why* (including Rust-specific whys, like a borrow that forces a clone).
 - Names say what they hold. Booleans read as statements: `is_running`, `has_loans`, `needs_backup`.
 - The product name lives in one constant, `APP_NAME`. Never hard-code it elsewhere.
@@ -100,7 +101,7 @@ Dependencies point downward: `app` → `save` → `sii`. **`sii` and `save` have
 
 ## Commits and PRs
 
-Never add AI attribution: no `Co-Authored-By: Claude …` (or any other AI) trailer, no `Claude-Session` line, no "Generated with Claude Code" line in commit messages or PR descriptions. Commit as the configured git user only. Use conventional prefixes (`feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`). Don't hard-wrap commit message bodies; use one line per bullet. Never commit or push without the owner's explicit go-ahead, every time.
+Never add AI attribution: no `Co-Authored-By: Claude …` (or any other AI) trailer, no `Claude-Session` line, no "Generated with Claude Code" line in commit messages or PR descriptions. Commit as the configured git user only. Use conventional prefixes (`feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`). Don't hard-wrap commit message bodies; use one line per bullet. The owner allows committing and pushing routine work to `main` as you go. Ask first for anything destructive or unusual: force pushes, rewriting history, deleting branches or tags, releases.
 
 ## Decisions
 

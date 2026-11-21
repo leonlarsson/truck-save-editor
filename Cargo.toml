@@ -1,0 +1,28 @@
+[workspace]
+resolver = "3"
+members = ["crates/sii", "crates/save", "crates/app"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/leonlarsson/truck-save-editor"
+
+[workspace.dependencies]
+sii = { path = "crates/sii" }
+save = { path = "crates/save" }
+
+# GPUI Kit (GPUI + gpui-component + assets) is pinned exactly: its API changes between releases.
+gpui-kit = "=0.10.0"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+
+[profile.dev.package."*"]
+# Dependencies (GPUI is big) build optimised, so the app runs smoothly while developing.
+opt-level = 2

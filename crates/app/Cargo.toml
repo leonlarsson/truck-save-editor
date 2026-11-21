@@ -1,0 +1,17 @@
+[package]
+name = "app"
+description = "Truck Save Editor: the desktop app."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "truck-save-editor"
+path = "src/main.rs"
+
+[dependencies]
+save.workspace = true
+gpui-kit.workspace = true
+
+[lints]
+workspace = true

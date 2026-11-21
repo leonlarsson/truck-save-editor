@@ -1,0 +1,17 @@
+[package]
+name = "save"
+description = "The ETS2/ATS save: profiles and slots, the document model, typed access, edits and safe writing."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+default = ["native"]
+# Disk access: finding profiles, backups and writing. Off for WebAssembly builds.
+native = []
+
+[dependencies]
+sii.workspace = true
+
+[lints]
+workspace = true
