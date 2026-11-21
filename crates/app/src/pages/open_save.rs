@@ -16,9 +16,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use gpui_kit::{
-    AppContext as _, Context, EventEmitter, InteractiveElement as _, IntoElement, ObjectFit,
-    ParentElement as _, Render, RenderImage, SharedString, StatefulInteractiveElement as _,
-    Styled as _, StyledImage as _, Task, Window, div, img, prelude::FluentBuilder as _, rems,
+    AppContext as _, Context, EventEmitter, FocusHandle, InteractiveElement as _, IntoElement,
+    KeyDownEvent, ObjectFit, ParentElement as _, Render, RenderImage, SharedString,
+    StatefulInteractiveElement as _, Styled as _, StyledImage as _, Task, Window, div, img,
+    prelude::FluentBuilder as _, rems,
 };
 use save::{Game, Profile, Slot};
 
@@ -28,6 +29,7 @@ use crate::i18n::t;
 use crate::labels;
 
 /// Asks the workspace to open a slot.
+#[derive(Clone)]
 pub struct OpenSlot {
     pub profile: Profile,
     pub slot: Slot,
@@ -38,6 +40,8 @@ pub struct OpenSavePage {
     selected_profile: usize,
     /// Each slot's preview picture, by slot folder, as they load.
     previews: HashMap<PathBuf, Arc<RenderImage>>,
+    /// Each slot row's focus, by slot folder, so Tab reaches the rows and Enter opens one.
+    row_focus: HashMap<PathBuf, FocusHandle>,
     _search: Option<Task<()>>,
     _previews: Option<Task<()>>,
 }
@@ -50,6 +54,7 @@ impl OpenSavePage {
             found: None,
             selected_profile: 0,
             previews: HashMap::new(),
+            row_focus: HashMap::new(),
             _search: None,
             _previews: None,
         };
@@ -76,6 +81,11 @@ impl OpenSavePage {
                 })
                 .await;
             let _ = this.update(cx, |page, cx| {
+                page.row_focus = found
+                    .iter()
+                    .flat_map(|(_, slots)| slots.iter())
+                    .map(|slot| (slot.dir.clone(), cx.focus_handle().tab_stop(true)))
+                    .collect();
                 page.found = Some(found);
                 page.selected_profile = 0;
                 page.load_previews(cx);
@@ -192,18 +202,37 @@ impl OpenSavePage {
                         .money
                         .map(|money| format!("{currency} {}", thousands(money)))
                         .unwrap_or_default();
-                    let profile = profile.clone();
-                    let opened = slot.clone();
+                    let open = OpenSlot {
+                        profile: profile.clone(),
+                        slot: slot.clone(),
+                    };
+                    let open_by_key = OpenSlot {
+                        profile: profile.clone(),
+                        slot: slot.clone(),
+                    };
+                    let ring = cx.theme().ring;
                     ListItem::new(SharedString::from(format!("slot-{}", slot.folder)))
                         .py_2()
                         .px_3()
                         .rounded(cx.theme().radius)
                         .accessibility_label(labels::slot_name(cx, slot))
+                        // Tab reaches each row; Enter or Space opens it. The ring shows only for
+                        // keyboard focus, not after a click.
+                        .when_some(self.row_focus.get(&slot.dir), |row, focus| {
+                            row.track_focus(focus)
+                        })
+                        // Always a border, clear until focused, so focus doesn't move anything.
+                        .border_1()
+                        .border_color(gpui_kit::transparent_black())
+                        .focus_visible(|style| style.border_color(ring))
+                        .on_key_down(cx.listener(move |_, event: &KeyDownEvent, _, cx| {
+                            if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                                cx.emit(open_by_key.clone());
+                                cx.stop_propagation();
+                            }
+                        }))
                         .on_click(cx.listener(move |_, _, _, cx| {
-                            cx.emit(OpenSlot {
-                                profile: profile.clone(),
-                                slot: opened.clone(),
-                            });
+                            cx.emit(open.clone());
                         }))
                         .child(
                             h_flex()

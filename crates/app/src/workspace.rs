@@ -725,6 +725,9 @@ impl Workspace {
 
     fn render_start(&self, cx: &mut Context<Self>) -> impl IntoElement {
         div()
+            // The workspace's focus here too: with nothing focused, keys (Tab) go nowhere.
+            .key_context(KEY_CONTEXT)
+            .track_focus(&self.focus_handle)
             .size_full()
             .relative()
             .child(self.open_save.clone())
@@ -1014,6 +1017,11 @@ impl Workspace {
 impl Render for Workspace {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.update_window_title(window, cx);
+        // When what had focus is gone (a closed save, a closed panel), the workspace takes it,
+        // so the keyboard keeps working without a click first.
+        if window.focused(cx).is_none() {
+            self.focus_handle.focus(window, cx);
+        }
         let Some(opened) = &self.opened else {
             return self.render_start(cx).into_any_element();
         };
