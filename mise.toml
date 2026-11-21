@@ -1,6 +1,6 @@
 [tools]
-rust = { version = "1.100.0", components = "clippy,rustfmt", targets = "x86_64-pc-windows-msvc" }
-"github:rust-cross/cargo-xwin" = "latest"
+# Keep the Rust version in step with rust-toolchain.toml (used by the Windows build).
+rust = { version = "1.100.0", components = "clippy,rustfmt" }
 
 [env]
 # Real save files used as test fixtures (personal data, never commit)
@@ -27,5 +27,9 @@ description = "Run the desktop app in WSL (WSLg)"
 run = "cargo run -p app"
 
 [tasks.win]
-description = "Build the Windows .exe from WSL"
-run = "cargo xwin build --release --target x86_64-pc-windows-msvc -p app"
+description = "Build the Windows .exe (on Windows, driven from WSL)"
+run = "scripts/windows.sh build"
+
+[tasks.win-run]
+description = "Build the Windows .exe and start it"
+run = "scripts/windows.sh run"

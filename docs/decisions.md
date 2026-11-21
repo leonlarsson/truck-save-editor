@@ -58,3 +58,13 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Decided:** the app depends on `gpui-kit` alone (pinned exactly, `=0.10.0`), which pins the matching GPUI snapshot (`gpui-pre`) and brings the styled components (`gpui-component`), unstyled behaviour (`gpui-base`) and Lucide icons. Its two agent skills (API and Coding Guides; Design Guides) are copied into `.claude/skills/` from the same release.
 
 **Why:** `gpui` 0.2.2 on crates.io is older than the GPUI that `gpui-component` builds on, so the two can't be mixed; `gpui-kit` exists to keep them in step. It also brings data tables with virtual scrolling, inputs, forms, theming, AccessKit accessibility and WebAssembly support, which a save editor needs and plain GPUI lacks. It's used in a shipped commercial app (Longbridge Pro).
+
+## 2026-11-21: Windows builds run on Windows
+
+**Decided:** the Windows `.exe` is built by Windows' own Rust toolchain. From WSL, `mise run win` copies the source to the Windows drive and runs `cargo` there (`scripts/windows.sh`). `rust-toolchain.toml` pins the same Rust version as `mise.toml`. Release builds will come from GitHub Actions on a Windows runner.
+
+**Why:** GPUI's Windows renderer compiles its DirectX shaders with `fxc.exe` from the Windows SDK at build time. Its build script only does that when the build itself runs on Windows, so cross-compiling from Linux with `cargo-xwin` fails (`shaders_bytes.rs` missing), and debug builds read the shader source from the build machine's disk at runtime. GPUI Fast has the same build script. Zed builds its Windows releases on Windows too.
+
+**Considered:** patching GPUI's build script to call `fxc.exe` through WSL interop. Rejected: a fork of a dependency that changes weekly.
+
+**Replaces:** the `cargo-xwin` plan in "mise manages the tools" (it's removed from `mise.toml`).

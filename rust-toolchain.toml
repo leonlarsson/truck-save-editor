@@ -1,0 +1,4 @@
+# Pins Rust for builds outside mise (the Windows build, see scripts/windows.sh). Keep in step with mise.toml.
+[toolchain]
+channel = "1.100.0"
+components = ["clippy", "rustfmt"]
