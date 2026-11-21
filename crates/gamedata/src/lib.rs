@@ -280,7 +280,17 @@ fn rank(ranks: &[(i64, String)], level: i64) -> Option<&str> {
 
 /// The archives that hold definitions: `def.scs`, then every DLC archive (`dlc_*.scs`), sorted.
 fn def_archives(install_dir: &Path) -> Vec<PathBuf> {
-    let mut archives = vec![install_dir.join("def.scs")];
+    archives_after(install_dir, "def.scs")
+}
+
+/// The archives that hold the game's pictures and models: `base.scs`, then every DLC archive.
+pub fn content_archives(install_dir: &Path) -> Vec<PathBuf> {
+    archives_after(install_dir, "base.scs")
+}
+
+/// `first`, then every DLC archive (`dlc_*.scs`) in the install folder, sorted.
+fn archives_after(install_dir: &Path, first: &str) -> Vec<PathBuf> {
+    let mut archives = vec![install_dir.join(first)];
     if let Ok(entries) = std::fs::read_dir(install_dir) {
         let mut dlcs: Vec<PathBuf> = entries
             .filter_map(|entry| entry.ok().map(|entry| entry.path()))

@@ -164,8 +164,9 @@ pub fn observe_in<V: 'static>(
 /// a small copy so a big save doesn't cost much memory.
 #[derive(Default)]
 struct Pictures {
-    /// `base.scs`, opened once on first use, shared with the background loads.
-    archive: Arc<Mutex<Option<hashfs::Archive>>>,
+    /// `base.scs` and every DLC archive (some pictures, like a DLC's cargo icons, live only
+    /// there), opened once on first use, shared with the background loads.
+    archives: Arc<Mutex<Option<Vec<hashfs::Archive>>>>,
     /// By material path: the picture, or `None` while loading or if the game has none.
     loaded: HashMap<String, Option<Arc<GameIcon>>>,
 }
@@ -189,18 +190,25 @@ fn picture(cx: &mut App, folder: &'static str, name: String) -> Option<Arc<GameI
     let install_dir = data(cx)?.install_dir.clone();
     let pictures = cx.global_mut::<Pictures>();
     pictures.loaded.insert(key.clone(), None);
-    let archive = pictures.archive.clone();
+    let archives = pictures.archives.clone();
     cx.spawn(async move |cx| {
         let picture = cx
             .background_spawn(async move {
-                // A poisoned lock only means an earlier load panicked; the archive is still fine.
-                let mut archive = archive
+                // A poisoned lock only means an earlier load panicked; the archives are fine.
+                let mut archives = archives
                     .lock()
                     .unwrap_or_else(|poisoned| poisoned.into_inner());
-                if archive.is_none() {
-                    *archive = hashfs::Archive::open(install_dir.join("base.scs")).ok();
-                }
-                let archive = archive.as_mut()?;
+                let archives = archives.get_or_insert_with(|| {
+                    gamedata::content_archives(&install_dir)
+                        .iter()
+                        .filter_map(|path| hashfs::Archive::open(path).ok())
+                        .collect()
+                });
+                // The first archive that has the picture's material, the base game's first.
+                let material = format!("{folder}/{name}.mat");
+                let archive = archives
+                    .iter_mut()
+                    .find(|archive| archive.contains(&material))?;
                 GameIcon::load(archive, folder, &name)
                     .map(|picture| Arc::new(picture.shrunk(PICTURE_PIXELS)))
             })

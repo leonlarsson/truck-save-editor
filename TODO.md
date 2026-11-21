@@ -48,7 +48,7 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [x] The game's own icons for skills and ADR classes: GDeflate and texture decoding in `hashfs`, the icon materials in `gamedata`, drawn at exact pixel size by `GameIconView`. Nothing of SCS's is bundled; without the game, the rows show no icon.
 - [x] Brand logos and the game's model names in Fleet.
 - [x] Company logos and cargo icons on Jobs (loaded as rows show, kept small).
-- [ ] Pictures from DLC archives too (some cargo icons live there).
+- [x] Pictures from DLC archives too (some cargo icons live there).
 - [x] Swedish, and the game's names in the app's language; Settings (language, appearance, game folder, backups).
 - [ ] More languages: a `Language`, a `locales/<code>.ftl` (the completeness test lists what's missing).
 - [x] Coach garages: coaches have none. Fleet says where each is: driven now (`player.assigned_vehicles`) or parked in a city (`player.my_vehicles[]` → `stored_vehicle_city`).
