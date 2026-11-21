@@ -7,8 +7,9 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.sha }}
+  # Every push to main gets a full build; only pull requests drop superseded runs.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   core:

@@ -221,6 +221,7 @@ dependencies = [
  "fluent-bundle",
  "gamedata",
  "gpui-kit",
+ "image",
  "save",
  "sii",
  "unic-langid",

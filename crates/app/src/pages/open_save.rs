@@ -11,10 +11,14 @@ use gpui_kit::component::{
     spinner::Spinner,
     v_flex,
 };
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::Arc;
+
 use gpui_kit::{
-    AppContext as _, Context, EventEmitter, InteractiveElement as _, IntoElement,
-    ParentElement as _, Render, SharedString, StatefulInteractiveElement as _, Styled as _, Task,
-    Window, div, prelude::FluentBuilder as _, rems,
+    AppContext as _, Context, EventEmitter, InteractiveElement as _, IntoElement, ObjectFit,
+    ParentElement as _, Render, RenderImage, SharedString, StatefulInteractiveElement as _,
+    Styled as _, StyledImage as _, Task, Window, div, img, prelude::FluentBuilder as _, rems,
 };
 use save::{Game, Profile, Slot};
 
@@ -32,7 +36,10 @@ pub struct OpenSlot {
 pub struct OpenSavePage {
     found: Option<Vec<(Profile, Vec<Slot>)>>,
     selected_profile: usize,
+    /// Each slot's preview picture, by slot folder, as they load.
+    previews: HashMap<PathBuf, Arc<RenderImage>>,
     _search: Option<Task<()>>,
+    _previews: Option<Task<()>>,
 }
 
 impl EventEmitter<OpenSlot> for OpenSavePage {}
@@ -42,7 +49,9 @@ impl OpenSavePage {
         let mut page = Self {
             found: None,
             selected_profile: 0,
+            previews: HashMap::new(),
             _search: None,
+            _previews: None,
         };
         page.search(cx);
         page
@@ -69,6 +78,34 @@ impl OpenSavePage {
             let _ = this.update(cx, |page, cx| {
                 page.found = Some(found);
                 page.selected_profile = 0;
+                page.load_previews(cx);
+                cx.notify();
+            });
+        }));
+    }
+
+    /// Reads every slot's preview picture in the background; rows show them as they arrive.
+    fn load_previews(&mut self, cx: &mut Context<Self>) {
+        let dirs: Vec<PathBuf> = self
+            .found
+            .iter()
+            .flatten()
+            .flat_map(|(_, slots)| slots.iter().map(|slot| slot.dir.clone()))
+            .collect();
+        self._previews = Some(cx.spawn(async move |this, cx| {
+            let previews = cx
+                .background_spawn(async move {
+                    dirs.into_iter()
+                        .filter_map(|dir| {
+                            let bytes = std::fs::read(dir.join("preview.tga")).ok()?;
+                            let picture = save::decode_tga(&bytes)?;
+                            Some((dir, Arc::new(render_image(picture)?)))
+                        })
+                        .collect::<HashMap<_, _>>()
+                })
+                .await;
+            let _ = this.update(cx, |page, cx| {
+                page.previews = previews;
                 cx.notify();
             });
         }));
@@ -174,19 +211,25 @@ impl OpenSavePage {
                                 .justify_between()
                                 .gap_4()
                                 .child(
-                                    v_flex()
+                                    h_flex()
+                                        .gap_3()
                                         .min_w_0()
+                                        .child(thumbnail(self.previews.get(&slot.dir).cloned(), cx))
                                         .child(
-                                            div()
-                                                .text_sm()
-                                                .font_medium()
-                                                .child(labels::slot_name(cx, slot)),
-                                        )
-                                        .child(
-                                            div()
-                                                .text_xs()
-                                                .text_color(cx.theme().muted_foreground)
-                                                .child(detail),
+                                            v_flex()
+                                                .min_w_0()
+                                                .child(
+                                                    div()
+                                                        .text_sm()
+                                                        .font_medium()
+                                                        .child(labels::slot_name(cx, slot)),
+                                                )
+                                                .child(
+                                                    div()
+                                                        .text_xs()
+                                                        .text_color(cx.theme().muted_foreground)
+                                                        .child(detail),
+                                                ),
                                         ),
                                 )
                                 .child(
@@ -290,5 +333,33 @@ impl Render for OpenSavePage {
                     .child(header)
                     .child(body),
             )
+    }
+}
+
+/// A preview picture as GPUI draws it (the decoder already gives blue-green-red-alpha order).
+fn render_image(picture: save::Picture) -> Option<RenderImage> {
+    let buffer = image::RgbaImage::from_raw(picture.width, picture.height, picture.bgra)?;
+    Some(RenderImage::new(vec![image::Frame::new(buffer)]))
+}
+
+/// A slot's preview at the size of the game's own thumbnails, or a quiet placeholder.
+fn thumbnail(preview: Option<Arc<RenderImage>>, cx: &Context<OpenSavePage>) -> impl IntoElement {
+    let frame = div()
+        .w(rems(6.))
+        .h(rems(3.))
+        .flex_shrink_0()
+        .rounded(cx.theme().radius)
+        .overflow_hidden()
+        .bg(cx.theme().muted)
+        .border_1()
+        .border_color(cx.theme().border);
+    match preview {
+        Some(preview) => frame.child(img(preview).size_full().object_fit(ObjectFit::Cover)),
+        None => frame
+            .flex()
+            .items_center()
+            .justify_center()
+            .text_color(cx.theme().muted_foreground)
+            .child(Icon::new(IconName::Truck).small()),
     }
 }
