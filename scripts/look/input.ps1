@@ -1,5 +1,5 @@
 # Clicks or types into one window (by title). Used by scripts/look.sh.
-param([string]$Title, [string]$Action, [int]$X = 0, [int]$Y = 0, [string]$Keys = "")
+param([string]$Title, [string]$Action, [int]$X = 0, [int]$Y = 0, [string]$Keys = "", [int]$Wheel = 0)
 Add-Type @"
 using System; using System.Runtime.InteropServices; using System.Text;
 public class U {
@@ -27,6 +27,13 @@ if ($Action -eq "click") {
   Start-Sleep -Milliseconds 80
   [U]::mouse_event(0x0002, 0, 0, 0, [UIntPtr]::Zero); Start-Sleep -Milliseconds 40
   [U]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)
+}
+if ($Action -eq "scroll") {
+  [U]::SetCursorPos($r.L + $X, $r.T + $Y) | Out-Null
+  Start-Sleep -Milliseconds 80
+  # Negative scrolls down; 120 is one notch.
+  $delta = [BitConverter]::ToUInt32([BitConverter]::GetBytes([int32]$Wheel), 0)
+  [U]::mouse_event(0x0800, 0, 0, $delta, [UIntPtr]::Zero)
 }
 if ($Action -eq "keys") {
   Add-Type -AssemblyName System.Windows.Forms

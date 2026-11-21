@@ -32,7 +32,31 @@ pub fn skill_description(cx: &App, index: usize) -> SharedString {
     }
 }
 
-/// An ADR class, by bit (bit 0 first). Check the order against the game before shipping.
+/// A coach skill's name (Coaches DLC), in the order of `save::CoachSkills::levels`.
+pub fn coach_skill_name(cx: &App, index: usize) -> SharedString {
+    match index {
+        0 => t!(cx, "coach-skill-longer-duties"),
+        1 => t!(cx, "coach-skill-demanding-timetables"),
+        2 => t!(cx, "coach-skill-premium-service"),
+        3 => t!(cx, "coach-skill-cushioned-journey"),
+        4 => t!(cx, "coach-skill-passenger-favourite"),
+        _ => t!(cx, "coach-skill-ecodriving"),
+    }
+}
+
+pub fn coach_skill_description(cx: &App, index: usize) -> SharedString {
+    match index {
+        0 => t!(cx, "coach-skill-longer-duties-description"),
+        1 => t!(cx, "coach-skill-demanding-timetables-description"),
+        2 => t!(cx, "coach-skill-premium-service-description"),
+        3 => t!(cx, "coach-skill-cushioned-journey-description"),
+        4 => t!(cx, "coach-skill-passenger-favourite-description"),
+        _ => t!(cx, "coach-skill-ecodriving-description"),
+    }
+}
+
+/// An ADR class, by bit (bit 0 first): classes 1, 2, 3, 4, 6 and 8, as the game's `adr_info_icon[]`
+/// in `def/economy_data.sii` orders them.
 pub fn adr_class(cx: &App, bit: usize) -> SharedString {
     match bit {
         0 => t!(cx, "adr-explosives"),

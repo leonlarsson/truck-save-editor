@@ -2,17 +2,20 @@
 
 use gpui_kit::component::{
     ActiveTheme as _, Sizable as _, StyledExt as _, button::Button, checkbox::Checkbox, h_flex,
-    v_flex,
+    progress::Progress, v_flex,
 };
 use gpui_kit::{
     AppContext as _, Context, Entity, IntoElement, ParentElement as _, Render, Styled as _,
     Subscription, Window, div, rems,
 };
-use save::{ADR_ALL, MAX_SKILL_LEVEL, Skills};
+use save::{ADR_ALL, CoachSkills, LevelTable, MAX_COACH_SKILL_LEVEL, MAX_SKILL_LEVEL, Skills};
 
 use crate::format::compact;
 use crate::i18n::t;
-use crate::labels::{ADR_CLASS_COUNT, adr_class, skill_description, skill_name};
+use crate::labels::{
+    ADR_CLASS_COUNT, adr_class, coach_skill_description, coach_skill_name, skill_description,
+    skill_name,
+};
 use crate::session::Session;
 use crate::ui::{AmountChanged, AmountField, LevelPicker, Section, StepButtons, page_body};
 
@@ -119,20 +122,16 @@ impl OverviewPage {
     }
 
     fn render_experience(&self, cx: &mut Context<Self>) -> Section {
-        let steps: [i64; 3] = [10_000, 100_000, 1_000_000];
-        Section::new(t!(cx, "experience"))
-            .description(t!(cx, "experience-description"))
-            .child(self.experience.clone())
-            .child(h_flex().gap_2().flex_wrap().children(steps.map(|step| {
-                StepButtons::new(("xp-step", step as usize), compact(step)).on_step(cx.listener(
-                    move |this, direction: &i64, _, cx| {
-                        let direction = *direction;
-                        this.edit(cx, |career| {
-                            career.experience = (career.experience + direction * step).max(0);
-                        });
-                    },
-                ))
-            })))
+        let experience = self.session.read(cx).career().experience;
+        let section =
+            Section::new(t!(cx, "experience")).description(t!(cx, "experience-description"));
+        self.with_level(
+            section,
+            experience,
+            &self.experience.clone(),
+            Career::Truck,
+            cx,
+        )
     }
 
     fn render_coach_experience(
@@ -140,22 +139,79 @@ impl OverviewPage {
         field: &Entity<AmountField>,
         cx: &mut Context<Self>,
     ) -> Section {
-        let steps: [i64; 3] = [1_000, 10_000, 100_000];
-        Section::new(t!(cx, "coach-experience"))
-            .description(t!(cx, "coach-experience-description"))
+        let experience = self.session.read(cx).career().coach_experience.unwrap_or(0);
+        let section = Section::new(t!(cx, "coach-experience"))
+            .description(t!(cx, "coach-experience-description"));
+        self.with_level(section, experience, field, Career::Coach, cx)
+    }
+
+    /// The level (big), how far into it, the XP field, and buttons to move whole levels.
+    fn with_level(
+        &self,
+        section: Section,
+        experience: i64,
+        field: &Entity<AmountField>,
+        career: Career,
+        cx: &mut Context<Self>,
+    ) -> Section {
+        let table = LevelTable::default();
+        let level = table.level(experience);
+        let percent = (level.fraction() * 100.0).floor() as i64;
+        section
+            .child(
+                v_flex()
+                    .gap_2()
+                    .child(
+                        h_flex()
+                            .justify_between()
+                            .items_end()
+                            .child(div().text_2xl().font_semibold().child(t!(
+                                cx,
+                                "level-number",
+                                level = level.number
+                            )))
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .text_color(cx.theme().muted_foreground)
+                                    .child(t!(
+                                        cx,
+                                        "level-progress",
+                                        percent = percent,
+                                        next = level.number + 1
+                                    )),
+                            ),
+                    )
+                    .child(
+                        Progress::new(career.progress_id())
+                            .value(level.fraction() * 100.0)
+                            .accessibility_label(t!(cx, "level-progress-label")),
+                    ),
+            )
             .child(field.clone())
-            .child(h_flex().gap_2().flex_wrap().children(steps.map(|step| {
-                StepButtons::new(("coach-xp-step", step as usize), compact(step)).on_step(
-                    cx.listener(move |this, direction: &i64, _, cx| {
-                        let direction = *direction;
-                        this.edit(cx, |career| {
-                            if let Some(value) = &mut career.coach_experience {
-                                *value = (*value + direction * step).max(0);
-                            }
-                        });
-                    }),
-                )
-            })))
+            .child(
+                h_flex()
+                    .gap_2()
+                    .flex_wrap()
+                    .children([1i64, 10].map(|levels| {
+                        StepButtons::new(
+                            (career.step_id(), levels as usize),
+                            t!(cx, "level-step", count = levels),
+                        )
+                        .on_step(cx.listener(
+                            move |this, direction: &i64, _, cx| {
+                                let direction = *direction;
+                                let table = LevelTable::default();
+                                this.edit(cx, |c| {
+                                    let current = career.experience(c);
+                                    let target =
+                                        (table.level(current).number + direction * levels).max(0);
+                                    career.set_experience(c, table.experience_for(target));
+                                });
+                            },
+                        ))
+                    })),
+            )
     }
 
     fn render_skills(&self, cx: &mut Context<Self>) -> Section {
@@ -205,6 +261,59 @@ impl OverviewPage {
                     })),
             )
             .children(rows)
+    }
+
+    fn render_coach_skills(&self, cx: &mut Context<Self>) -> Option<Section> {
+        let skills = self.session.read(cx).career().coach_skills?;
+        let rows = (0..skills.levels().len()).map(|index| {
+            let name = coach_skill_name(cx, index);
+            h_flex()
+                .justify_between()
+                .gap_4()
+                .py_1()
+                .child(
+                    v_flex()
+                        .min_w_0()
+                        .child(div().text_sm().font_medium().child(name.clone()))
+                        .child(
+                            div()
+                                .text_xs()
+                                .text_color(cx.theme().muted_foreground)
+                                .child(coach_skill_description(cx, index)),
+                        ),
+                )
+                .child(
+                    LevelPicker::new(("coach-skill", index), name)
+                        .max(MAX_COACH_SKILL_LEVEL)
+                        .value(skills.levels()[index].1)
+                        .on_change(cx.listener(move |this, level: &u8, _, cx| {
+                            let level = *level;
+                            this.edit(cx, |career| {
+                                if let Some(skills) = &mut career.coach_skills {
+                                    skills.set_level(index, level);
+                                }
+                            });
+                        })),
+                )
+        });
+        Some(
+            Section::new(t!(cx, "coach-skills"))
+                .description(t!(cx, "coach-skills-description"))
+                .action(
+                    Button::new("max-coach-skills")
+                        .small()
+                        .outline()
+                        .label(t!(cx, "skills-max"))
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.edit(cx, |career| {
+                                if career.coach_skills.is_some() {
+                                    career.coach_skills = Some(CoachSkills::maxed());
+                                }
+                            });
+                        })),
+                )
+                .children(rows),
+        )
     }
 
     fn render_adr(&self, cx: &mut Context<Self>) -> Section {
@@ -262,7 +371,49 @@ impl Render for OverviewPage {
                     )
                 })
                 .child(self.render_skills(cx))
-                .child(self.render_adr(cx)),
+                .child(self.render_adr(cx))
+                .children(self.render_coach_skills(cx)),
         )
+    }
+}
+
+/// Which career an experience card edits.
+#[derive(Clone, Copy)]
+enum Career {
+    Truck,
+    Coach,
+}
+
+impl Career {
+    fn experience(self, career: &save::Career) -> i64 {
+        match self {
+            Career::Truck => career.experience,
+            Career::Coach => career.coach_experience.unwrap_or(0),
+        }
+    }
+
+    fn set_experience(self, career: &mut save::Career, value: i64) {
+        match self {
+            Career::Truck => career.experience = value,
+            Career::Coach => {
+                if career.coach_experience.is_some() {
+                    career.coach_experience = Some(value);
+                }
+            }
+        }
+    }
+
+    fn step_id(self) -> &'static str {
+        match self {
+            Career::Truck => "truck-level-step",
+            Career::Coach => "coach-level-step",
+        }
+    }
+
+    fn progress_id(self) -> &'static str {
+        match self {
+            Career::Truck => "truck-level-progress",
+            Career::Coach => "coach-level-progress",
+        }
     }
 }

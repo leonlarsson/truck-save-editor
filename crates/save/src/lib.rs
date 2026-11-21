@@ -9,6 +9,7 @@ mod error;
 mod fleet;
 mod game;
 mod info;
+mod levels;
 #[cfg(feature = "native")]
 mod profiles;
 #[cfg(feature = "native")]
@@ -16,11 +17,12 @@ mod store;
 #[cfg(feature = "native")]
 mod time;
 
-pub use career::{ADR_ALL, Career, CoachSkills, MAX_SKILL_LEVEL, Skills};
+pub use career::{ADR_ALL, Career, CoachSkills, MAX_COACH_SKILL_LEVEL, MAX_SKILL_LEVEL, Skills};
 pub use error::{Error, Result};
 pub use fleet::{Vehicle, VehicleKind, Wear, model_display_name, repair, vehicles, wear_is_known};
 pub use game::Game;
 pub use info::{SlotInfo, read_info, update_info};
+pub use levels::{FALLBACK_STEPS, Level, LevelTable};
 #[cfg(feature = "native")]
 pub use profiles::{
     Location, PROFILE_DIRS_VARIABLE, Profile, Slot, SlotKind, decode_profile_folder, find_profiles,

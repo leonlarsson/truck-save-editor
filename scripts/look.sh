@@ -8,6 +8,7 @@
 #   scripts/look.sh shot <file.png>         capture the app window
 #   scripts/look.sh click <x> <y>           left-click at a point relative to the window's top-left
 #   scripts/look.sh keys <text>             type, in SendKeys syntax ({ESC}, {ENTER}, {TAB}, ^a …)
+#   scripts/look.sh scroll <x> <y> <notches> scroll at a point (negative = down)
 #   scripts/look.sh stop                    close the app
 set -euo pipefail
 
@@ -40,6 +41,7 @@ case "${1:-}" in
         ;;
     click) ps input.ps1 -Title "$title" -Action click -X "$2" -Y "$3" ;;
     keys) ps input.ps1 -Title "$title" -Action keys -Keys "$2" ;;
+    scroll) ps input.ps1 -Title "$title" -Action scroll -X "$2" -Y "$3" -Wheel "$(( $4 * 120 ))" ;;
     stop) pkill -x truck-save-edit || true ;;
-    *) sed -n '2,12p' "$0"; exit 1 ;;
+    *) sed -n '2,13p' "$0"; exit 1 ;;
 esac

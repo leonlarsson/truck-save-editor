@@ -111,14 +111,35 @@ money = Money
 money-description = Your company's bank balance.
 money-label = Bank balance
 experience = Truck experience
-experience-description = Decides your level as a truck driver.
+experience-description = Your level as a truck driver.
 experience-label = Truck experience points
 coach-experience = Coach experience
-coach-experience-description = Coaches have a career of their own, with its own levels.
+coach-experience-description = Coaching is a career of its own.
 coach-experience-label = Coach experience points
 experience-unit = XP
 experience-amount = { $amount } XP
 skills = Truck skills
+level-number = Level { $level }
+level-progress = { $percent }% to level { $next }
+level-progress-label = Progress to the next level
+level-step = { $count ->
+    [one] 1 level
+   *[other] { $count } levels
+}
+coach-skills = Coach skills
+coach-skills-description = Each coach skill goes up to level 3.
+coach-skill-longer-duties = Longer duties
+coach-skill-longer-duties-description = More stops per duty
+coach-skill-demanding-timetables = Demanding timetables
+coach-skill-demanding-timetables-description = Stricter schedules that pay more XP
+coach-skill-premium-service = Premium service
+coach-skill-premium-service-description = Passengers who pay more, and forgive less
+coach-skill-cushioned-journey = Cushioned journey
+coach-skill-cushioned-journey-description = Smooth driving pays and earns more
+coach-skill-passenger-favourite = Passenger favourite
+coach-skill-passenger-favourite-description = Flawless driving lifts satisfaction
+coach-skill-ecodriving = Ecodriving
+coach-skill-ecodriving-description = Uses less fuel
 skills-description = Click a level to set it. Click the highest filled level again to lower it.
 skills-max = Max all skills
 skill-level = Level { $level }

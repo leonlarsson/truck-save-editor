@@ -5,7 +5,8 @@ use sii::{Document, Value, value};
 
 use crate::error::{Error, Result};
 
-/// The highest level of each skill (ADR is a set of classes instead).
+/// The highest level of each truck skill (`max_rank` in the game's `def/skill_data.sii`; ADR is a
+/// set of classes instead).
 pub const MAX_SKILL_LEVEL: u8 = 6;
 
 /// All six ADR classes.
@@ -74,8 +75,13 @@ impl Skills {
     }
 }
 
-/// The coach driver's skills (Coaches DLC), as levels by their save field names. What each one
-/// is called in game, and its highest level, are still to be confirmed (see `TODO.md`).
+/// The highest level of each coach skill (`max_rank` in the game's `def/skill_data.sii`).
+pub const MAX_COACH_SKILL_LEVEL: u8 = 3;
+
+/// The coach driver's skills (Coaches DLC), by their save field names. In game they're called
+/// Longer Duties (`long_duty`), Demanding Timetables (`tight_schedule`), Premium Service
+/// (`satisfaction_decrease`), Cushioned Journey (`low_acceleration`), Passenger Favourite
+/// (`satisfaction_increase`) and Ecodriving (`ecodriving`): from the game's English text.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CoachSkills {
     pub long_duty: u8,
@@ -87,6 +93,17 @@ pub struct CoachSkills {
 }
 
 impl CoachSkills {
+    pub fn maxed() -> Self {
+        Self {
+            long_duty: MAX_COACH_SKILL_LEVEL,
+            tight_schedule: MAX_COACH_SKILL_LEVEL,
+            satisfaction_decrease: MAX_COACH_SKILL_LEVEL,
+            low_acceleration: MAX_COACH_SKILL_LEVEL,
+            satisfaction_increase: MAX_COACH_SKILL_LEVEL,
+            ecodriving: MAX_COACH_SKILL_LEVEL,
+        }
+    }
+
     pub const FIELDS: [&'static str; 6] = [
         "long_duty",
         "tight_schedule",
@@ -124,6 +141,7 @@ impl CoachSkills {
     }
 
     pub fn set_level(&mut self, index: usize, level: u8) {
+        let level = level.min(MAX_COACH_SKILL_LEVEL);
         match index {
             0 => self.long_duty = level,
             1 => self.tight_schedule = level,

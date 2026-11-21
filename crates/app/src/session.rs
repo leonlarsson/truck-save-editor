@@ -11,7 +11,7 @@ use save::{Career, Game, LoadedSlot, Profile, Slot, Vehicle, VehicleKind};
 
 use crate::format::thousands;
 use crate::i18n::t;
-use crate::labels::{adr_summary, skill_name};
+use crate::labels::{adr_summary, coach_skill_name, skill_name};
 
 pub struct Session {
     game: Game,
@@ -157,6 +157,15 @@ impl Session {
                 t!(cx, "skill-level", level = before.skills.levels()[index].1),
                 t!(cx, "skill-level", level = after.skills.levels()[index].1),
             );
+        }
+        if let (Some(old), Some(new)) = (before.coach_skills, after.coach_skills) {
+            for index in 0..old.levels().len() {
+                add(
+                    coach_skill_name(cx, index),
+                    t!(cx, "skill-level", level = old.levels()[index].1),
+                    t!(cx, "skill-level", level = new.levels()[index].1),
+                );
+            }
         }
         add(
             t!(cx, "adr"),

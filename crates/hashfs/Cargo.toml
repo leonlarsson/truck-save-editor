@@ -1,0 +1,14 @@
+[package]
+name = "hashfs"
+description = "Reads SCS Software's HashFS game archives (.scs), to look up the game's own data: levels, names, icons."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+flate2 = "1.1.11"
+thiserror = "2.0.21"
+
+[lints]
+workspace = true
