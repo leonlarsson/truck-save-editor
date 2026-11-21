@@ -60,6 +60,8 @@ struct Pending {
     visit_all_cities: bool,
     /// Values changed in All data, by where they are; applied before the other changes.
     raw_edits: BTreeMap<FieldPath, String>,
+    /// Whether to make every job offer last at least a week (game time) when saving.
+    keep_offers: bool,
     /// Cities whose truck dealer to unlock when saving.
     unlock_dealers: BTreeSet<String>,
     /// Cities whose recruitment agency to unlock when saving.
@@ -77,6 +79,7 @@ impl Pending {
             maxed_drivers: HashSet::new(),
             visit_all_cities: false,
             raw_edits: BTreeMap::new(),
+            keep_offers: false,
             unlock_dealers: BTreeSet::new(),
             unlock_recruitments: BTreeSet::new(),
         }
@@ -96,6 +99,9 @@ impl Pending {
         }
     }
 }
+
+/// How long "Keep every offer" keeps them: a week of game time, in minutes.
+pub const KEEP_OFFERS_MINUTES: i64 = 7 * 24 * 60;
 
 /// How many steps Undo remembers.
 const UNDO_LIMIT: usize = 200;
@@ -300,6 +306,17 @@ impl Session {
         });
     }
 
+    /// The job offers as they'll be after saving, and the game's clock (minutes).
+    pub fn jobs(&self) -> (Vec<save::Job>, i64) {
+        let preview = self.preview();
+        (save::jobs(&preview), save::game_time(&preview).unwrap_or(0))
+    }
+
+    /// Makes every job offer last at least a week of game time from now.
+    pub fn keep_offers(&mut self, cx: &mut Context<Self>) {
+        self.change(cx, |pending, _| pending.keep_offers = true);
+    }
+
     /// Marks one vehicle for repair.
     pub fn repair(&mut self, id: &str, cx: &mut Context<Self>) {
         self.change(cx, |pending, _| {
@@ -326,6 +343,7 @@ impl Session {
             + usize::from(!self.pending.maxed_drivers.is_empty())
             + self.pending.raw_edits.len()
             + usize::from(self.pending.visit_all_cities)
+            + usize::from(self.pending.keep_offers)
             + usize::from(!self.pending.unlock_dealers.is_empty())
             + usize::from(!self.pending.unlock_recruitments.is_empty())
     }
@@ -593,6 +611,13 @@ impl Session {
                 ),
             );
         }
+        if self.pending.keep_offers {
+            add(
+                t!(cx, "jobs-offers"),
+                t!(cx, "garages-before"),
+                t!(cx, "jobs-kept-week"),
+            );
+        }
         if !self.pending.refueled.is_empty() {
             add(
                 t!(cx, "fuel"),
@@ -641,6 +666,11 @@ impl Session {
         }
         if self.pending.visit_all_cities {
             save::visit_all_cities(&mut slot.game);
+        }
+        if self.pending.keep_offers
+            && let Some(now) = save::game_time(&slot.game)
+        {
+            save::extend_offers(&mut slot.game, now + KEEP_OFFERS_MINUTES);
         }
         for place in [Place::Dealer, Place::Recruitment] {
             let cities: Vec<String> = self.pending.unlocks(place).iter().cloned().collect();

@@ -61,6 +61,10 @@ pub struct GameData {
     recruitment_cities: BTreeSet<String>,
     /// Vehicle models: model id → (brand text key, series text key).
     models: HashMap<String, (String, String)>,
+    /// Companies' names (`renar` → `Renar Logistik`), as the game writes them (not translated).
+    company_names: HashMap<String, String>,
+    /// Cargo: token → key of its name in the text (`battery` → `cn_batteries`).
+    cargo_names: HashMap<String, String>,
     /// Brand logos, by brand token (`volvo`): for trucks, and for coaches.
     truck_logos: HashMap<String, Arc<GameIcon>>,
     coach_logos: HashMap<String, Arc<GameIcon>>,
@@ -125,9 +129,40 @@ impl GameData {
                 .collect();
         }
 
-        let archives = def_archives(install_dir);
-        data.models = vehicles::read_models(&archives);
-        let cities = cities::read_cities(&archives);
+        // Every archive with definitions, opened once: the base game's, then each DLC's.
+        let mut cities = cities::Cities::default();
+        for path in def_archives(install_dir) {
+            let Ok(mut archive) = hashfs::Archive::open(&path) else {
+                continue;
+            };
+            vehicles::add_models(&mut archive, &mut data.models);
+            for_each_definition(&mut archive, "city", |document| cities.add(document));
+            for_each_definition(&mut archive, "company", |document| {
+                for unit in document.units_of_kind("company_permanent") {
+                    let (Some(token), Some(name)) = (
+                        unit.id.strip_prefix("company.permanent."),
+                        unit.single("name"),
+                    ) else {
+                        continue;
+                    };
+                    data.company_names.insert(
+                        token.to_string(),
+                        sii::value::parse_string(name).to_string(),
+                    );
+                }
+            });
+            for_each_definition(&mut archive, "cargo", |document| {
+                for unit in document.units_of_kind("cargo_data") {
+                    let (Some(token), Some(name)) =
+                        (unit.id.strip_prefix("cargo."), unit.single("name"))
+                    else {
+                        continue;
+                    };
+                    let key = sii::value::parse_string(name).trim_matches('@').to_string();
+                    data.cargo_names.insert(token.to_string(), key);
+                }
+            });
+        }
         data.recruitment_cities = recruitment::RECRUITMENT_CITIES
             .iter()
             .filter(|token| cities.names.contains_key(**token))
@@ -176,6 +211,17 @@ impl GameData {
             // Trailers: the series alone (`Box`).
             None => Some(series),
         }
+    }
+
+    /// A company's name (`renar` → `Renar Logistik`).
+    pub fn company_name(&self, token: &str) -> Option<String> {
+        self.company_names.get(token).cloned()
+    }
+
+    /// A cargo's name in the loaded language (`battery` → `Batteries`).
+    pub fn cargo_name(&self, token: &str) -> Option<String> {
+        self.text(self.cargo_names.get(token)?)
+            .filter(|name| !name.is_empty())
     }
 
     /// A brand's logo (`volvo`), from the truck or coach set.
@@ -247,6 +293,29 @@ fn def_archives(install_dir: &Path) -> Vec<PathBuf> {
         archives.extend(dlcs);
     }
     archives
+}
+
+/// Reads every definition file of one kind in an archive: `def/<base>.sii` and the `def/<base>.*.sii`
+/// files DLCs and patches add. A file that can't be read is skipped.
+fn for_each_definition(
+    archive: &mut hashfs::Archive,
+    base: &str,
+    mut each: impl FnMut(&sii::Document),
+) {
+    let Ok(Some(listing)) = archive.list("/def") else {
+        return;
+    };
+    let prefix = format!("{base}.");
+    let files: Vec<String> = listing
+        .files
+        .into_iter()
+        .filter(|name| name.starts_with(&prefix) && name.ends_with(".sii"))
+        .collect();
+    for file in files {
+        if let Ok(document) = read_document(archive, &format!("/def/{file}")) {
+            each(&document);
+        }
+    }
 }
 
 /// Reads a game file (any SII form), with its `@include`s.

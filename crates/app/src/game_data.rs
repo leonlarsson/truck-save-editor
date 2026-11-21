@@ -180,3 +180,17 @@ pub fn driver_face(cx: &mut App, driver_id: &str) -> Option<Arc<GameIcon>> {
     .detach();
     None
 }
+
+/// A company's name (`renar` → `Renar Logistik`), else made from its token.
+pub fn company_name(cx: &App, token: &str) -> String {
+    data(cx)
+        .and_then(|d| d.company_name(token))
+        .unwrap_or_else(|| save::city_display_name(token))
+}
+
+/// A cargo's name (`battery` → `Batteries`), else made from its token.
+pub fn cargo_name(cx: &App, token: &str) -> String {
+    data(cx)
+        .and_then(|d| d.cargo_name(token))
+        .unwrap_or_else(|| save::city_display_name(token))
+}

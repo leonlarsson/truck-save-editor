@@ -121,6 +121,47 @@ redo = Redo
 undo-tooltip = Undo (Ctrl+Z)
 redo-tooltip = Redo (Ctrl+Shift+Z)
 
+## Jobs
+
+page-jobs = Jobs
+jobs-summary = { $count ->
+    [one] 1 job offer
+   *[other] { $amount } job offers
+}
+jobs-offers = Job offers
+jobs-keep = Keep every offer a week
+jobs-keep-tooltip = Make every job offer last at least a week of game time, so the one you want is still there.
+jobs-kept-week = Kept for at least a week
+jobs-table = Job offers
+jobs-search = Search by city, company or cargo
+jobs-filter-my-garages = From my garages
+jobs-filter-urgent = Urgent
+jobs-filter-no-ferry = No ferry
+column-from = From
+column-to = To
+column-cargo = Cargo
+column-distance = Distance
+column-expires = Expires
+column-urgency = Urgency
+job-place = { $company }, { $city }
+job-urgency-standard = Standard
+job-urgency-important = Important
+job-urgency-urgent = Urgent
+job-expires-in = { $minutes ->
+    [one] in 1 minute
+   *[other] in { $minutes } minutes
+}
+job-expires-in-hours = { $hours ->
+    [one] in 1 hour
+   *[other] in { $hours } hours
+}
+job-expires-in-days = { $days ->
+    [one] in 1 day
+   *[other] in { $days } days
+}
+job-expired = Expired
+job-ferry = { $distance } · ferry
+
 ## Filters
 
 filter-count = { $shown } of { $total }

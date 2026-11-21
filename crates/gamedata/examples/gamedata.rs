@@ -38,6 +38,11 @@ fn main() {
                 println!("{model}: {:?}", data.model_name(model));
             }
             println!(
+                "renar: {:?}, battery: {:?}",
+                data.company_name("renar"),
+                data.cargo_name("battery")
+            );
+            println!(
                 "{} cities with a dealer, {} with a recruitment agency",
                 data.dealer_cities().len(),
                 data.recruitment_cities().len()

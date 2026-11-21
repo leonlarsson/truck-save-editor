@@ -3,9 +3,6 @@
 //! truck dealer (`vehicle_brands[]`).
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::PathBuf;
-
-use crate::read_document;
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct Cities {
@@ -15,43 +12,22 @@ pub(crate) struct Cities {
     pub dealers: BTreeSet<String>,
 }
 
-/// Reads the city definitions from the given archives (see `def_archives`). An archive or file
-/// that can't be read is skipped: the rest still count.
-pub(crate) fn read_cities(archives: &[PathBuf]) -> Cities {
-    let mut cities = Cities::default();
-    for path in archives {
-        let Ok(mut archive) = hashfs::Archive::open(path) else {
-            continue;
-        };
-        let Ok(Some(listing)) = archive.list("/def") else {
-            continue;
-        };
-        let files: Vec<String> = listing
-            .files
-            .into_iter()
-            .filter(|name| {
-                name == "city.sii" || (name.starts_with("city.") && name.ends_with(".sii"))
-            })
-            .collect();
-        for file in files {
-            let Ok(document) = read_document(&mut archive, &format!("/def/{file}")) else {
+impl Cities {
+    /// Adds the cities a `city.sii` (or a DLC's `city.*.sii`) defines.
+    pub(crate) fn add(&mut self, document: &sii::Document) {
+        for unit in document.units_of_kind("city_data") {
+            let Some(token) = unit.id.strip_prefix("city.") else {
                 continue;
             };
-            for unit in document.units_of_kind("city_data") {
-                let Some(token) = unit.id.strip_prefix("city.") else {
-                    continue;
-                };
-                let name_key = unit
-                    .single("city_name_localized")
-                    .map(|key| sii::value::parse_string(key).trim_matches('@').to_string())
-                    .filter(|key| !key.is_empty())
-                    .unwrap_or_else(|| token.to_string());
-                cities.names.insert(token.to_string(), name_key);
-                if !unit.items("vehicle_brands").is_empty() {
-                    cities.dealers.insert(token.to_string());
-                }
+            let name_key = unit
+                .single("city_name_localized")
+                .map(|key| sii::value::parse_string(key).trim_matches('@').to_string())
+                .filter(|key| !key.is_empty())
+                .unwrap_or_else(|| token.to_string());
+            self.names.insert(token.to_string(), name_key);
+            if !unit.items("vehicle_brands").is_empty() {
+                self.dealers.insert(token.to_string());
             }
         }
     }
-    cities
 }

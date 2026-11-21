@@ -4,17 +4,16 @@
 //! (an empty key), only a series.
 
 use std::collections::HashMap;
-use std::path::PathBuf;
 
 use crate::read_document;
 
-/// Brand and series text keys, by model id (`volvo.fh16_2012`).
-pub(crate) fn read_models(archives: &[PathBuf]) -> HashMap<String, (String, String)> {
-    let mut models = HashMap::new();
-    for path in archives {
-        let Ok(mut archive) = hashfs::Archive::open(path) else {
-            continue;
-        };
+/// Adds the models an archive defines: brand and series text keys, by model id
+/// (`volvo.fh16_2012`). Models already known are kept.
+pub(crate) fn add_models(
+    archive: &mut hashfs::Archive,
+    models: &mut HashMap<String, (String, String)>,
+) {
+    {
         for kind in ["truck", "bus", "trailer_owned"] {
             let folder = format!("/def/vehicle/{kind}");
             let Ok(Some(listing)) = archive.list(&folder) else {
@@ -30,7 +29,7 @@ pub(crate) fn read_models(archives: &[PathBuf]) -> HashMap<String, (String, Stri
                 if !archive.contains(&data_path) {
                     continue;
                 }
-                let Ok(document) = read_document(&mut archive, &data_path) else {
+                let Ok(document) = read_document(archive, &data_path) else {
                     continue;
                 };
                 let info = document
@@ -49,5 +48,4 @@ pub(crate) fn read_models(archives: &[PathBuf]) -> HashMap<String, (String, Stri
             }
         }
     }
-    models
 }

@@ -32,6 +32,7 @@ use crate::pages::{
     drivers::DriversPage,
     fleet::FleetPage,
     garages::GaragesPage,
+    jobs::JobsPage,
     map::MapPage,
     open_save::{OpenSavePage, OpenSlot},
     overview::OverviewPage,
@@ -69,6 +70,7 @@ struct Opened {
     drivers: Entity<DriversPage>,
     all_data: Entity<AllDataPage>,
     map: Entity<MapPage>,
+    jobs: Entity<JobsPage>,
     _observe: Subscription,
 }
 
@@ -145,6 +147,7 @@ impl Workspace {
         let drivers = cx.new(|cx| DriversPage::new(session.clone(), window, cx));
         let all_data = cx.new(|cx| AllDataPage::new(session.clone(), window, cx));
         let map = cx.new(|cx| MapPage::new(session.clone(), window, cx));
+        let jobs = cx.new(|cx| JobsPage::new(session.clone(), window, cx));
         let _observe = cx.observe(&session, |_, _, cx| cx.notify());
         self.opened = Some(Opened {
             session,
@@ -154,6 +157,7 @@ impl Workspace {
             drivers,
             all_data,
             map,
+            jobs,
             _observe,
         });
     }
@@ -213,6 +217,7 @@ impl Workspace {
             PaletteCommand::AllAdr => {
                 edit(cx, Box::new(|career| career.skills.adr = save::ADR_ALL))
             }
+            PaletteCommand::KeepOffers => session.update(cx, |session, cx| session.keep_offers(cx)),
             PaletteCommand::RefuelAll => session.update(cx, |session, cx| {
                 session.refuel_all(VehicleKind::Truck, cx);
                 session.refuel_all(VehicleKind::Coach, cx);
@@ -755,6 +760,10 @@ impl Workspace {
             Page::Map => div()
                 .size_full()
                 .child(opened.map.clone())
+                .into_any_element(),
+            Page::Jobs => div()
+                .size_full()
+                .child(opened.jobs.clone())
                 .into_any_element(),
             Page::AllData => div()
                 .size_full()

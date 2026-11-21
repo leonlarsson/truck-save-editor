@@ -4,6 +4,7 @@ pub mod all_data;
 pub mod drivers;
 pub mod fleet;
 pub mod garages;
+pub mod jobs;
 pub mod map;
 pub mod open_save;
 pub mod overview;
@@ -22,20 +23,28 @@ pub enum Page {
     Garages,
     Drivers,
     Map,
+    Jobs,
     AllData,
 }
 
 impl Page {
-    pub const ALL: [Page; 6] = [
+    pub const ALL: [Page; 7] = [
         Page::Overview,
         Page::Fleet,
         Page::Garages,
         Page::Drivers,
         Page::Map,
+        Page::Jobs,
         Page::AllData,
     ];
     pub const CAREER: [Page; 1] = [Page::Overview];
-    pub const COMPANY: [Page; 4] = [Page::Fleet, Page::Garages, Page::Drivers, Page::Map];
+    pub const COMPANY: [Page; 5] = [
+        Page::Fleet,
+        Page::Garages,
+        Page::Drivers,
+        Page::Map,
+        Page::Jobs,
+    ];
     pub const ADVANCED: [Page; 1] = [Page::AllData];
 
     pub fn title(self, cx: &App) -> SharedString {
@@ -45,6 +54,7 @@ impl Page {
             Page::Garages => t!(cx, "page-garages"),
             Page::Drivers => t!(cx, "page-drivers"),
             Page::Map => t!(cx, "page-map"),
+            Page::Jobs => t!(cx, "page-jobs"),
             Page::AllData => t!(cx, "page-all-data"),
         }
     }
@@ -57,6 +67,7 @@ impl Page {
             Page::Garages => "garages",
             Page::Drivers => "drivers",
             Page::Map => "map",
+            Page::Jobs => "jobs",
             Page::AllData => "all-data",
         }
     }
@@ -68,6 +79,7 @@ impl Page {
             Page::Garages => IconName::Warehouse,
             Page::Drivers => IconName::Users,
             Page::Map => IconName::Map,
+            Page::Jobs => IconName::Container,
             Page::AllData => IconName::Database,
         }
     }

@@ -31,6 +31,7 @@ pub enum PaletteCommand {
     MaxAllDrivers,
     VisitEveryCity,
     RefuelAll,
+    KeepOffers,
     UnlockDealers,
     UnlockRecruitments,
     Save,
@@ -62,6 +63,7 @@ fn groups(has_coaches: bool) -> Vec<Vec<PaletteCommand>> {
         PaletteCommand::VisitEveryCity,
         PaletteCommand::UnlockDealers,
         PaletteCommand::UnlockRecruitments,
+        PaletteCommand::KeepOffers,
     ];
     if has_coaches {
         actions.insert(2, PaletteCommand::MaxCoachSkills);
@@ -125,6 +127,11 @@ fn item(command: PaletteCommand, cx: &App) -> CommandItem {
             t!(cx, "palette-refuel-all"),
             IconName::Truck,
             &["fuel", "tank", "fill", "diesel"],
+        ),
+        PaletteCommand::KeepOffers => (
+            t!(cx, "jobs-keep"),
+            IconName::Container,
+            &["jobs", "offers", "cargo", "expire"],
         ),
         PaletteCommand::BuyAllGarages => (
             t!(cx, "palette-buy-all-garages"),

@@ -167,3 +167,7 @@ Saves can hold tokens for cities that no longer have one (a leftover from an old
 
 - Trucks and trailers live in garages (`garage.vehicles[]`, `garage.trailers[]`). Coaches have no garage. The player has one own vehicle slot per mode in `player.my_vehicles[]` (`player_vehicles` units: `vehicle`, `stored_vehicle_city`, where it's parked while another mode is in use), and `player.assigned_vehicles` is the one being driven now.
 - Hired drivers are `driver_ai : driver.<n>` units with no name field. Their face is the game's `material/ui/driver/<n>.mat` (a plain 256×256 picture). The game reads names from `/locale/<lang>/driver_names.sii` when there is one; 1.62 ships none.
+
+## Jobs
+
+Each company in each city is `company : company.volatile.<company>.<city>`, with its offers in `job_offer[]`: `job_offer_data` units with `target` (`"<company>.<city>"`), `cargo` (`cargo.<token>`; `null` for an empty slot), `shortest_distance_km`, `urgency` (0 standard, 1 important, 2 urgent), `ferry_time` and `ferry_price`, `units_count`, `trailer_definition`, and `expiration_time` in game minutes, against `economy.game_time`. Names come from the game: `def/company/<token>.sui` (`company_permanent`, a plain `name`) and `def/cargo/<token>.sui` (`cargo_data`, `name` a text key), plus the `company.*.sii` and `cargo.*.sii` each DLC adds.
