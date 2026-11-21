@@ -5,8 +5,9 @@
 
 mod assets;
 mod format;
+mod labels;
 mod pages;
-mod sample;
+mod session;
 mod theme;
 mod ui;
 mod workspace;

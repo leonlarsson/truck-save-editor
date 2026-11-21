@@ -10,6 +10,7 @@ repository = "https://github.com/leonlarsson/truck-save-editor"
 
 [workspace.dependencies]
 sii = { path = "crates/sii" }
+save = { path = "crates/save" }
 
 # GPUI Kit (GPUI + gpui-component + assets) is pinned exactly: its API changes between releases.
 gpui-kit = "=0.10.0"

@@ -20,7 +20,7 @@ pub use career::{ADR_ALL, Career, MAX_SKILL_LEVEL, Skills};
 pub use error::{Error, Result};
 pub use fleet::{Truck, Wear, model_display_name, repair, trucks};
 pub use game::Game;
-pub use info::{SlotInfo, update_info};
+pub use info::{SlotInfo, read_info, update_info};
 #[cfg(feature = "native")]
 pub use profiles::{
     Location, PROFILE_DIRS_VARIABLE, Profile, Slot, SlotKind, decode_profile_folder, find_profiles,

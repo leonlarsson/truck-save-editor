@@ -1,6 +1,7 @@
 //! The app's pages, one per sidebar entry.
 
 pub mod fleet;
+pub mod open_save;
 pub mod overview;
 
 use gpui_kit::SharedString;

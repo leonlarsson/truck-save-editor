@@ -2,35 +2,38 @@
 
 use gpui_kit::component::{
     ActiveTheme as _, Sizable as _, StyledExt as _, button::Button, checkbox::Checkbox, h_flex,
-    progress::Progress, v_flex,
+    v_flex,
 };
 use gpui_kit::{
     AppContext as _, Context, Entity, IntoElement, ParentElement as _, Render, Styled as _,
     Subscription, Window, div, rems,
 };
+use save::{ADR_ALL, MAX_SKILL_LEVEL, Skills};
 
-use crate::format::compact;
-use crate::sample::{self, ADR_ALL, ADR_CLASSES, Career, MAX_SKILL_LEVEL, SKILLS};
+use crate::format::{compact, thousands};
+use crate::labels::{ADR_CLASSES, SKILLS};
+use crate::session::Session;
 use crate::ui::{AmountChanged, AmountField, LevelPicker, Section, StepButtons, page_body};
 
 /// What typing in an amount field can do, said once under each field.
 const AMOUNT_HINT: &str = "Try 2.5m, 10k, +1m or -500k.";
 
 pub struct OverviewPage {
-    /// The career as loaded; edits are compared against it to count changes.
-    original: Career,
-    career: Career,
+    session: Entity<Session>,
     money: Entity<AmountField>,
     experience: Entity<AmountField>,
     _subscriptions: Vec<Subscription>,
 }
 
 impl OverviewPage {
-    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let career = Career::sample();
+    pub fn new(session: Entity<Session>, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let (career, currency) = {
+            let session = session.read(cx);
+            (session.career().clone(), session.game().currency_symbol())
+        };
         let money = cx.new(|cx| {
-            AmountField::new(career.money, "Bank balance in euros", window, cx)
-                .prefix("€")
+            AmountField::new(career.money, "Bank balance", window, cx)
+                .prefix(currency)
                 .hint(AMOUNT_HINT)
         });
         let experience = cx.new(|cx| {
@@ -42,54 +45,43 @@ impl OverviewPage {
 
         let _subscriptions = vec![
             cx.subscribe(&money, |this, _, AmountChanged(value), cx| {
-                this.career.money = *value;
-                cx.notify();
+                let value = *value;
+                this.edit(cx, |career| career.money = value);
             }),
             cx.subscribe(&experience, |this, _, AmountChanged(value), cx| {
-                this.career.experience = *value;
+                let value = *value;
+                this.edit(cx, |career| career.experience = value);
+            }),
+            // Changes made elsewhere (step buttons, Discard, saving) show in the fields too.
+            cx.observe_in(&session, window, |this, _, window, cx| {
+                this.sync_fields(window, cx);
                 cx.notify();
             }),
         ];
 
         Self {
-            original: career.clone(),
-            career,
+            session,
             money,
             experience,
             _subscriptions,
         }
     }
 
-    /// How many values differ from the loaded save.
-    pub fn changes(&self) -> usize {
-        self.career.changes_from(&self.original)
-    }
-
-    pub fn discard_changes(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.career = self.original.clone();
-        self.sync_fields(window, cx);
-        cx.notify();
-    }
-
-    fn set_money(&mut self, value: i64, window: &mut Window, cx: &mut Context<Self>) {
-        self.career.money = value;
-        self.sync_fields(window, cx);
-        cx.notify();
-    }
-
-    fn set_experience(&mut self, value: i64, window: &mut Window, cx: &mut Context<Self>) {
-        self.career.experience = value.max(0);
-        self.sync_fields(window, cx);
-        cx.notify();
-    }
-
-    /// Puts the career's values into the fields after a change made elsewhere (a button, Discard).
     fn sync_fields(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let (money, experience) = (self.career.money, self.career.experience);
-        self.money
-            .update(cx, |field, cx| field.set_value(money, window, cx));
-        self.experience
-            .update(cx, |field, cx| field.set_value(experience, window, cx));
+        let career = self.session.read(cx).career().clone();
+        for (field, value) in [
+            (&self.money, career.money),
+            (&self.experience, career.experience),
+        ] {
+            if field.read(cx).value() != value {
+                field.update(cx, |field, cx| field.set_value(value, window, cx));
+            }
+        }
+    }
+
+    fn edit(&self, cx: &mut Context<Self>, edit: impl FnOnce(&mut save::Career)) {
+        self.session
+            .update(cx, |session, cx| session.edit_career(cx, edit));
     }
 
     fn render_money(&self, cx: &mut Context<Self>) -> Section {
@@ -99,67 +91,45 @@ impl OverviewPage {
             .child(self.money.clone())
             .child(h_flex().gap_2().flex_wrap().children(steps.map(|step| {
                 StepButtons::new(("money-step", step as usize), compact(step)).on_step(cx.listener(
-                    move |this, direction: &i64, window, cx| {
-                        let value = this.career.money.saturating_add(direction * step);
-                        this.set_money(value, window, cx);
+                    move |this, direction: &i64, _, cx| {
+                        let direction = *direction;
+                        this.edit(cx, |career| {
+                            career.money = career.money.saturating_add(direction * step);
+                        });
                     },
                 ))
             })))
     }
 
     fn render_experience(&self, cx: &mut Context<Self>) -> Section {
-        let (level, progress) = sample::level_for(self.career.experience);
-        // The experience at which a level starts. PLACEHOLDER curve, like `sample::level_for`.
-        let level_start = |level: i64| level.max(0) * level.max(0) * 400;
-        Section::new("Experience")
+        let steps: [i64; 3] = [10_000, 100_000, 1_000_000];
+        let bus = self.session.read(cx).career().bus_experience;
+        let mut section = Section::new("Experience")
             .description("Experience points decide your level.")
-            .child(
-                v_flex()
-                    .gap_2()
-                    .child(
-                        h_flex()
-                            .justify_between()
-                            .items_end()
-                            .child(
-                                div()
-                                    .text_2xl()
-                                    .font_semibold()
-                                    .child(format!("Level {level}")),
-                            )
-                            .child(
-                                div()
-                                    .text_sm()
-                                    .text_color(cx.theme().muted_foreground)
-                                    .child(format!(
-                                        "{}% to level {}",
-                                        (progress * 100.0).floor(),
-                                        level + 1
-                                    )),
-                            ),
-                    )
-                    .child(
-                        Progress::new("level-progress")
-                            .value(progress * 100.0)
-                            .accessibility_label("Progress to the next level"),
-                    ),
-            )
             .child(self.experience.clone())
-            .child(
-                h_flex()
-                    .gap_2()
-                    .flex_wrap()
-                    .children([(1, "1 level"), (10, "10 levels")].map(|(levels, label)| {
-                        StepButtons::new(("level-step", levels as usize), label).on_step(
-                            cx.listener(move |this, direction: &i64, window, cx| {
-                                let target = level + direction * levels;
-                                this.set_experience(level_start(target), window, cx);
-                            }),
-                        )
-                    })),
-            )
+            .child(h_flex().gap_2().flex_wrap().children(steps.map(|step| {
+                StepButtons::new(("xp-step", step as usize), compact(step)).on_step(cx.listener(
+                    move |this, direction: &i64, _, cx| {
+                        let direction = *direction;
+                        this.edit(cx, |career| {
+                            career.experience = (career.experience + direction * step).max(0);
+                        });
+                    },
+                ))
+            })));
+        if let Some(bus) = bus.filter(|bus| *bus > 0) {
+            section = section.child(
+                div()
+                    .text_xs()
+                    .text_color(cx.theme().muted_foreground)
+                    .child(format!("Bus driving: {} XP", thousands(bus))),
+            );
+        }
+        section
     }
 
     fn render_skills(&self, cx: &mut Context<Self>) -> Section {
+        let skills = self.session.read(cx).career().skills;
         let rows = SKILLS.iter().enumerate().map(|(index, skill)| {
             h_flex()
                 .justify_between()
@@ -179,10 +149,10 @@ impl OverviewPage {
                 .child(
                     LevelPicker::new(("skill", index), skill.name)
                         .max(MAX_SKILL_LEVEL)
-                        .value(self.career.skills[index])
+                        .value(skills.levels()[index].1)
                         .on_change(cx.listener(move |this, level: &u8, _, cx| {
-                            this.career.skills[index] = *level;
-                            cx.notify();
+                            let level = *level;
+                            this.edit(cx, |career| career.skills.set_level(index, level));
                         })),
                 )
         });
@@ -197,27 +167,34 @@ impl OverviewPage {
                     .outline()
                     .label("Max all skills")
                     .on_click(cx.listener(|this, _, _, cx| {
-                        this.career.skills = [MAX_SKILL_LEVEL; 5];
-                        cx.notify();
+                        this.edit(cx, |career| {
+                            career.skills = Skills {
+                                adr: career.skills.adr,
+                                ..Skills::maxed()
+                            };
+                        });
                     })),
             )
             .children(rows)
     }
 
     fn render_adr(&self, cx: &mut Context<Self>) -> Section {
+        let adr = self.session.read(cx).career().skills.adr;
         let classes = ADR_CLASSES.iter().enumerate().map(|(bit, name)| {
             let mask = 1u8 << bit;
             div().w(rems(13.)).child(
                 Checkbox::new(("adr", bit))
                     .label(*name)
-                    .checked(self.career.adr & mask != 0)
+                    .checked(adr & mask != 0)
                     .on_change(cx.listener(move |this, checked: &bool, _, cx| {
-                        if *checked {
-                            this.career.adr |= mask;
-                        } else {
-                            this.career.adr &= !mask;
-                        }
-                        cx.notify();
+                        let checked = *checked;
+                        this.edit(cx, |career| {
+                            if checked {
+                                career.skills.adr |= mask;
+                            } else {
+                                career.skills.adr &= !mask;
+                            }
+                        });
                     })),
             )
         });
@@ -230,8 +207,7 @@ impl OverviewPage {
                     .outline()
                     .label("All classes")
                     .on_click(cx.listener(|this, _, _, cx| {
-                        this.career.adr = ADR_ALL;
-                        cx.notify();
+                        this.edit(cx, |career| career.skills.adr = ADR_ALL);
                     })),
             )
             .child(h_flex().flex_wrap().gap_y_3().children(classes))

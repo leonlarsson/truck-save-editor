@@ -97,6 +97,11 @@ impl AmountField {
         self
     }
 
+    /// The amount, as last confirmed.
+    pub fn value(&self) -> i64 {
+        self.value
+    }
+
     /// Sets the amount from elsewhere (a button, Discard). Doesn't emit `AmountChanged`.
     pub fn set_value(&mut self, value: i64, window: &mut Window, cx: &mut Context<Self>) {
         self.value = value;

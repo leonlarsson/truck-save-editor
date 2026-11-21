@@ -13,6 +13,7 @@ use crate::error::{Error, Result, io};
 use crate::game::Game;
 
 /// A slot read into memory.
+#[derive(Clone)]
 pub struct LoadedSlot {
     pub dir: PathBuf,
     pub game: Document,

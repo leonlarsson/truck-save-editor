@@ -56,6 +56,13 @@ impl SlotInfo {
     }
 }
 
+/// Reads a slot's `info.sii` file (any form) into its summary.
+pub fn read_info(bytes: &[u8]) -> Option<SlotInfo> {
+    sii::read(bytes)
+        .ok()
+        .map(|document| SlotInfo::read(&document))
+}
+
 /// Updates the load menu's summary to match a changed career.
 pub fn update_info(info: &mut Document, career: &Career) {
     let Some(id) = info

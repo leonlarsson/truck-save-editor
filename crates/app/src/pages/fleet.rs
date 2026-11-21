@@ -1,9 +1,7 @@
 //! Fleet: every truck the company owns, in a sortable table that stays smooth with thousands of rows.
 
-use std::collections::HashMap;
-
 use gpui_kit::component::{
-    ActiveTheme as _, Sizable as _,
+    ActiveTheme as _, Disableable as _, Sizable as _,
     button::Button,
     h_flex,
     table::{Column, ColumnSort, DataTable, TableDelegate, TableState},
@@ -11,73 +9,63 @@ use gpui_kit::component::{
 };
 use gpui_kit::{
     App, AppContext as _, Context, Entity, IntoElement, ParentElement as _, Render, SharedString,
-    Styled as _, Window, div,
+    Styled as _, Subscription, Window, div,
 };
+use save::Truck;
 
 use crate::format::thousands;
-use crate::sample::{self, Truck};
-
-/// The number of made-up trucks: well beyond any real fleet, to prove the table stays smooth.
-const SAMPLE_TRUCKS: u32 = 2_000;
+use crate::session::Session;
 
 pub struct FleetPage {
+    session: Entity<Session>,
     table: Entity<TableState<TruckTable>>,
+    _subscriptions: Vec<Subscription>,
 }
 
 impl FleetPage {
-    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let trucks = sample::trucks(SAMPLE_TRUCKS);
-        let original_wear = trucks
-            .iter()
-            .map(|truck| (truck.id, truck.wear_percent))
-            .collect();
+    pub fn new(session: Entity<Session>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let delegate = TruckTable {
-            trucks,
-            original_wear,
+            trucks: session.read(cx).trucks(),
+            sort: None,
         };
         let table = cx.new(|cx| TableState::new(delegate, window, cx).sortable(true));
-        cx.observe(&table, |_, _, cx| cx.notify()).detach();
-        Self { table }
-    }
-
-    /// How many trucks differ from the loaded save.
-    pub fn changes(&self, cx: &App) -> usize {
-        self.table.read(cx).delegate().changed_trucks()
-    }
-
-    pub fn discard_changes(&mut self, cx: &mut Context<Self>) {
-        self.table.update(cx, |table, cx| {
-            let delegate = table.delegate_mut();
-            for truck in &mut delegate.trucks {
-                if let Some(wear) = delegate.original_wear.get(&truck.id) {
-                    truck.wear_percent = *wear;
-                }
-            }
-            table.refresh(cx);
+        let _subscriptions = vec![cx.observe(&session, |this, session, cx| {
+            let trucks = session.read(cx).trucks();
+            this.table.update(cx, |table, cx| {
+                table.delegate_mut().set_trucks(trucks);
+                table.refresh(cx);
+                cx.notify();
+            });
             cx.notify();
-        });
-    }
-
-    fn repair_all(&mut self, cx: &mut Context<Self>) {
-        self.table.update(cx, |table, cx| {
-            for truck in &mut table.delegate_mut().trucks {
-                truck.wear_percent = 0;
-            }
-            table.refresh(cx);
-            cx.notify();
-        });
+        })];
+        Self {
+            session,
+            table,
+            _subscriptions,
+        }
     }
 }
 
 impl Render for FleetPage {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let delegate = self.table.read(cx).delegate();
-        let truck_count = delegate.trucks.len();
-        let worn_count = delegate
-            .trucks
+        let trucks = &self.table.read(cx).delegate().trucks;
+        let truck_count = trucks.len();
+        let worn_count = trucks
             .iter()
-            .filter(|truck| truck.wear_percent > 0)
+            .filter(|truck| truck.wear.worst() > 0.0)
             .count();
+        let summary = match worn_count {
+            0 => format!(
+                "{} trucks · all in good shape",
+                thousands(truck_count as i64)
+            ),
+            1 => format!("{} trucks · 1 needs repairs", thousands(truck_count as i64)),
+            n => format!(
+                "{} trucks · {} need repairs",
+                thousands(truck_count as i64),
+                thousands(n as i64)
+            ),
+        };
 
         v_flex()
             .size_full()
@@ -93,18 +81,18 @@ impl Render for FleetPage {
                         div()
                             .text_sm()
                             .text_color(cx.theme().muted_foreground)
-                            .child(format!(
-                                "{} trucks · {} need repairs",
-                                thousands(truck_count as i64),
-                                thousands(worn_count as i64)
-                            )),
+                            .child(summary),
                     )
                     .child(
                         Button::new("repair-all")
                             .small()
                             .outline()
                             .label("Repair all")
-                            .on_click(cx.listener(|this, _, _, cx| this.repair_all(cx))),
+                            .disabled(worn_count == 0)
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.session
+                                    .update(cx, |session, cx| session.repair_all(cx));
+                            })),
                     ),
             )
             .child(
@@ -121,25 +109,23 @@ impl Render for FleetPage {
 /// Feeds the trucks to GPUI Kit's table. Only the visible rows are ever rendered.
 struct TruckTable {
     trucks: Vec<Truck>,
-    /// Wear as loaded, by truck id, to count changes and undo them.
-    original_wear: HashMap<u32, u8>,
+    /// The sort in effect, kept so new data (after a repair) stays in the same order.
+    sort: Option<(TruckColumn, ColumnSort)>,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 enum TruckColumn {
     Truck,
     Plate,
-    Driver,
     Garage,
     Odometer,
     Wear,
 }
 
 impl TruckColumn {
-    const ALL: [TruckColumn; 6] = [
+    const ALL: [TruckColumn; 5] = [
         TruckColumn::Truck,
         TruckColumn::Plate,
-        TruckColumn::Driver,
         TruckColumn::Garage,
         TruckColumn::Odometer,
         TruckColumn::Wear,
@@ -147,11 +133,32 @@ impl TruckColumn {
 }
 
 impl TruckTable {
-    fn changed_trucks(&self) -> usize {
-        self.trucks
-            .iter()
-            .filter(|truck| self.original_wear.get(&truck.id) != Some(&truck.wear_percent))
-            .count()
+    fn set_trucks(&mut self, trucks: Vec<Truck>) {
+        self.trucks = trucks;
+        if let Some((column, sort)) = self.sort {
+            self.sort_by(column, sort);
+        }
+    }
+
+    /// Sorts by a column; equal values keep the order the save lists them in (the sort is stable).
+    fn sort_by(&mut self, column: TruckColumn, sort: ColumnSort) {
+        if sort == ColumnSort::Default {
+            return;
+        }
+        self.trucks.sort_by(|a, b| {
+            let ordering = match column {
+                TruckColumn::Truck => a.display_name().cmp(&b.display_name()),
+                TruckColumn::Plate => a.plate.cmp(&b.plate),
+                TruckColumn::Garage => a.garage_city.cmp(&b.garage_city),
+                TruckColumn::Odometer => a.odometer_km.cmp(&b.odometer_km),
+                TruckColumn::Wear => a.wear.worst().total_cmp(&b.wear.worst()),
+            };
+            if sort == ColumnSort::Descending {
+                ordering.reverse()
+            } else {
+                ordering
+            }
+        });
     }
 
     fn text(&self, row: usize, column: TruckColumn) -> SharedString {
@@ -159,16 +166,17 @@ impl TruckTable {
             return SharedString::default();
         };
         match column {
-            TruckColumn::Truck => truck.name.clone().into(),
+            TruckColumn::Truck => truck.display_name().into(),
             TruckColumn::Plate => truck.plate.clone().into(),
-            TruckColumn::Driver => truck
-                .driver
-                .clone()
-                .unwrap_or_else(|| "No driver".into())
+            TruckColumn::Garage => truck
+                .garage_city
+                .as_deref()
+                .map(save::city_display_name)
+                .unwrap_or_else(|| "No garage".to_string())
                 .into(),
-            TruckColumn::Garage => truck.garage.into(),
             TruckColumn::Odometer => format!("{} km", thousands(truck.odometer_km)).into(),
-            TruckColumn::Wear => format!("{} %", truck.wear_percent).into(),
+            // Rounded up, so any wear at all shows (and matches the "need repairs" count).
+            TruckColumn::Wear => format!("{}%", (truck.wear.worst() * 100.0).ceil()).into(),
         }
     }
 }
@@ -184,10 +192,9 @@ impl TableDelegate for TruckTable {
 
     fn column(&self, col_ix: usize, _: &App) -> Column {
         match TruckColumn::ALL.get(col_ix) {
-            Some(TruckColumn::Truck) => Column::new("truck", "Truck").width(200.).sortable(),
-            Some(TruckColumn::Plate) => Column::new("plate", "Plate").width(100.),
-            Some(TruckColumn::Driver) => Column::new("driver", "Driver").width(170.).sortable(),
-            Some(TruckColumn::Garage) => Column::new("garage", "Garage").width(130.).sortable(),
+            Some(TruckColumn::Truck) => Column::new("truck", "Truck").width(220.).sortable(),
+            Some(TruckColumn::Plate) => Column::new("plate", "Plate").width(110.).sortable(),
+            Some(TruckColumn::Garage) => Column::new("garage", "Garage").width(150.).sortable(),
             Some(TruckColumn::Odometer) => Column::new("odometer", "Odometer")
                 .width(130.)
                 .text_right()
@@ -209,22 +216,8 @@ impl TableDelegate for TruckTable {
         let Some(column) = TruckColumn::ALL.get(col_ix).copied() else {
             return;
         };
-        // Sort by the column, keeping a stable order (by id) for equal values.
-        self.trucks.sort_by(|a, b| {
-            let ordering = match column {
-                TruckColumn::Truck => a.name.cmp(&b.name),
-                TruckColumn::Plate => a.plate.cmp(&b.plate),
-                TruckColumn::Driver => a.driver.cmp(&b.driver),
-                TruckColumn::Garage => a.garage.cmp(b.garage),
-                TruckColumn::Odometer => a.odometer_km.cmp(&b.odometer_km),
-                TruckColumn::Wear => a.wear_percent.cmp(&b.wear_percent),
-            };
-            match sort {
-                ColumnSort::Ascending => ordering.then(a.id.cmp(&b.id)),
-                ColumnSort::Descending => ordering.reverse().then(a.id.cmp(&b.id)),
-                ColumnSort::Default => a.id.cmp(&b.id),
-            }
-        });
+        self.sort = (sort != ColumnSort::Default).then_some((column, sort));
+        self.sort_by(column, sort);
     }
 
     fn render_td(
@@ -238,13 +231,14 @@ impl TableDelegate for TruckTable {
             .get(col_ix)
             .copied()
             .unwrap_or(TruckColumn::Truck);
-        let is_missing_driver = matches!(column, TruckColumn::Driver)
-            && self
-                .trucks
-                .get(row_ix)
-                .is_some_and(|truck| truck.driver.is_none());
+        let truck = self.trucks.get(row_ix);
+        let is_muted = match column {
+            TruckColumn::Garage => truck.is_some_and(|truck| truck.garage_city.is_none()),
+            TruckColumn::Wear => truck.is_some_and(|truck| truck.wear.worst() == 0.0),
+            _ => false,
+        };
         let text = self.text(row_ix, column);
-        if is_missing_driver {
+        if is_muted {
             div().text_color(cx.theme().muted_foreground).child(text)
         } else {
             div().child(text)

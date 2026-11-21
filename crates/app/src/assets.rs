@@ -12,6 +12,7 @@ gpui_kit::assets::icon_assets!(
     [
         Container,
         Database,
+        FolderOpen,
         FlaskConical,
         Gauge,
         Map,
