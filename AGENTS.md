@@ -78,6 +78,11 @@ Dependencies point downward: `app` → `gamedata` → `save` → `sii`, and `gam
 
 ## GPUI app conventions
 
+- **One `Session` entity holds the open save** (`crates/app/src/session.rs`): what was loaded, and every pending change (career, repairs, garage upgrades, maxed drivers, visited cities, All data edits). Pages read from it and change it only through its methods; it counts and describes the changes for the header and the save dialog, and `prepared()` builds the slot as it would be written. A new kind of change gets a field there, a line in `changes()`, its count in `change_count()`, and its application in `prepared()`.
+- **Pages** (`crates/app/src/pages/`): `open_save` (the start screen), `overview`, `fleet`, `garages`, `drivers`, `map`, `all_data`. Each observes the session and redraws from it.
+- **The kit** (`crates/app/src/ui/`): `Section`, `PageHeader`, `AmountField` (amounts with 2.5m / +1m), `LevelPicker`, `StepButtons`, `TextTable` (a virtualized table of text).
+- **The game's own data** (levels, ranks, city names) comes from `game_data.rs`, loaded in the background at startup; always have a fallback for when it isn't there.
+
 - **Build screens from the UI kit** in `crates/app/src/ui/` (our own components, wrapping `gpui-component` where it helps). Screens don't style raw elements ad hoc. A missing component goes in the kit.
 - **Colours, spacing, radii, type sizes and durations come only from theme tokens** (`ui/theme.rs`), defined for light and dark. Check both after changing the kit.
 - Loading, decoding and saving run on the background executor; the UI shows progress and stays responsive.
