@@ -34,7 +34,8 @@ Agreed work, in order. Each step should end with something the owner can see or 
 ## 7. Sections
 
 - [ ] Fleet (trucks and trailers: repair, odometer, plates), Garages (sizes, upgrade all), Drivers (skills, max all), Map (visited cities, unlock dealers and recruitment agencies), Jobs.
-- [ ] All data: every unit and field, searchable and editable.
+- [x] All data: every unit and field, editable (shape-checked).
+- [ ] All data: show All data edits on the typed pages too (an edited money_account in Overview), and search values across units.
 - [x] Reading the game's archives (HashFS v1/v2) and its data: levels, ranks, skill limits, text and city names (`hashfs`, `gamedata`).
 - [ ] The game's own icons (skills, ADR classes, brands): a texture decoder (.tobj, GDeflate-compressed DDS). Never commit or bundle SCS artwork; fall back to Lucide icons when the game isn't found.
 - [ ] Use the game's language for its names when the app gets more languages (gamedata already takes a language code).

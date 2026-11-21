@@ -4,7 +4,7 @@
 //! the header counts its changes. Nothing is written to disk here: `prepared` builds the slot as
 //! it would be saved, and the workspace hands that to `save::save` in the background.
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 
 use gpui_kit::{App, Context, SharedString};
 use save::{Career, Driver, Game, Garage, LoadedSlot, Profile, Slot, Vehicle, VehicleKind};
@@ -34,6 +34,8 @@ pub struct Session {
     saved_drivers: Vec<Driver>,
     /// Drivers to max out when saving, by id.
     maxed_drivers: HashSet<String>,
+    /// Values changed in All data, by where they are; applied before the other changes.
+    raw_edits: BTreeMap<FieldPath, String>,
     is_saving: bool,
 }
 
@@ -53,6 +55,7 @@ impl Session {
             saved_garages: save::garages(&loaded.game),
             saved_drivers: save::drivers(&loaded.game),
             maxed_drivers: HashSet::new(),
+            raw_edits: BTreeMap::new(),
             saved_career: career.clone(),
             career,
             profile,
@@ -124,6 +127,47 @@ impl Session {
             + usize::from(!self.repaired.is_empty())
             + usize::from(!self.upgraded_garages.is_empty())
             + usize::from(!self.maxed_drivers.is_empty())
+            + self.raw_edits.len()
+    }
+
+    /// The save as loaded (or last saved), for All data. Edits aren't in it; see `raw_value`.
+    pub fn document(&self) -> &sii::Document {
+        &self.loaded.game
+    }
+
+    /// A value as it'll be saved: the All data edit if there is one, else what's in the save.
+    pub fn raw_value(&self, path: &FieldPath) -> Option<String> {
+        if let Some(edited) = self.raw_edits.get(path) {
+            return Some(edited.clone());
+        }
+        let value = self.loaded.game.unit(&path.unit)?.get(&path.field)?;
+        match path.index {
+            None => value.as_single().map(str::to_string),
+            Some(index) => value.items().get(index).cloned(),
+        }
+    }
+
+    pub fn is_edited(&self, path: &FieldPath) -> bool {
+        self.raw_edits.contains_key(path)
+    }
+
+    /// Changes one value (in its text form, as All data shows it). Setting it back to what's in
+    /// the save removes the change.
+    pub fn set_raw_value(&mut self, path: FieldPath, text: String, cx: &mut Context<Self>) {
+        let original = {
+            let edit = self.raw_edits.remove(&path);
+            let original = self.raw_value(&path);
+            if let Some(edit) = edit {
+                self.raw_edits.insert(path.clone(), edit);
+            }
+            original
+        };
+        if original.as_deref() == Some(text.as_str()) {
+            self.raw_edits.remove(&path);
+        } else {
+            self.raw_edits.insert(path, text);
+        }
+        cx.notify();
     }
 
     /// The hired drivers as they'll be after saving.
@@ -242,6 +286,29 @@ impl Session {
             game_data::city_name(cx, &before.hq_city).into(),
             game_data::city_name(cx, &after.hq_city).into(),
         );
+        for (path, text) in &self.raw_edits {
+            let before = self
+                .loaded
+                .game
+                .unit(&path.unit)
+                .and_then(|unit| unit.get(&path.field))
+                .and_then(|value| match path.index {
+                    None => value.as_single().map(str::to_string),
+                    Some(index) => value.items().get(index).cloned(),
+                })
+                .unwrap_or_default();
+            let kind = self
+                .loaded
+                .game
+                .unit(&path.unit)
+                .map(|unit| unit.kind.clone())
+                .unwrap_or_default();
+            add(
+                format!("{kind} › {}", path.field_name()).into(),
+                before.into(),
+                text.clone().into(),
+            );
+        }
         if !self.maxed_drivers.is_empty() {
             add(
                 t!(cx, "page-drivers"),
@@ -281,13 +348,19 @@ impl Session {
         self.repaired.clear();
         self.upgraded_garages.clear();
         self.maxed_drivers.clear();
+        self.raw_edits.clear();
         cx.notify();
     }
 
     /// The slot as it would be saved: the loaded save with every change applied.
     pub fn prepared(&self) -> save::Result<LoadedSlot> {
         let mut slot = self.loaded.clone();
-        self.career.write(&mut slot.game)?;
+        // All data edits first, so the typed changes (which name exactly what they change) win.
+        for (path, text) in &self.raw_edits {
+            path.apply(&mut slot.game, text);
+        }
+        self.career
+            .write_changes(&self.saved_career, &mut slot.game)?;
         for id in &self.repaired {
             save::repair(&mut slot.game, id, false);
         }
@@ -310,6 +383,7 @@ impl Session {
         self.upgraded_garages.clear();
         self.saved_drivers = save::drivers(&written.game);
         self.maxed_drivers.clear();
+        self.raw_edits.clear();
         self.loaded = written;
         self.saved_career = self.career.clone();
         self.repaired.clear();
@@ -352,5 +426,42 @@ impl Session {
             .file_name()
             .map(|name| name.to_string_lossy().into_owned())
             .unwrap_or_else(|| "profile".to_string())
+    }
+}
+
+/// Where a value is: a unit, a field, and for arrays the item.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct FieldPath {
+    pub unit: String,
+    pub field: String,
+    pub index: Option<usize>,
+}
+
+impl FieldPath {
+    /// `money_account`, or `trucks[3]` for an array item.
+    pub fn field_name(&self) -> String {
+        match self.index {
+            Some(index) => format!("{}[{index}]", self.field),
+            None => self.field.clone(),
+        }
+    }
+
+    fn apply(&self, document: &mut sii::Document, text: &str) {
+        let Some(mut unit) = document.unit_mut(&self.unit) else {
+            return;
+        };
+        match self.index {
+            None => unit.set(&self.field, sii::Value::single(text)),
+            Some(index) => {
+                let mut items = unit
+                    .get(&self.field)
+                    .map(|value| value.items().to_vec())
+                    .unwrap_or_default();
+                if let Some(item) = items.get_mut(index) {
+                    *item = text.to_string();
+                    unit.set(&self.field, sii::Value::Array(items));
+                }
+            }
+        }
     }
 }

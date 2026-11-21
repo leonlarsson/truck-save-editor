@@ -222,6 +222,7 @@ dependencies = [
  "gamedata",
  "gpui-kit",
  "save",
+ "sii",
  "unic-langid",
 ]
 

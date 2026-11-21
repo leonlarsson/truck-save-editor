@@ -175,6 +175,33 @@ adr-toxic = Toxic
 adr-corrosive = Corrosive
 hq = HQ
 
+## All data
+
+all-data-intro = Every unit in the save, and every value in it. Pick a kind, then a unit, then a value to change.
+all-data-kinds = Kinds
+all-data-units = Units
+all-data-values = Values
+all-data-filter = Filter kinds
+all-data-kind = Kind
+all-data-count = Units
+all-data-unit = Unit
+all-data-field = Field
+all-data-value = Value
+all-data-items = { $count ->
+    [one] 1 item
+   *[other] { $count } items
+}
+all-data-pick-value = Pick a value
+all-data-apply = Apply
+all-data-revert = Revert
+all-data-wrong-shape = This value holds { $expected }; type one of those (text keeps its quotes).
+shape-bool = true or false
+shape-number = a number
+shape-text = text in quotes
+shape-id = an id or name
+shape-vector = numbers in brackets
+shape-value = a value
+
 ## Garages
 
 garages = Garages

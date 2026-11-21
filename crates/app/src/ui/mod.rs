@@ -6,9 +6,11 @@ mod level_picker;
 mod page;
 mod section;
 mod step_buttons;
+mod text_table;
 
 pub use amount_field::{AmountChanged, AmountField};
 pub use level_picker::LevelPicker;
 pub use page::{PageHeader, page_body};
 pub use section::Section;
 pub use step_buttons::StepButtons;
+pub use text_table::{RowLook, TextColumn, TextRow, TextTable};

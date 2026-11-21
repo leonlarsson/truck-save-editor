@@ -1,5 +1,6 @@
 //! The app's pages, one per sidebar entry.
 
+pub mod all_data;
 pub mod drivers;
 pub mod fleet;
 pub mod garages;
@@ -75,7 +76,7 @@ impl Page {
     pub fn is_built(self) -> bool {
         matches!(
             self,
-            Page::Overview | Page::Fleet | Page::Garages | Page::Drivers
+            Page::Overview | Page::Fleet | Page::Garages | Page::Drivers | Page::AllData
         )
     }
 }

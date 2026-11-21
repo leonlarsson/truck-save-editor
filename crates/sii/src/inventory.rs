@@ -82,7 +82,8 @@ pub fn inventory(document: &Document) -> Inventory {
     inventory
 }
 
-fn shape_of(text: &str) -> Shape {
+/// What shape of value a field's text holds (`5` → integer, `"x"` → text …).
+pub fn shape_of(text: &str) -> Shape {
     let text = text.trim();
     if text == "true" || text == "false" {
         Shape::Bool

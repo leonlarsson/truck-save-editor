@@ -236,6 +236,68 @@ impl Career {
         Ok(())
     }
 
+    /// Writes only the fields that differ from `before` (the career as it was read), so values
+    /// changed elsewhere (All data) aren't overwritten with unchanged ones.
+    pub fn write_changes(&self, before: &Career, document: &mut Document) -> Result<()> {
+        let economy = document
+            .first_of_kind("economy")
+            .ok_or(Error::MissingUnit("economy"))?;
+        let economy_id = economy.id.clone();
+        let bank_id = required(economy, "bank")?.to_string();
+        let player_id = required(economy, "player")?.to_string();
+
+        if self.money != before.money {
+            let mut bank = document
+                .unit_mut(&bank_id)
+                .ok_or(Error::MissingUnit("bank"))?;
+            bank.set("money_account", Value::single(self.money.to_string()));
+        }
+        let mut economy = document
+            .unit_mut(&economy_id)
+            .ok_or(Error::MissingUnit("economy"))?;
+        if self.experience != before.experience {
+            economy.set(
+                "experience_points",
+                Value::single(self.experience.to_string()),
+            );
+        }
+        if let Some(coach) = self
+            .coach_experience
+            .filter(|_| self.coach_experience != before.coach_experience)
+        {
+            economy.set("bus_experience_points", Value::single(coach.to_string()));
+        }
+        if self.skills.adr != before.skills.adr {
+            economy.set("adr", Value::single(self.skills.adr.to_string()));
+        }
+        for ((field, level), (_, old)) in
+            self.skills.levels().into_iter().zip(before.skills.levels())
+        {
+            if level != old {
+                economy.set(field, Value::single(level.to_string()));
+            }
+        }
+        if let (Some(new), Some(old)) = (&self.coach_skills, &before.coach_skills) {
+            for ((field, level), (_, previous)) in new.levels().into_iter().zip(old.levels()) {
+                if level != previous {
+                    economy.set(field, Value::single(level.to_string()));
+                }
+            }
+        }
+        if self.hq_city != before.hq_city {
+            let mut player = document
+                .unit_mut(&player_id)
+                .ok_or(Error::MissingUnit("player"))?;
+            let hq = if value::is_plain_token(&self.hq_city) {
+                self.hq_city.clone()
+            } else {
+                value::format_string(&self.hq_city)
+            };
+            player.set("hq_city", Value::single(hq));
+        }
+        Ok(())
+    }
+
     /// How many values differ from `other`: the "N changes" count.
     pub fn changes_from(&self, other: &Career) -> usize {
         let skills = self
@@ -319,6 +381,24 @@ mod tests {
             .replace("mechanical: 2", "mechanical: 6");
         assert_eq!(text, expected);
         assert_eq!(Career::read(&document).expect("reads again"), career);
+    }
+
+    #[test]
+    fn writes_only_changed_fields_over_other_edits() {
+        let mut document = sii::parse_text(SAVE).expect("parses");
+        let before = Career::read(&document).expect("reads");
+        // Something else (All data) changed the money directly…
+        document
+            .unit_mut("_nameless.2")
+            .expect("bank")
+            .set("money_account", Value::single("7"));
+        // …and the career only changed experience: the money edit must survive.
+        let mut after = before.clone();
+        after.experience += 1;
+        after.write_changes(&before, &mut document).expect("writes");
+        let career = Career::read(&document).expect("reads again");
+        assert_eq!(career.money, 7);
+        assert_eq!(career.experience, before.experience + 1);
     }
 
     #[test]
