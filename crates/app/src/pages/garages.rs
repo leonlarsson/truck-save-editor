@@ -12,7 +12,7 @@ use gpui_kit::component::{
 };
 use gpui_kit::{
     App, AppContext as _, Context, Entity, InteractiveElement as _, IntoElement,
-    ParentElement as _, Render, SharedString, Styled as _, Subscription, Window, div,
+    ParentElement as _, Pixels, Render, SharedString, Styled as _, Subscription, Window, div,
 };
 use save::Garage;
 
@@ -20,6 +20,7 @@ use crate::game_data;
 use crate::i18n::t;
 use crate::pages::details;
 use crate::session::Session;
+use crate::ui::{FillsWidth, fill_widths};
 use crate::ui::{FilterBar, FilterChanged};
 use crate::workspace::OpenDetails;
 
@@ -39,6 +40,7 @@ const FILTER_NOT_LARGE: usize = 1;
 impl GaragesPage {
     pub fn new(session: Entity<Session>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let delegate = GarageTable {
+            table_width: None,
             garages: Vec::new(),
             session: session.clone(),
             sort: None,
@@ -258,11 +260,14 @@ impl Render for GaragesPage {
                     }))
                     .child(crate::ui::table_or_empty(
                         &self.filter,
-                        DataTable::new(&self.table)
-                            .stripe(true)
-                            .bordered(true)
-                            .accessibility_label(t!(cx, "garages-table"))
-                            .into_any_element(),
+                        crate::ui::fill_table(
+                            &self.table,
+                            DataTable::new(&self.table)
+                                .stripe(true)
+                                .bordered(true)
+                                .accessibility_label(t!(cx, "garages-table"))
+                                .into_any_element(),
+                        ),
                         None,
                         cx,
                     )),
@@ -271,6 +276,8 @@ impl Render for GaragesPage {
 }
 
 struct GarageTable {
+    /// The table's measured width, which its name columns grow to fill.
+    table_width: Option<Pixels>,
     garages: Vec<Garage>,
     /// For the Details buttons.
     session: Entity<Session>,
@@ -300,19 +307,15 @@ impl GarageTable {
     /// Each column as it is, before the sort arrow (see `column`).
     fn base_column(&self, col_ix: usize, cx: &App) -> Column {
         match GarageColumn::ALL.get(col_ix) {
-            Some(GarageColumn::City) => Column::new("city", t!(cx, "column-city"))
-                .width(220.)
-                .sortable(),
-            Some(GarageColumn::Size) => Column::new("size", t!(cx, "column-garage-size"))
-                .width(150.)
-                .sortable(),
+            Some(GarageColumn::City) => Column::new("city", t!(cx, "column-city")).sortable(),
+            Some(GarageColumn::Size) => {
+                Column::new("size", t!(cx, "column-garage-size")).sortable()
+            }
             Some(GarageColumn::Trucks) => Column::new("trucks", t!(cx, "column-trucks"))
-                .width(110.)
                 .text_right()
                 .sortable(),
-            Some(GarageColumn::Details) => Column::new("details", "").width(44.),
+            Some(GarageColumn::Details) => Column::new("details", ""),
             Some(GarageColumn::Drivers) | None => Column::new("drivers", t!(cx, "column-drivers"))
-                .width(110.)
                 .text_right()
                 .sortable(),
         }
@@ -387,6 +390,34 @@ impl GarageTable {
     }
 }
 
+impl GarageColumn {
+    /// The column's width in a table no wider than all of them together.
+    fn base_width(self) -> f32 {
+        match self {
+            GarageColumn::City => 220.,
+            GarageColumn::Size => 150.,
+            GarageColumn::Trucks => 110.,
+            GarageColumn::Details => 44.,
+            GarageColumn::Drivers => 110.,
+        }
+    }
+
+    /// Columns of names grow into a wider table; numbers and short values keep their width.
+    fn grows(self) -> bool {
+        matches!(self, GarageColumn::City)
+    }
+}
+
+impl FillsWidth for GarageTable {
+    fn table_width(&self) -> Option<Pixels> {
+        self.table_width
+    }
+
+    fn set_table_width(&mut self, width: Pixels) {
+        self.table_width = Some(width);
+    }
+}
+
 impl TableDelegate for GarageTable {
     fn columns_count(&self, _: &App) -> usize {
         GarageColumn::ALL.len()
@@ -398,7 +429,15 @@ impl TableDelegate for GarageTable {
 
     fn column(&self, col_ix: usize, cx: &App) -> Column {
         // The sorted column shows its arrow; the others show they can be sorted.
-        let column = self.base_column(col_ix, cx);
+        let columns: Vec<(f32, bool)> = GarageColumn::ALL
+            .iter()
+            .map(|column| (column.base_width(), column.grows()))
+            .collect();
+        let width = fill_widths(&columns, self.table_width)
+            .get(col_ix)
+            .copied()
+            .unwrap_or(100.);
+        let column = self.base_column(col_ix, cx).width(width);
         match (GarageColumn::ALL.get(col_ix), self.sort) {
             (Some(this), Some((sorted, order))) if *this == sorted => column.sort(order),
             _ => column,

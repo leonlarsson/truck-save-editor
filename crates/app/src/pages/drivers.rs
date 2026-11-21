@@ -11,7 +11,7 @@ use gpui_kit::component::{
 };
 use gpui_kit::{
     App, AppContext as _, Context, Entity, InteractiveElement as _, IntoElement,
-    ParentElement as _, Render, SharedString, Styled as _, Subscription, Window, div, rems,
+    ParentElement as _, Pixels, Render, SharedString, Styled as _, Subscription, Window, div, rems,
 };
 use save::{Driver, Skills};
 
@@ -21,6 +21,7 @@ use crate::i18n::t;
 use crate::labels::ADR_CLASS_COUNT;
 use crate::pages::details;
 use crate::session::Session;
+use crate::ui::{FillsWidth, fill_widths};
 use crate::ui::{FilterBar, FilterChanged, GameIconView};
 use crate::workspace::OpenDetails;
 
@@ -37,6 +38,7 @@ const FILTER_NOT_MAXED: usize = 0;
 impl DriversPage {
     pub fn new(session: Entity<Session>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let delegate = DriverTable {
+            table_width: None,
             drivers: Vec::new(),
             session: session.clone(),
             sort: None,
@@ -171,11 +173,14 @@ impl Render for DriversPage {
                     }))
                     .child(crate::ui::table_or_empty(
                         &self.filter,
-                        DataTable::new(&self.table)
-                            .stripe(true)
-                            .bordered(true)
-                            .accessibility_label(t!(cx, "drivers-table"))
-                            .into_any_element(),
+                        crate::ui::fill_table(
+                            &self.table,
+                            DataTable::new(&self.table)
+                                .stripe(true)
+                                .bordered(true)
+                                .accessibility_label(t!(cx, "drivers-table"))
+                                .into_any_element(),
+                        ),
                         Some(
                             crate::ui::EmptyState::new(t!(cx, "drivers-none"))
                                 .description(t!(cx, "drivers-none-body")),
@@ -187,6 +192,8 @@ impl Render for DriversPage {
 }
 
 struct DriverTable {
+    /// The table's measured width, which its name columns grow to fill.
+    table_width: Option<Pixels>,
     drivers: Vec<Driver>,
     /// For the Details buttons.
     session: Entity<Session>,
@@ -226,25 +233,20 @@ impl DriverTable {
     /// Each column as it is, before the sort arrow (see `column`).
     fn base_column(&self, col_ix: usize, cx: &App) -> Column {
         match DriverColumn::ALL.get(col_ix) {
-            Some(DriverColumn::Hometown) => Column::new("hometown", t!(cx, "column-hometown"))
-                .width(200.)
-                .sortable(),
-            Some(DriverColumn::Location) => Column::new("location", t!(cx, "column-location"))
-                .width(170.)
-                .sortable(),
+            Some(DriverColumn::Hometown) => {
+                Column::new("hometown", t!(cx, "column-hometown")).sortable()
+            }
+            Some(DriverColumn::Location) => {
+                Column::new("location", t!(cx, "column-location")).sortable()
+            }
             Some(DriverColumn::Experience) => {
                 Column::new("experience", t!(cx, "column-experience"))
-                    .width(140.)
                     .text_right()
                     .sortable()
             }
-            Some(DriverColumn::Skills) => Column::new("skills", t!(cx, "column-skills"))
-                .width(150.)
-                .sortable(),
-            Some(DriverColumn::Details) => Column::new("details", "").width(44.),
-            Some(DriverColumn::Adr) | None => Column::new("adr", t!(cx, "column-adr"))
-                .width(90.)
-                .sortable(),
+            Some(DriverColumn::Skills) => Column::new("skills", t!(cx, "column-skills")).sortable(),
+            Some(DriverColumn::Details) => Column::new("details", ""),
+            Some(DriverColumn::Adr) | None => Column::new("adr", t!(cx, "column-adr")).sortable(),
         }
     }
 
@@ -328,6 +330,35 @@ impl DriverTable {
     }
 }
 
+impl DriverColumn {
+    /// The column's width in a table no wider than all of them together.
+    fn base_width(self) -> f32 {
+        match self {
+            DriverColumn::Hometown => 200.,
+            DriverColumn::Location => 170.,
+            DriverColumn::Experience => 140.,
+            DriverColumn::Skills => 150.,
+            DriverColumn::Details => 44.,
+            DriverColumn::Adr => 90.,
+        }
+    }
+
+    /// Columns of names grow into a wider table; numbers and short values keep their width.
+    fn grows(self) -> bool {
+        matches!(self, DriverColumn::Hometown | DriverColumn::Location)
+    }
+}
+
+impl FillsWidth for DriverTable {
+    fn table_width(&self) -> Option<Pixels> {
+        self.table_width
+    }
+
+    fn set_table_width(&mut self, width: Pixels) {
+        self.table_width = Some(width);
+    }
+}
+
 impl TableDelegate for DriverTable {
     fn columns_count(&self, _: &App) -> usize {
         DriverColumn::ALL.len()
@@ -339,7 +370,15 @@ impl TableDelegate for DriverTable {
 
     fn column(&self, col_ix: usize, cx: &App) -> Column {
         // The sorted column shows its arrow; the others show they can be sorted.
-        let column = self.base_column(col_ix, cx);
+        let columns: Vec<(f32, bool)> = DriverColumn::ALL
+            .iter()
+            .map(|column| (column.base_width(), column.grows()))
+            .collect();
+        let width = fill_widths(&columns, self.table_width)
+            .get(col_ix)
+            .copied()
+            .unwrap_or(100.);
+        let column = self.base_column(col_ix, cx).width(width);
         match (DriverColumn::ALL.get(col_ix), self.sort) {
             (Some(this), Some((sorted, order))) if *this == sorted => column.sort(order),
             _ => column,

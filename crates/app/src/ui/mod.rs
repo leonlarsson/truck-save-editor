@@ -3,6 +3,7 @@
 
 mod amount_field;
 mod empty_state;
+mod fill_table;
 mod filter_bar;
 mod game_icon;
 mod level_picker;
@@ -13,6 +14,7 @@ mod text_table;
 
 pub use amount_field::{AmountChanged, AmountField};
 pub use empty_state::EmptyState;
+pub use fill_table::{FillsWidth, fill_table, fill_widths};
 pub use filter_bar::{FilterBar, FilterChanged, fold, table_or_empty};
 pub use game_icon::GameIconView;
 pub use level_picker::LevelPicker;

@@ -10,7 +10,7 @@ use gpui_kit::component::{
 };
 use gpui_kit::{
     App, AppContext as _, Context, Entity, InteractiveElement as _, IntoElement,
-    ParentElement as _, Render, SharedString, Styled as _, Subscription, Window, div, rems,
+    ParentElement as _, Pixels, Render, SharedString, Styled as _, Subscription, Window, div, rems,
 };
 use save::{Vehicle, VehicleKind};
 
@@ -19,6 +19,7 @@ use crate::game_data;
 use crate::i18n::t;
 use crate::pages::details;
 use crate::session::Session;
+use crate::ui::{FillsWidth, fill_widths};
 use crate::ui::{FilterBar, FilterChanged, GameIconView};
 use crate::workspace::OpenDetails;
 
@@ -39,6 +40,7 @@ impl FleetPage {
     pub fn new(session: Entity<Session>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let kind = VehicleKind::Truck;
         let delegate = TruckTable {
+            table_width: None,
             trucks: Vec::new(),
             columns: TruckColumn::ALL.to_vec(),
             session: session.clone(),
@@ -299,11 +301,14 @@ impl Render for FleetPage {
                     }))
                     .child(crate::ui::table_or_empty(
                         &self.filter,
-                        DataTable::new(&self.table)
-                            .stripe(true)
-                            .bordered(true)
-                            .accessibility_label(t!(cx, "trucks-table"))
-                            .into_any_element(),
+                        crate::ui::fill_table(
+                            &self.table,
+                            DataTable::new(&self.table)
+                                .stripe(true)
+                                .bordered(true)
+                                .accessibility_label(t!(cx, "trucks-table"))
+                                .into_any_element(),
+                        ),
                         None,
                         cx,
                     )),
@@ -321,6 +326,8 @@ struct Row {
 
 /// Feeds the trucks to GPUI Kit's table. Only the visible rows are ever rendered.
 struct TruckTable {
+    /// The table's measured width, which its name columns grow to fill.
+    table_width: Option<Pixels>,
     trucks: Vec<Row>,
     /// The columns shown: every one, less Fuel for trailers (they have no tank).
     columns: Vec<TruckColumn>,
@@ -357,26 +364,17 @@ impl TruckTable {
     /// Each column as it is, before the sort arrow (see `column`).
     fn base_column(&self, col_ix: usize, cx: &App) -> Column {
         match self.columns.get(col_ix) {
-            Some(TruckColumn::Truck) => Column::new("truck", t!(cx, "column-truck"))
-                .width(210.)
-                .sortable(),
-            Some(TruckColumn::Plate) => Column::new("plate", t!(cx, "column-plate"))
-                .width(100.)
-                .sortable(),
-            Some(TruckColumn::Garage) => Column::new("garage", t!(cx, "column-garage"))
-                .width(130.)
-                .sortable(),
+            Some(TruckColumn::Truck) => Column::new("truck", t!(cx, "column-truck")).sortable(),
+            Some(TruckColumn::Plate) => Column::new("plate", t!(cx, "column-plate")).sortable(),
+            Some(TruckColumn::Garage) => Column::new("garage", t!(cx, "column-garage")).sortable(),
             Some(TruckColumn::Odometer) => Column::new("odometer", t!(cx, "column-odometer"))
-                .width(120.)
                 .text_right()
                 .sortable(),
             Some(TruckColumn::Fuel) => Column::new("fuel", t!(cx, "column-fuel"))
-                .width(70.)
                 .text_right()
                 .sortable(),
-            Some(TruckColumn::Details) => Column::new("details", "").width(44.),
+            Some(TruckColumn::Details) => Column::new("details", ""),
             Some(TruckColumn::Wear) | None => Column::new("wear", t!(cx, "column-wear"))
-                .width(140.)
                 .text_right()
                 .sortable(),
         }
@@ -472,6 +470,36 @@ impl TruckTable {
     }
 }
 
+impl TruckColumn {
+    /// The column's width in a table no wider than all of them together.
+    fn base_width(self) -> f32 {
+        match self {
+            TruckColumn::Truck => 210.,
+            TruckColumn::Plate => 100.,
+            TruckColumn::Garage => 130.,
+            TruckColumn::Odometer => 120.,
+            TruckColumn::Fuel => 70.,
+            TruckColumn::Details => 44.,
+            TruckColumn::Wear => 140.,
+        }
+    }
+
+    /// Columns of names grow into a wider table; numbers and short values keep their width.
+    fn grows(self) -> bool {
+        matches!(self, TruckColumn::Truck | TruckColumn::Garage)
+    }
+}
+
+impl FillsWidth for TruckTable {
+    fn table_width(&self) -> Option<Pixels> {
+        self.table_width
+    }
+
+    fn set_table_width(&mut self, width: Pixels) {
+        self.table_width = Some(width);
+    }
+}
+
 impl TableDelegate for TruckTable {
     fn columns_count(&self, _: &App) -> usize {
         self.columns.len()
@@ -483,7 +511,16 @@ impl TableDelegate for TruckTable {
 
     fn column(&self, col_ix: usize, cx: &App) -> Column {
         // The sorted column shows its arrow; the others show they can be sorted.
-        let column = self.base_column(col_ix, cx);
+        let columns: Vec<(f32, bool)> = self
+            .columns
+            .iter()
+            .map(|column| (column.base_width(), column.grows()))
+            .collect();
+        let width = fill_widths(&columns, self.table_width)
+            .get(col_ix)
+            .copied()
+            .unwrap_or(100.);
+        let column = self.base_column(col_ix, cx).width(width);
         match (self.columns.get(col_ix), self.sort) {
             (Some(this), Some((sorted, order))) if *this == sorted => column.sort(order),
             _ => column,

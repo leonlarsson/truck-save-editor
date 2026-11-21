@@ -11,14 +11,15 @@ use gpui_kit::component::{
     v_flex,
 };
 use gpui_kit::{
-    App, AppContext as _, Context, Entity, IntoElement, ParentElement as _, Render, SharedString,
-    Styled as _, Subscription, Window, div,
+    App, AppContext as _, Context, Entity, IntoElement, ParentElement as _, Pixels, Render,
+    SharedString, Styled as _, Subscription, Window, div,
 };
 
 use crate::format::thousands;
 use crate::game_data;
 use crate::i18n::t;
 use crate::session::{KEEP_OFFERS_MINUTES, Session};
+use crate::ui::{FillsWidth, fill_widths};
 use crate::ui::{FilterBar, FilterChanged, GameIconView};
 
 pub struct JobsPage {
@@ -61,6 +62,7 @@ impl JobsPage {
         let table = cx.new(|cx| {
             TableState::new(
                 JobTable {
+                    table_width: None,
                     rows: Vec::new(),
                     sort: None,
                 },
@@ -236,11 +238,14 @@ impl Render for JobsPage {
             .child(
                 div().flex_1().min_h_0().child(crate::ui::table_or_empty(
                     &self.filter,
-                    DataTable::new(&self.table)
-                        .stripe(true)
-                        .bordered(true)
-                        .accessibility_label(t!(cx, "jobs-table"))
-                        .into_any_element(),
+                    crate::ui::fill_table(
+                        &self.table,
+                        DataTable::new(&self.table)
+                            .stripe(true)
+                            .bordered(true)
+                            .accessibility_label(t!(cx, "jobs-table"))
+                            .into_any_element(),
+                    ),
                     Some(
                         crate::ui::EmptyState::new(t!(cx, "jobs-none"))
                             .description(t!(cx, "jobs-none-body")),
@@ -252,6 +257,8 @@ impl Render for JobsPage {
 }
 
 struct JobTable {
+    /// The table's measured width, which its name columns grow to fill.
+    table_width: Option<Pixels>,
     rows: Vec<Row>,
     sort: Option<(JobColumn, ColumnSort)>,
 }
@@ -281,25 +288,16 @@ impl JobTable {
     /// Each column as it is, before the sort arrow (see `column`).
     fn base_column(&self, col_ix: usize, cx: &App) -> Column {
         match JobColumn::ALL.get(col_ix) {
-            Some(JobColumn::From) => Column::new("from", t!(cx, "column-from"))
-                .width(190.)
-                .sortable(),
-            Some(JobColumn::To) => Column::new("to", t!(cx, "column-to"))
-                .width(190.)
-                .sortable(),
-            Some(JobColumn::Cargo) => Column::new("cargo", t!(cx, "column-cargo"))
-                .width(140.)
-                .sortable(),
+            Some(JobColumn::From) => Column::new("from", t!(cx, "column-from")).sortable(),
+            Some(JobColumn::To) => Column::new("to", t!(cx, "column-to")).sortable(),
+            Some(JobColumn::Cargo) => Column::new("cargo", t!(cx, "column-cargo")).sortable(),
             Some(JobColumn::Distance) => Column::new("distance", t!(cx, "column-distance"))
-                .width(120.)
                 .text_right()
                 .sortable(),
-            Some(JobColumn::Expires) => Column::new("expires", t!(cx, "column-expires"))
-                .width(105.)
-                .sortable(),
-            Some(JobColumn::Urgency) | None => Column::new("urgency", t!(cx, "column-urgency"))
-                .width(100.)
-                .sortable(),
+            Some(JobColumn::Expires) => Column::new("expires", t!(cx, "column-expires")).sortable(),
+            Some(JobColumn::Urgency) | None => {
+                Column::new("urgency", t!(cx, "column-urgency")).sortable()
+            }
         }
     }
 
@@ -365,6 +363,35 @@ impl JobTable {
     }
 }
 
+impl JobColumn {
+    /// The column's width in a table no wider than all of them together.
+    fn base_width(self) -> f32 {
+        match self {
+            JobColumn::From => 190.,
+            JobColumn::To => 190.,
+            JobColumn::Cargo => 140.,
+            JobColumn::Distance => 120.,
+            JobColumn::Expires => 105.,
+            JobColumn::Urgency => 100.,
+        }
+    }
+
+    /// Columns of names grow into a wider table; numbers and short values keep their width.
+    fn grows(self) -> bool {
+        matches!(self, JobColumn::From | JobColumn::To | JobColumn::Cargo)
+    }
+}
+
+impl FillsWidth for JobTable {
+    fn table_width(&self) -> Option<Pixels> {
+        self.table_width
+    }
+
+    fn set_table_width(&mut self, width: Pixels) {
+        self.table_width = Some(width);
+    }
+}
+
 impl TableDelegate for JobTable {
     fn columns_count(&self, _: &App) -> usize {
         JobColumn::ALL.len()
@@ -376,7 +403,15 @@ impl TableDelegate for JobTable {
 
     fn column(&self, col_ix: usize, cx: &App) -> Column {
         // The sorted column shows its arrow; the others show they can be sorted.
-        let column = self.base_column(col_ix, cx);
+        let columns: Vec<(f32, bool)> = JobColumn::ALL
+            .iter()
+            .map(|column| (column.base_width(), column.grows()))
+            .collect();
+        let width = fill_widths(&columns, self.table_width)
+            .get(col_ix)
+            .copied()
+            .unwrap_or(100.);
+        let column = self.base_column(col_ix, cx).width(width);
         match (JobColumn::ALL.get(col_ix), self.sort) {
             (Some(this), Some((sorted, order))) if *this == sorted => column.sort(order),
             _ => column,
