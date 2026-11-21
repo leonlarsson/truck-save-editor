@@ -7,7 +7,7 @@
 use std::collections::HashSet;
 
 use gpui_kit::{App, Context, SharedString};
-use save::{Career, Game, LoadedSlot, Profile, Slot, Vehicle, VehicleKind};
+use save::{Career, Game, Garage, LoadedSlot, Profile, Slot, Vehicle, VehicleKind};
 
 use crate::format::thousands;
 use crate::game_data;
@@ -26,6 +26,10 @@ pub struct Session {
     saved_vehicles: Vec<Vehicle>,
     /// Trucks to repair when saving, by id.
     repaired: HashSet<String>,
+    /// The garages as they are on disk.
+    saved_garages: Vec<Garage>,
+    /// Garages to buy or upgrade to large when saving, by id.
+    upgraded_garages: HashSet<String>,
     is_saving: bool,
 }
 
@@ -42,12 +46,14 @@ impl Session {
         Ok(Self {
             game: profile.game,
             saved_vehicles: save::vehicles(&loaded.game),
+            saved_garages: save::garages(&loaded.game),
             saved_career: career.clone(),
             career,
             profile,
             slot,
             loaded,
             repaired: HashSet::new(),
+            upgraded_garages: HashSet::new(),
             is_saving: false,
         })
     }
@@ -108,7 +114,34 @@ impl Session {
     }
 
     pub fn change_count(&self) -> usize {
-        self.career.changes_from(&self.saved_career) + usize::from(!self.repaired.is_empty())
+        self.career.changes_from(&self.saved_career)
+            + usize::from(!self.repaired.is_empty())
+            + usize::from(!self.upgraded_garages.is_empty())
+    }
+
+    /// The garages as they'll be after saving.
+    pub fn garages(&self) -> Vec<Garage> {
+        self.saved_garages
+            .iter()
+            .map(|garage| {
+                let mut garage = garage.clone();
+                if self.upgraded_garages.contains(&garage.id) {
+                    garage.is_owned = true;
+                    garage.slots = garage.slots.max(save::LARGE_GARAGE_SLOTS);
+                }
+                garage
+            })
+            .collect()
+    }
+
+    /// Makes every owned garage large; with `buy_all`, buys every garage too.
+    pub fn upgrade_garages(&mut self, buy_all: bool, cx: &mut Context<Self>) {
+        for garage in &self.saved_garages {
+            if !garage.is_large() && (garage.is_owned || buy_all) {
+                self.upgraded_garages.insert(garage.id.clone());
+            }
+        }
+        cx.notify();
     }
 
     /// Every change, described for people.
@@ -178,6 +211,23 @@ impl Session {
             game_data::city_name(cx, &before.hq_city).into(),
             game_data::city_name(cx, &after.hq_city).into(),
         );
+        if !self.upgraded_garages.is_empty() {
+            let (bought, upgraded): (Vec<&Garage>, Vec<&Garage>) = self
+                .saved_garages
+                .iter()
+                .filter(|g| self.upgraded_garages.contains(&g.id))
+                .partition(|g| !g.is_owned);
+            add(
+                t!(cx, "garages"),
+                t!(cx, "garages-before"),
+                t!(
+                    cx,
+                    "garages-after",
+                    bought = bought.len(),
+                    upgraded = upgraded.len()
+                ),
+            );
+        }
         if !self.repaired.is_empty() {
             add(
                 t!(cx, "repairs"),
@@ -191,6 +241,7 @@ impl Session {
     pub fn discard(&mut self, cx: &mut Context<Self>) {
         self.career = self.saved_career.clone();
         self.repaired.clear();
+        self.upgraded_garages.clear();
         cx.notify();
     }
 
@@ -201,6 +252,9 @@ impl Session {
         for id in &self.repaired {
             save::repair(&mut slot.game, id, false);
         }
+        for id in &self.upgraded_garages {
+            save::upgrade_garage(&mut slot.game, id);
+        }
         if let Some(info) = &mut slot.info {
             save::update_info(info, &self.career);
         }
@@ -210,6 +264,8 @@ impl Session {
     /// After a successful save: what was written is now what's on disk.
     pub fn mark_saved(&mut self, written: LoadedSlot, cx: &mut Context<Self>) {
         self.saved_vehicles = save::vehicles(&written.game);
+        self.saved_garages = save::garages(&written.game);
+        self.upgraded_garages.clear();
         self.loaded = written;
         self.saved_career = self.career.clone();
         self.repaired.clear();

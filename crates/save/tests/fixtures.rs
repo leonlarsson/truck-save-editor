@@ -52,6 +52,11 @@ fn real_saves_have_a_career_and_a_fleet() {
             dir.display()
         );
 
+        // Every garage reads, and owned ones have slots.
+        let garages = save::garages(&slot.game);
+        assert!(!garages.is_empty(), "{}: no garages", dir.display());
+        assert!(garages.iter().filter(|g| g.is_owned).all(|g| g.slots > 0));
+
         // Writing the unchanged career back leaves the save exactly as it was.
         let before = sii::to_text(&slot.game);
         career.write(&mut slot.game).expect("writes");

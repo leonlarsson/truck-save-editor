@@ -8,6 +8,7 @@ mod career;
 mod error;
 mod fleet;
 mod game;
+mod garages;
 mod info;
 mod levels;
 #[cfg(feature = "native")]
@@ -21,6 +22,7 @@ pub use career::{ADR_ALL, Career, CoachSkills, MAX_COACH_SKILL_LEVEL, MAX_SKILL_
 pub use error::{Error, Result};
 pub use fleet::{Vehicle, VehicleKind, Wear, model_display_name, repair, vehicles, wear_is_known};
 pub use game::Game;
+pub use garages::{Garage, LARGE_GARAGE_SLOTS, garages, upgrade_garage};
 pub use info::{SlotInfo, read_info, update_info};
 pub use levels::{FALLBACK_STEPS, Level, LevelTable};
 #[cfg(feature = "native")]

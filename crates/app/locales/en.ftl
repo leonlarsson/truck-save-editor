@@ -167,6 +167,41 @@ adr-toxic = Toxic
 adr-corrosive = Corrosive
 hq = HQ
 
+## Garages
+
+garages = Garages
+garages-before = As they were
+garages-after = { $bought ->
+    [0] { $upgraded ->
+        [one] 1 upgraded to large
+       *[other] { $upgraded } upgraded to large
+    }
+   *[other] { $upgraded ->
+        [0] { $bought } bought, all large
+       *[other] { $bought } bought and { $upgraded } upgraded, all large
+    }
+}
+garages-summary = { $count ->
+    [one] 1 city
+   *[other] { $count } cities
+} · { $owned } owned · { $large } large
+garages-upgrade-owned = Upgrade owned
+garages-upgrade-owned-tooltip = Make every garage you own large: 5 trucks and 5 drivers.
+garages-buy-all = Buy all
+garages-buy-all-tooltip = Buy every city's garage, all large.
+garage-not-owned = Not owned
+garage-large = Large
+garage-slots = { $count ->
+    [one] 1 slot
+   *[other] { $count } slots
+}
+garage-filled = { $filled } of { $slots }
+column-city = City
+column-garage-size = Garage
+column-trucks = Trucks
+column-drivers = Drivers
+garages-table = Garages
+
 ## Fleet
 
 fleet-trucks = { $count ->

@@ -27,6 +27,7 @@ use crate::labels;
 use crate::pages::{
     Page,
     fleet::FleetPage,
+    garages::GaragesPage,
     open_save::{OpenSavePage, OpenSlot},
     overview::OverviewPage,
 };
@@ -48,6 +49,7 @@ struct Opened {
     session: Entity<Session>,
     overview: Entity<OverviewPage>,
     fleet: Entity<FleetPage>,
+    garages: Entity<GaragesPage>,
     _observe: Subscription,
 }
 
@@ -109,11 +111,13 @@ impl Workspace {
         let session = cx.new(|_| session);
         let overview = cx.new(|cx| OverviewPage::new(session.clone(), window, cx));
         let fleet = cx.new(|cx| FleetPage::new(session.clone(), window, cx));
+        let garages = cx.new(|cx| GaragesPage::new(session.clone(), window, cx));
         let _observe = cx.observe(&session, |_, _, cx| cx.notify());
         self.opened = Some(Opened {
             session,
             overview,
             fleet,
+            garages,
             _observe,
         });
     }
@@ -388,6 +392,10 @@ impl Workspace {
             Page::Fleet => div()
                 .size_full()
                 .child(opened.fleet.clone())
+                .into_any_element(),
+            Page::Garages => div()
+                .size_full()
+                .child(opened.garages.clone())
                 .into_any_element(),
             other => div()
                 .size_full()

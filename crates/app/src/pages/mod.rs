@@ -1,6 +1,7 @@
 //! The app's pages, one per sidebar entry.
 
 pub mod fleet;
+pub mod garages;
 pub mod open_save;
 pub mod overview;
 
@@ -71,6 +72,6 @@ impl Page {
     /// Whether the page exists yet. Pages that don't are listed but disabled, so people can see
     /// what's coming instead of wondering where it is.
     pub fn is_built(self) -> bool {
-        matches!(self, Page::Overview | Page::Fleet)
+        matches!(self, Page::Overview | Page::Fleet | Page::Garages)
     }
 }
