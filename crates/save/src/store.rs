@@ -234,7 +234,7 @@ fn copy_files(from: &Path, to: &Path) -> Result<()> {
 }
 
 /// Writes a file by writing a temporary one beside it and moving it into place.
-fn write_atomically(path: &Path, bytes: &[u8]) -> Result<()> {
+pub(crate) fn write_atomically(path: &Path, bytes: &[u8]) -> Result<()> {
     let mut temporary = path.as_os_str().to_owned();
     temporary.push(".tse-writing");
     let temporary = PathBuf::from(temporary);

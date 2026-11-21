@@ -15,6 +15,7 @@ mod jobs;
 mod levels;
 mod map;
 mod preview;
+mod profile_file;
 #[cfg(feature = "native")]
 mod profiles;
 #[cfg(feature = "native")]
@@ -35,6 +36,9 @@ pub use jobs::{Job, extend_offers, game_time, jobs};
 pub use levels::{FALLBACK_STEPS, Level, LevelTable};
 pub use map::{City, Place, cities, unlock, unlocked, visit_all_cities};
 pub use preview::{Picture, decode_tga};
+pub use profile_file::{company_name, set_cached_experience, set_company_name};
+#[cfg(feature = "native")]
+pub use profile_file::{load_profile_file, save_profile_file};
 #[cfg(feature = "native")]
 pub use profiles::{
     Location, PROFILE_DIRS_VARIABLE, Profile, Slot, SlotKind, decode_profile_folder, find_profiles,

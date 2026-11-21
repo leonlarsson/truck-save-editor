@@ -904,6 +904,28 @@ fn newer_game_warning(session: &Entity<Session>, cx: &App) -> Option<Alert> {
     })
 }
 
+/// Says so when the profile file (the company's name) couldn't be written after the slot was.
+/// Returns whether it was written (or didn't need to be).
+fn report_profile(
+    result: Option<save::Result<save::Backup>>,
+    window: &mut Window,
+    cx: &mut App,
+) -> bool {
+    match result {
+        None | Some(Ok(_)) => true,
+        Some(Err(error)) => {
+            window.push_notification(
+                Notification::new()
+                    .with_type(NotificationType::Error)
+                    .title(t!(cx, "save-profile-failed"))
+                    .message(error.to_string()),
+                cx,
+            );
+            false
+        }
+    }
+}
+
 /// Writes the session's changes in the background: back up the slot, then write it.
 fn start_save(session: Entity<Session>, window: &mut Window, cx: &mut App) {
     let prepared = session.read(cx).prepared();
@@ -930,12 +952,14 @@ fn start_save(session: Entity<Session>, window: &mut Window, cx: &mut App) {
         );
         return;
     };
-    let (game, profile_folder, name) = {
+    let (game, profile_folder, name, profile, profile_dir) = {
         let session = session.read(cx);
         (
             session.game(),
             session.profile_folder(),
             labels::slot_name(cx, session.slot()),
+            session.prepared_profile(),
+            session.profile().dir.clone(),
         )
     };
     session.update(cx, |session, cx| session.set_saving(true, cx));
@@ -944,13 +968,26 @@ fn start_save(session: Entity<Session>, window: &mut Window, cx: &mut App) {
         .spawn(cx, async move |cx| {
             let result = cx
                 .background_spawn(async move {
-                    save::save(game, &slot, &backups_root, &profile_folder)
-                        .map(|backup| (slot, backup))
+                    let backup = save::save(game, &slot, &backups_root, &profile_folder)?;
+                    // The slot first; then the profile file, only if the company's name changed.
+                    let profile = profile.map(|document| {
+                        save::save_profile_file(
+                            game,
+                            &profile_dir,
+                            &document,
+                            &backups_root,
+                            &profile_folder,
+                        )
+                    });
+                    Ok::<_, save::Error>((slot, backup, profile))
                 })
                 .await;
             let _ = cx.update(|window, cx| match result {
-                Ok((written, backup)) => {
-                    session.update(cx, |session, cx| session.mark_saved(written, cx));
+                Ok((written, backup, profile)) => {
+                    let profile_written = report_profile(profile, window, cx);
+                    session.update(cx, |session, cx| {
+                        session.mark_saved(written, profile_written, cx)
+                    });
                     window.push_notification(
                         Notification::new()
                             .with_type(NotificationType::Success)
@@ -994,10 +1031,17 @@ fn start_save_as_new_slot(session: Entity<Session>, window: &mut Window, cx: &mu
             return;
         }
     };
-    let (game, original_name) = {
+    let (game, original_name, profile, profile_dir, profile_folder) = {
         let session = session.read(cx);
-        (session.game(), labels::slot_name(cx, session.slot()))
+        (
+            session.game(),
+            labels::slot_name(cx, session.slot()),
+            session.prepared_profile(),
+            session.profile().dir.clone(),
+            session.profile_folder(),
+        )
     };
+    let backups_root = backups_root();
     let new_name = t!(cx, "new-slot-name", name = &original_name).to_string();
     session.update(cx, |session, cx| session.set_saving(true, cx));
 
@@ -1008,12 +1052,26 @@ fn start_save_as_new_slot(session: Entity<Session>, window: &mut Window, cx: &mu
                 .background_spawn(async move {
                     let dir = save::save_as_new_slot(game, &slot, &name)?;
                     let written = save::load(&dir)?;
-                    Ok::<_, save::Error>((dir, written))
+                    // The company's name is the profile's, so it's written for this one too.
+                    let profile = match (profile, backups_root) {
+                        (Some(document), Some(root)) => Some(save::save_profile_file(
+                            game,
+                            &profile_dir,
+                            &document,
+                            &root,
+                            &profile_folder,
+                        )),
+                        _ => None,
+                    };
+                    Ok::<_, save::Error>((dir, written, profile))
                 })
                 .await;
             let _ = cx.update(|window, cx| match result {
-                Ok((dir, written)) => {
-                    session.update(cx, |session, cx| session.moved_to(dir, written, cx));
+                Ok((dir, written, profile)) => {
+                    let profile_written = report_profile(profile, window, cx);
+                    session.update(cx, |session, cx| {
+                        session.moved_to(dir, written, profile_written, cx)
+                    });
                     window.push_notification(
                         Notification::new()
                             .with_type(NotificationType::Success)

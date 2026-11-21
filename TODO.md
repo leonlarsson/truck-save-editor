@@ -57,6 +57,8 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [x] Driver faces: `driver.<n>` shows the game's face `material/ui/driver/<n>.mat`.
 - [ ] Driver names: the game reads `/locale/<lang>/driver_names.sii` when there is one, but ships none, and the default names aren't in any data file. Look again (maybe inside the executable's resources).
 
+- [x] Company name (in `profile.sii`, backed up and checked like a slot; the login in the same file is never touched).
+
 ## Keeping up with the game
 
 - [x] Inventory diff: list every unit kind, field and value type in a save, and compare two saves' lists (`docs/compatibility.md`).

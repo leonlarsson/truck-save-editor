@@ -28,6 +28,9 @@ pub struct Session {
     saved_garages: Vec<Garage>,
     /// The hired drivers as they are on disk.
     saved_drivers: Vec<Driver>,
+    /// The profile's `profile.sii`, as on disk. Held only to write it back with a new company
+    /// name; it also holds the World of Trucks login, which nothing here reads or shows.
+    profile_file: Option<sii::Document>,
     /// Every change not saved yet.
     pending: Pending,
     /// What `pending` was before each change, latest last: Undo goes back through these.
@@ -62,6 +65,8 @@ struct Pending {
     raw_edits: BTreeMap<FieldPath, String>,
     /// Whether to make every job offer last at least a week (game time) when saving.
     keep_offers: bool,
+    /// The company's new name (in the profile, so for every save in it).
+    company_name: Option<String>,
     /// Cities whose truck dealer to unlock when saving.
     unlock_dealers: BTreeSet<String>,
     /// Cities whose recruitment agency to unlock when saving.
@@ -80,6 +85,7 @@ impl Pending {
             visit_all_cities: false,
             raw_edits: BTreeMap::new(),
             keep_offers: false,
+            company_name: None,
             unlock_dealers: BTreeSet::new(),
             unlock_recruitments: BTreeSet::new(),
         }
@@ -136,6 +142,7 @@ impl Session {
             saved_vehicles: save::vehicles(&loaded.game),
             saved_garages: save::garages(&loaded.game),
             saved_drivers: save::drivers(&loaded.game),
+            profile_file: save::load_profile_file(&profile.dir).ok(),
             pending: Pending::none(career.clone()),
             undo: Vec::new(),
             redo: Vec::new(),
@@ -360,6 +367,35 @@ impl Session {
         self.preview().unit(id).cloned()
     }
 
+    /// The company's name as it'll be saved (`None` if the profile couldn't be read).
+    pub fn company_name(&self) -> Option<String> {
+        self.pending
+            .company_name
+            .clone()
+            .or_else(|| self.profile_file.as_ref().and_then(save::company_name))
+    }
+
+    /// Renames the company (for the whole profile). Back to the name on disk removes the change.
+    pub fn set_company_name(&mut self, name: String, cx: &mut Context<Self>) {
+        let saved = self.profile_file.as_ref().and_then(save::company_name);
+        let name = name.trim().to_string();
+        if name.is_empty() || self.profile_file.is_none() {
+            return;
+        }
+        self.change(cx, |pending, _| {
+            pending.company_name = (saved.as_deref() != Some(name.as_str())).then_some(name);
+        });
+    }
+
+    /// The profile file as it would be written, if the company's name changed.
+    pub fn prepared_profile(&self) -> Option<sii::Document> {
+        let name = self.pending.company_name.as_ref()?;
+        let mut document = self.profile_file.clone()?;
+        save::set_company_name(&mut document, name);
+        save::set_cached_experience(&mut document, self.pending.career.experience);
+        Some(document)
+    }
+
     /// Marks one vehicle for repair.
     pub fn repair(&mut self, id: &str, cx: &mut Context<Self>) {
         self.change(cx, |pending, _| {
@@ -387,6 +423,7 @@ impl Session {
             + self.pending.raw_edits.len()
             + usize::from(self.pending.visit_all_cities)
             + usize::from(self.pending.keep_offers)
+            + usize::from(self.pending.company_name.is_some())
             + usize::from(!self.pending.unlock_dealers.is_empty())
             + usize::from(!self.pending.unlock_recruitments.is_empty())
     }
@@ -654,6 +691,14 @@ impl Session {
                 ),
             );
         }
+        if let Some(name) = &self.pending.company_name {
+            let before = self
+                .profile_file
+                .as_ref()
+                .and_then(save::company_name)
+                .unwrap_or_default();
+            add(t!(cx, "company-name"), before.into(), name.clone().into());
+        }
         if self.pending.keep_offers {
             add(
                 t!(cx, "jobs-offers"),
@@ -726,14 +771,30 @@ impl Session {
     }
 
     /// After a successful save: what was written is now what's on disk.
-    pub fn mark_saved(&mut self, written: LoadedSlot, cx: &mut Context<Self>) {
+    /// `profile_written` says whether the profile file (the company's name) was written too; if
+    /// it wasn't, that change stays pending.
+    pub fn mark_saved(
+        &mut self,
+        written: LoadedSlot,
+        profile_written: bool,
+        cx: &mut Context<Self>,
+    ) {
         self.saved_vehicles = save::vehicles(&written.game);
         self.saved_garages = save::garages(&written.game);
         self.saved_drivers = save::drivers(&written.game);
         self.loaded = written;
         self.forget_preview();
         self.saved_career = self.pending.career.clone();
+        let unwritten_company_name = if profile_written {
+            if let Some(profile) = self.prepared_profile() {
+                self.profile_file = Some(profile);
+            }
+            None
+        } else {
+            self.pending.company_name.clone()
+        };
         self.pending = Pending::none(self.saved_career.clone());
+        self.pending.company_name = unwritten_company_name;
         // What's on disk changed under the history; undoing past a save would describe changes
         // against a save that no longer exists.
         self.undo.clear();
@@ -747,6 +808,7 @@ impl Session {
         &mut self,
         dir: std::path::PathBuf,
         written: LoadedSlot,
+        profile_written: bool,
         cx: &mut Context<Self>,
     ) {
         let folder = dir
@@ -767,7 +829,7 @@ impl Session {
             folder,
             dir,
         };
-        self.mark_saved(written, cx);
+        self.mark_saved(written, profile_written, cx);
     }
 
     /// The profile's folder name, used to keep its backups apart.
@@ -916,7 +978,7 @@ mod tests {
         set_money(&session, 2000, cx);
         session.update(cx, |session, cx| {
             let written = session.prepared().expect("prepares");
-            session.mark_saved(written, cx);
+            session.mark_saved(written, true, cx);
         });
         cx.update(|cx| {
             let session = session.read(cx);

@@ -2,8 +2,13 @@
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::{
-    ActiveTheme as _, Icon, Sizable as _, StyledExt as _, button::Button, checkbox::Checkbox,
-    h_flex, progress::Progress, v_flex,
+    ActiveTheme as _, Icon, Sizable as _, StyledExt as _,
+    button::Button,
+    checkbox::Checkbox,
+    h_flex,
+    input::{Input, InputEvent, InputState},
+    progress::Progress,
+    v_flex,
 };
 use gpui_kit::{
     App, AppContext as _, Context, Entity, Hsla, InteractiveElement as _, IntoElement,
@@ -30,6 +35,8 @@ pub struct OverviewPage {
     experience: Entity<AmountField>,
     /// Coach experience (Coaches DLC); `None` for saves from before coaches.
     coach_experience: Option<Entity<AmountField>>,
+    /// The company's name (the profile's); `None` when the profile file couldn't be read.
+    company: Option<Entity<InputState>>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -78,12 +85,30 @@ impl OverviewPage {
                 this.edit(cx, |career| career.coach_experience = Some(value));
             }));
         }
+        let company = session
+            .read(cx)
+            .company_name()
+            .map(|name| cx.new(|cx| InputState::new(window, cx).default_value(name)));
+        if let Some(input) = &company {
+            _subscriptions.push(cx.subscribe_in(
+                input,
+                window,
+                |this, input, event: &InputEvent, _, cx| {
+                    if matches!(event, InputEvent::PressEnter { .. } | InputEvent::Blur) {
+                        let name = input.read(cx).value().to_string();
+                        this.session
+                            .update(cx, |session, cx| session.set_company_name(name, cx));
+                    }
+                },
+            ));
+        }
 
         Self {
             session,
             money,
             experience,
             coach_experience,
+            company,
             _subscriptions,
         }
     }
@@ -101,6 +126,11 @@ impl OverviewPage {
             if field.read(cx).value() != value {
                 field.update(cx, |field, cx| field.set_value(value, window, cx));
             }
+        }
+        if let (Some(input), Some(name)) = (&self.company, self.session.read(cx).company_name())
+            && input.read(cx).value().as_ref() != name
+        {
+            input.update(cx, |input, cx| input.set_value(name, window, cx));
         }
     }
 
@@ -451,6 +481,11 @@ impl Render for OverviewPage {
                             })),
                     ),
                 )
+                .children(self.company.clone().map(|input| {
+                    Section::new(t!(cx, "company-name"))
+                        .description(t!(cx, "company-name-description"))
+                        .child(div().max_w(rems(24.)).child(Input::new(&input)))
+                }))
                 .child({
                     // The big levers side by side, at the same height; they wrap on narrow windows.
                     let mut cards = vec![self.render_money(cx), self.render_experience(cx)];

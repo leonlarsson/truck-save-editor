@@ -171,3 +171,7 @@ Saves can hold tokens for cities that no longer have one (a leftover from an old
 ## Jobs
 
 Each company in each city is `company : company.volatile.<company>.<city>`, with its offers in `job_offer[]`: `job_offer_data` units with `target` (`"<company>.<city>"`), `cargo` (`cargo.<token>`; `null` for an empty slot), `shortest_distance_km`, `urgency` (0 standard, 1 important, 2 urgent), `ferry_time` and `ferry_price`, `units_count`, `trailer_definition`, and `expiration_time` in game minutes, against `economy.game_time`. Names come from the game: `def/company/<token>.sui` (`company_permanent`, a plain `name`) and `def/cargo/<token>.sui` (`cargo_data`, `name` a text key), plus the `company.*.sii` and `cargo.*.sii` each DLC adds.
+
+## The profile file
+
+A profile's `profile.sii` is one `user_profile` unit: `face`, `brand`, `logo`, `company_name`, `male`, `cached_experience` and `cached_distance` (what the profile list shows), `user_data[]`, `active_mods`, `customization`, `cached_stats[]`, `cached_discovery[]`, `version`, `profile_name`, `creation_time`, `save_time`, and the World of Trucks login: `online_user_name` and an encrypted `online_password`. The editor changes only `company_name` (and keeps `cached_experience` in step when it writes the file); the login is never read, shown or changed, and the file is never copied into fixtures or the repository.

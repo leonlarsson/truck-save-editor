@@ -110,6 +110,7 @@ save-no-backup-folder = Det finns ingen mapp att lägga säkerhetskopior i, så 
 saved-title = Sparad och kontrollerad ”{ $name }”
 saved-backup = Den gamla versionen finns som säkerhetskopia i { $path }
 save-failed = Kunde inte spara ”{ $name }”
+save-profile-failed = Sparfilen skrevs, men inte företagsnamnet: det väntar fortfarande på att sparas
 
 ## Warnings
 
@@ -289,6 +290,8 @@ restore-failed = Kunde inte återställa ”{ $name }”
 ## Overview
 
 amount-hint = Prova 2.5m, 10k, +1m eller -500k.
+company-name = Företagsnamn
+company-name-description = Ditt företags namn, för hela profilen: varje sparfil i den. Det ligger i profilfilen, som säkerhetskopieras innan den skrivs.
 money = Pengar
 money-description = Företagets saldo på banken.
 money-label = Banksaldo
