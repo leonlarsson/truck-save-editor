@@ -248,22 +248,8 @@ impl Render for VehicleDetail {
         let id = self.id.clone();
         let refuel_id = self.id.clone();
         v_flex()
+            .pt_2()
             .gap_6()
-            .child(
-                h_flex()
-                    .gap_3()
-                    .items_center()
-                    .children(game_data::brand_logo(cx, &vehicle).map(|logo| {
-                        GameIconView::new(logo)
-                            .size(1.4)
-                            .channel(gamedata::RED, cx.theme().muted_foreground)
-                    }))
-                    .child(
-                        div()
-                            .text_lg()
-                            .child(game_data::model_name(cx, &vehicle).unwrap_or_default()),
-                    ),
-            )
             .child(group(
                 t!(cx, "detail-about"),
                 v_flex()
@@ -333,7 +319,7 @@ fn part_label(key: &str, cx: &gpui_kit::App) -> SharedString {
     }
 }
 
-/// Opens a vehicle's panel.
+/// Opens a vehicle's panel, titled with its brand's logo and model.
 pub fn open(
     session: Entity<Session>,
     vehicle: &Vehicle,
@@ -341,16 +327,27 @@ pub fn open(
     cx: &mut gpui_kit::App,
 ) {
     let id = vehicle.id.clone();
-    let title = match vehicle.kind {
+    let kind_name = match vehicle.kind {
         VehicleKind::Truck => t!(cx, "detail-truck"),
         VehicleKind::Coach => t!(cx, "detail-coach"),
         VehicleKind::Trailer => t!(cx, "detail-trailer"),
     };
+    // The object itself is the title; its kind is the fallback when the model isn't known.
+    let name: SharedString = game_data::model_name(cx, vehicle)
+        .map(SharedString::from)
+        .unwrap_or(kind_name);
+    let logo = game_data::brand_logo(cx, vehicle);
     let view = cx.new(|cx| VehicleDetail::new(session, id, window, cx));
-    window.open_sheet(cx, move |sheet, _, _| {
-        sheet
-            .title(title.clone())
-            .size(px(SHEET_WIDTH))
-            .child(view.clone())
+    window.open_sheet(cx, move |sheet, _, cx| {
+        let title = h_flex()
+            .gap_2()
+            .items_center()
+            .children(logo.clone().map(|logo| {
+                GameIconView::new(logo)
+                    .size(1.1)
+                    .channel(gamedata::RED, cx.theme().muted_foreground)
+            }))
+            .child(name.clone());
+        sheet.title(title).size(px(SHEET_WIDTH)).child(view.clone())
     });
 }

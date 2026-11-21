@@ -137,12 +137,8 @@ impl Render for GarageDetail {
         };
 
         v_flex()
+            .pt_2()
             .gap_6()
-            .child(
-                div()
-                    .text_lg()
-                    .child(game_data::city_name(cx, &garage.city)),
-            )
             .child(group(
                 t!(cx, "detail-about"),
                 v_flex()
@@ -203,7 +199,7 @@ impl Render for GarageDetail {
     }
 }
 
-/// Opens a garage's panel.
+/// Opens a garage's panel, titled with its city.
 pub fn open(
     session: Entity<Session>,
     garage: &Garage,
@@ -211,10 +207,15 @@ pub fn open(
     cx: &mut gpui_kit::App,
 ) {
     let id = garage.id.clone();
+    let title: SharedString = t!(
+        cx,
+        "detail-garage-in",
+        city = game_data::city_name(cx, &garage.city)
+    );
     let view = cx.new(|cx| GarageDetail::new(session, id, cx));
-    window.open_sheet(cx, move |sheet, _, cx| {
+    window.open_sheet(cx, move |sheet, _, _| {
         sheet
-            .title(t!(cx, "detail-garage"))
+            .title(title.clone())
             .size(px(SHEET_WIDTH))
             .child(view.clone())
     });

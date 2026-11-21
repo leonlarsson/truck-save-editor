@@ -126,6 +126,7 @@ impl Render for DriverDetail {
         let id = self.id.clone();
 
         v_flex()
+            .pt_2()
             .gap_6()
             .child(
                 h_flex()
