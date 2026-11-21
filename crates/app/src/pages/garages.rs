@@ -1,8 +1,9 @@
 //! Garages: every city's garage, whether it's owned, how big it is and how full. Buy them all or
 //! upgrade the owned ones to large in one go.
 
+use gpui_kit::assets::IconName;
 use gpui_kit::component::{
-    ActiveTheme as _, Disableable as _, Sizable as _,
+    ActiveTheme as _, Disableable as _, Icon, Sizable as _,
     button::{Button, ButtonVariants as _},
     h_flex,
     select::{SearchableVec, Select, SelectEvent, SelectItem, SelectState},
@@ -232,7 +233,7 @@ impl Render for GaragesPage {
                             .child(
                                 Button::new("buy-all")
                                     .small()
-                                    .primary()
+                                    .outline()
                                     .label(t!(cx, "garages-buy-all"))
                                     .tooltip(t!(cx, "garages-buy-all-tooltip"))
                                     .disabled(large == count)
@@ -309,7 +310,7 @@ impl GarageTable {
                 .width(110.)
                 .text_right()
                 .sortable(),
-            Some(GarageColumn::Details) => Column::new("details", "").width(80.),
+            Some(GarageColumn::Details) => Column::new("details", "").width(44.),
             Some(GarageColumn::Drivers) | None => Column::new("drivers", t!(cx, "column-drivers"))
                 .width(110.)
                 .text_right()
@@ -443,7 +444,11 @@ impl TableDelegate for GarageTable {
                     Button::new(("details", row_ix))
                         .xsmall()
                         .ghost()
-                        .label(t!(cx, "details"))
+                        // Quiet: every row has one, and rows also open by double-click and
+                        // Enter. Named for screen readers, explained by its tooltip.
+                        .icon(Icon::new(IconName::ChevronRight))
+                        .accessibility_label(t!(cx, "details-open"))
+                        .tooltip(t!(cx, "details-open"))
                         .on_click(move |_, window, cx| {
                             details::open_garage(session.clone(), &garage, window, cx)
                         }),

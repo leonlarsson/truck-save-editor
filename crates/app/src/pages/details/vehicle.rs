@@ -10,7 +10,7 @@ use gpui_kit::component::{
 };
 use gpui_kit::{
     AppContext as _, Context, Entity, IntoElement, ParentElement as _, Render, SharedString,
-    Styled as _, Subscription, Window, div, px,
+    Styled as _, Subscription, Window, div, px, rems,
 };
 use save::{Vehicle, VehicleKind};
 
@@ -209,11 +209,11 @@ impl Render for VehicleDetail {
                                 h_flex()
                                     .gap_3()
                                     .items_center()
-                                    .child(div().w(px(110.)).text_sm().child(part_label(label, cx)))
+                                    .child(div().w(rems(7.)).text_sm().child(part_label(label, cx)))
                                     .child(div().flex_1().child(
                                         Progress::new(("wear", index)).value(percent as f32),
                                     ))
-                                    .child(div().w(px(40.)).text_sm().text_right().child(t!(
+                                    .child(div().w(rems(2.5)).text_sm().text_right().child(t!(
                                         cx,
                                         "percent",
                                         amount = percent
@@ -270,13 +270,13 @@ impl Render for VehicleDetail {
                     .gap_1()
                     .child(fact(
                         t!(cx, "column-plate"),
-                        div().w(px(180.)).child(Input::new(&self.plate).small()),
+                        div().w(rems(11.)).child(Input::new(&self.plate).small()),
                         cx,
                     ))
                     .child(fact(t!(cx, "column-garage"), where_kept, cx))
                     .child(fact(
                         t!(cx, "column-odometer"),
-                        div().w(px(180.)).child(self.odometer.clone()),
+                        div().w(rems(11.)).child(self.odometer.clone()),
                         cx,
                     ))
                     .children(vehicle.fuel.map(|fuel| {

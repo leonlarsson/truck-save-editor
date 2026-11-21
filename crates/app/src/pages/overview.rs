@@ -11,7 +11,7 @@ use gpui_kit::component::{
     v_flex,
 };
 use gpui_kit::{
-    App, AppContext as _, Context, Entity, Hsla, InteractiveElement as _, IntoElement,
+    App, AppContext as _, Context, Entity, InteractiveElement as _, IntoElement,
     ParentElement as _, Render, SharedString, StatefulInteractiveElement as _, Styled as _,
     Subscription, Window, div, rems,
 };
@@ -387,7 +387,7 @@ impl OverviewPage {
                     .child(
                         GameIconView::new(icon)
                             .size(2.5)
-                            .backdrop(PLACARD_BACKDROP)
+                            .backdrop(crate::theme::PLACARD_BACKDROP)
                             .opacity(if is_on { 1. } else { 0.35 }),
                     )
                     .on_click(cx.listener(move |this, _, _, cx| set(this, !is_on, cx)))
@@ -425,15 +425,6 @@ impl OverviewPage {
             )
     }
 }
-
-/// The dark of the game's own panels, which its placards are drawn over (the black half of the
-/// corrosive placard is that panel showing through). The same in both themes: it's the sign's.
-const PLACARD_BACKDROP: Hsla = Hsla {
-    h: 0.,
-    s: 0.,
-    l: 0.07,
-    a: 1.,
-};
 
 /// A skill's icon from the game: the highlight in the theme's accent once the skill is learned,
 /// all quiet while it's at level 0.

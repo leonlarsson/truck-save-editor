@@ -164,7 +164,7 @@ impl Render for DriverDetail {
                 t!(cx, "detail-about"),
                 v_flex().gap_1().child(fact(
                     t!(cx, "column-experience"),
-                    div().w(px(180.)).child(self.experience.clone()),
+                    div().w(rems(11.)).child(self.experience.clone()),
                     cx,
                 )),
             ))

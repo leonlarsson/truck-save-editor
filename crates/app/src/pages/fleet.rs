@@ -1,7 +1,8 @@
 //! Fleet: every truck the company owns, in a sortable table that stays smooth with thousands of rows.
 
+use gpui_kit::assets::IconName;
 use gpui_kit::component::{
-    ActiveTheme as _, Disableable as _, Selectable as _, Sizable as _,
+    ActiveTheme as _, Disableable as _, Icon, Selectable as _, Sizable as _,
     button::{Button, ButtonGroup, ButtonVariants as _},
     h_flex,
     table::{Column, ColumnSort, DataTable, TableDelegate, TableEvent, TableState},
@@ -373,7 +374,7 @@ impl TruckTable {
                 .width(70.)
                 .text_right()
                 .sortable(),
-            Some(TruckColumn::Details) => Column::new("details", "").width(80.),
+            Some(TruckColumn::Details) => Column::new("details", "").width(44.),
             Some(TruckColumn::Wear) | None => Column::new("wear", t!(cx, "column-wear"))
                 .width(140.)
                 .text_right()
@@ -575,7 +576,11 @@ impl TableDelegate for TruckTable {
                         Button::new(("details", row_ix))
                             .xsmall()
                             .ghost()
-                            .label(t!(cx, "details"))
+                            // Quiet: every row has one, and rows also open by double-click
+                            // and Enter. Named for screen readers, explained by its tooltip.
+                            .icon(Icon::new(IconName::ChevronRight))
+                            .accessibility_label(t!(cx, "details-open"))
+                            .tooltip(t!(cx, "details-open"))
                             .on_click(move |_, window, cx| {
                                 details::open_vehicle(session.clone(), &vehicle, window, cx)
                             }),

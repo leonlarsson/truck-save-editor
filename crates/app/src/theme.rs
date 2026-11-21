@@ -79,3 +79,13 @@ impl ThemeIsDark for App {
         Theme::global(self).is_dark()
     }
 }
+
+/// The dark of the game's own panels, which its ADR placards are drawn over (the black half of
+/// the corrosive placard is that panel showing through). The same in both themes: it belongs to
+/// the sign, not to the app's look, so it's a fixed value rather than a theme colour.
+pub const PLACARD_BACKDROP: gpui_kit::Hsla = gpui_kit::Hsla {
+    h: 0.,
+    s: 0.,
+    l: 0.07,
+    a: 1.,
+};

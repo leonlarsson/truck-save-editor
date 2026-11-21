@@ -83,6 +83,9 @@ changes-count = { $count ->
 }
 discard = Kasta bort
 save = Spara
+save-open = Spara…
+details-open = Detaljer…
+settings-open = Inställningar…
 saving = Sparar…
 
 ## Opening, closing and saving
@@ -166,7 +169,6 @@ job-ferry = { $distance } · färja
 
 ## Detail panels
 
-details = Detaljer
 detail-truck = Lastbil
 detail-coach = Buss
 detail-trailer = Släp
@@ -254,7 +256,7 @@ settings-not-affiliated = Inte knuten till eller godkänd av SCS Software.
 
 ## Command palette
 
-palette-open = Kommandon
+palette-open = Kommandon…
 palette-shortcut = Ctrl+K
 palette-placeholder = Skriv ett kommando eller en sida…
 palette-group-pages = Gå till

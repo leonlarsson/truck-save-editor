@@ -287,7 +287,7 @@ impl Render for OpenSavePage {
                     .ghost()
                     .small()
                     .icon(Icon::new(IconName::Settings))
-                    .label(t!(cx, "page-settings"))
+                    .label(t!(cx, "settings-open"))
                     .on_click(|_, window, cx| crate::pages::settings::open_sheet(window, cx)),
             );
 
@@ -300,6 +300,7 @@ impl Render for OpenSavePage {
                 .child(t!(cx, "start-looking"))
                 .into_any_element(),
             Some(profiles) if profiles.is_empty() => v_flex()
+                .px_3()
                 .gap_3()
                 .items_start()
                 .child(div().font_medium().child(t!(cx, "start-none-title")))
@@ -321,7 +322,7 @@ impl Render for OpenSavePage {
                 let (profile, slots) = &profiles[selected];
                 v_flex()
                     .gap_6()
-                    .child(self.render_profiles(profiles, cx))
+                    .child(div().px_3().child(self.render_profiles(profiles, cx)))
                     .child(self.render_slots(profile, slots, cx))
                     .into_any_element()
             }
@@ -341,7 +342,9 @@ impl Render for OpenSavePage {
                     .px_8()
                     .py_12()
                     .gap_8()
-                    .child(header)
+                    // Everything on the slot rows' text edge: the rows pad their content so their
+                    // hover fill reaches past it; the header and the rest line up with that text.
+                    .child(div().px_3().child(header))
                     .child(body),
             )
     }

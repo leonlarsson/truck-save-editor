@@ -1,8 +1,9 @@
 //! Drivers: everyone the company has hired, with their skills and experience, and one click to max
 //! them all out.
 
+use gpui_kit::assets::IconName;
 use gpui_kit::component::{
-    ActiveTheme as _, Disableable as _, Sizable as _,
+    ActiveTheme as _, Disableable as _, Icon, Sizable as _,
     button::{Button, ButtonVariants as _},
     h_flex,
     table::{Column, ColumnSort, DataTable, TableDelegate, TableEvent, TableState},
@@ -143,7 +144,7 @@ impl Render for DriversPage {
                     .child(
                         Button::new("max-drivers")
                             .small()
-                            .primary()
+                            .outline()
                             .label(t!(cx, "drivers-max-all"))
                             .tooltip(t!(cx, "drivers-max-all-tooltip"))
                             .disabled(maxed == count)
@@ -240,7 +241,7 @@ impl DriverTable {
             Some(DriverColumn::Skills) => Column::new("skills", t!(cx, "column-skills"))
                 .width(150.)
                 .sortable(),
-            Some(DriverColumn::Details) => Column::new("details", "").width(80.),
+            Some(DriverColumn::Details) => Column::new("details", "").width(44.),
             Some(DriverColumn::Adr) | None => Column::new("adr", t!(cx, "column-adr"))
                 .width(90.)
                 .sortable(),
@@ -385,7 +386,11 @@ impl TableDelegate for DriverTable {
                     Button::new(("details", row_ix))
                         .xsmall()
                         .ghost()
-                        .label(t!(cx, "details"))
+                        // Quiet: every row has one, and rows also open by double-click and
+                        // Enter. Named for screen readers, explained by its tooltip.
+                        .icon(Icon::new(IconName::ChevronRight))
+                        .accessibility_label(t!(cx, "details-open"))
+                        .tooltip(t!(cx, "details-open"))
                         .on_click(move |_, window, cx| {
                             details::open_driver(session.clone(), &driver, window, cx)
                         }),

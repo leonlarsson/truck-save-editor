@@ -873,7 +873,7 @@ impl Workspace {
                     .label(if is_saving {
                         t!(cx, "saving")
                     } else {
-                        t!(cx, "save")
+                        t!(cx, "save-open")
                     })
                     .loading(is_saving)
                     .disabled(changes == 0 || is_saving)

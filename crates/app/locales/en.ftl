@@ -83,6 +83,9 @@ changes-count = { $count ->
 }
 discard = Discard
 save = Save
+save-open = Save…
+details-open = Details…
+settings-open = Settings…
 saving = Saving…
 
 ## Opening, closing and saving
@@ -166,7 +169,6 @@ job-ferry = { $distance } · ferry
 
 ## Detail panels
 
-details = Details
 detail-truck = Truck
 detail-coach = Coach
 detail-trailer = Trailer
@@ -254,7 +256,7 @@ settings-not-affiliated = Not affiliated with or endorsed by SCS Software.
 
 ## Command palette
 
-palette-open = Commands
+palette-open = Commands…
 palette-shortcut = Ctrl+K
 palette-placeholder = Type a command or a page…
 palette-group-pages = Go to

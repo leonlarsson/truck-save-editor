@@ -12,7 +12,7 @@ use gpui_kit::component::{
 };
 use gpui_kit::{
     AppContext as _, Context, Entity, IntoElement, ParentElement as _, Render, SharedString,
-    Styled as _, Window, div, px,
+    Styled as _, Window, div, px, rems,
 };
 use save::Place;
 
@@ -198,14 +198,14 @@ impl Render for QuickStart {
                 // Not hidden: say why it can't be done here.
                 .children(reason.map(|reason| {
                     div()
-                        .pl(px(24.))
+                        .pl(rems(1.5))
                         .text_xs()
                         .text_color(cx.theme().muted_foreground)
                         .child(reason)
                 }))
                 .children(
                     (choice == Choice::Money && is_chosen)
-                        .then(|| div().pl(px(24.)).w(px(280.)).child(self.money.clone())),
+                        .then(|| div().pl(rems(1.5)).w(rems(17.5)).child(self.money.clone())),
                 )
         });
 
