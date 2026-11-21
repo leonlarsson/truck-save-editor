@@ -5,6 +5,7 @@ use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Sizable as _,
     button::{Button, ButtonVariants as _},
     h_flex,
+    select::{SearchableVec, Select, SelectEvent, SelectItem, SelectState},
     table::{Column, ColumnSort, DataTable, TableDelegate, TableState},
     v_flex,
 };
@@ -21,6 +22,8 @@ use crate::session::Session;
 pub struct GaragesPage {
     session: Entity<Session>,
     table: Entity<TableState<GarageTable>>,
+    /// The headquarters: one of the cities with an owned garage.
+    headquarters: Entity<SelectState<SearchableVec<CityOption>>>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -31,20 +34,61 @@ impl GaragesPage {
             sort: None,
         };
         let table = cx.new(|cx| TableState::new(delegate, window, cx).sortable(true));
-        let _subscriptions = vec![cx.observe(&session, |this, session, cx| {
-            let garages = session.read(cx).garages();
-            this.table.update(cx, |table, cx| {
-                table.delegate_mut().set_garages(garages);
-                table.refresh(cx);
+        let headquarters = cx.new(|cx| {
+            SelectState::new(SearchableVec::new(Vec::new()), None, window, cx).searchable(true)
+        });
+        let _subscriptions = vec![
+            cx.observe_in(&session, window, |this, session, window, cx| {
+                let garages = session.read(cx).garages();
+                this.table.update(cx, |table, cx| {
+                    table.delegate_mut().set_garages(garages);
+                    table.refresh(cx);
+                    cx.notify();
+                });
+                this.sync_headquarters(window, cx);
                 cx.notify();
-            });
-            cx.notify();
-        })];
-        Self {
+            }),
+            cx.subscribe_in(
+                &headquarters,
+                window,
+                |this, _, event: &SelectEvent<SearchableVec<CityOption>>, _, cx| {
+                    if let SelectEvent::Confirm(Some(city)) = event {
+                        let city = city.to_string();
+                        this.session.update(cx, |session, cx| {
+                            session.edit_career(cx, |career| career.hq_city = city);
+                        });
+                    }
+                },
+            ),
+        ];
+        let mut page = Self {
             session,
             table,
+            headquarters,
             _subscriptions,
-        }
+        };
+        page.sync_headquarters(window, cx);
+        page
+    }
+
+    /// Puts the owned garages' cities in the HQ picker, the current HQ selected.
+    fn sync_headquarters(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let session = self.session.read(cx);
+        let hq: SharedString = session.career().hq_city.clone().into();
+        let mut cities: Vec<CityOption> = session
+            .garages()
+            .into_iter()
+            .filter(|garage| garage.is_owned)
+            .map(|garage| CityOption {
+                name: game_data::city_name(cx, &garage.city).into(),
+                token: garage.city.into(),
+            })
+            .collect();
+        cities.sort_by(|a, b| a.name.cmp(&b.name));
+        self.headquarters.update(cx, |select, cx| {
+            select.set_items(SearchableVec::new(cities), window, cx);
+            select.set_selected_value(&hq, window, cx);
+        });
     }
 
     fn upgrade(&mut self, buy_all: bool, cx: &mut Context<Self>) {
@@ -78,10 +122,28 @@ impl Render for GaragesPage {
                     .items_center()
                     .gap_4()
                     .child(
-                        div()
-                            .text_sm()
-                            .text_color(cx.theme().muted_foreground)
-                            .child(summary),
+                        h_flex()
+                            .gap_4()
+                            .items_center()
+                            .child(
+                                h_flex()
+                                    .gap_2()
+                                    .items_center()
+                                    .child(div().text_sm().child(t!(cx, "headquarters")))
+                                    .child(
+                                        div().w(gpui_kit::rems(13.)).child(
+                                            Select::new(&self.headquarters)
+                                                .small()
+                                                .placeholder(t!(cx, "headquarters-pick")),
+                                        ),
+                                    ),
+                            )
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .text_color(cx.theme().muted_foreground)
+                                    .child(summary),
+                            ),
                     )
                     .child(
                         h_flex()
@@ -263,5 +325,24 @@ impl TableDelegate for GarageTable {
             .get(col_ix)
             .map(|column| self.text(row_ix, *column, cx).to_string())
             .unwrap_or_default()
+    }
+}
+
+/// A city in the HQ picker: shown by its name, chosen by its token.
+#[derive(Clone)]
+struct CityOption {
+    token: SharedString,
+    name: SharedString,
+}
+
+impl SelectItem for CityOption {
+    type Value = SharedString;
+
+    fn title(&self) -> SharedString {
+        self.name.clone()
+    }
+
+    fn value(&self) -> &Self::Value {
+        &self.token
     }
 }

@@ -39,7 +39,7 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [ ] The game's own icons (skills, ADR classes, brands): a texture decoder (.tobj, GDeflate-compressed DDS). Never commit or bundle SCS artwork; fall back to Lucide icons when the game isn't found.
 - [ ] Use the game's language for its names when the app gets more languages (gamedata already takes a language code).
 - [ ] Coach garages: coaches show "No garage"; find where the save keeps them.
-- [ ] HQ city: pick from the cities the company has garages in.
+- [x] HQ city: pick from the cities the company has garages in (Garages page).
 - [ ] City names from the game's city definitions (`city_name_localized`), not only by token: a few tokens (`vasteraas`) differ from their text keys.
 - [ ] Driver names (not found in `def/` yet; maybe generated or in another archive).
 
