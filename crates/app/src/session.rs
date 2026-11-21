@@ -7,7 +7,7 @@
 use std::collections::HashSet;
 
 use gpui_kit::{App, Context, SharedString};
-use save::{Career, Game, LoadedSlot, Profile, Slot, Truck};
+use save::{Career, Game, LoadedSlot, Profile, Slot, Vehicle, VehicleKind};
 
 use crate::format::thousands;
 use crate::i18n::t;
@@ -21,8 +21,8 @@ pub struct Session {
     /// The career as it is on disk.
     saved_career: Career,
     career: Career,
-    /// The trucks as they are on disk.
-    saved_trucks: Vec<Truck>,
+    /// The vehicles (trucks and coaches) as they are on disk.
+    saved_vehicles: Vec<Vehicle>,
     /// Trucks to repair when saving, by id.
     repaired: HashSet<String>,
     is_saving: bool,
@@ -40,7 +40,7 @@ impl Session {
         let career = Career::read(&loaded.game)?;
         Ok(Self {
             game: profile.game,
-            saved_trucks: save::trucks(&loaded.game),
+            saved_vehicles: save::vehicles(&loaded.game),
             saved_career: career.clone(),
             career,
             profile,
@@ -82,9 +82,9 @@ impl Session {
         cx.notify();
     }
 
-    /// The trucks as they'll be after saving (repaired ones without wear).
-    pub fn trucks(&self) -> Vec<Truck> {
-        self.saved_trucks
+    /// The vehicles as they'll be after saving (repaired ones without wear).
+    pub fn vehicles(&self) -> Vec<Vehicle> {
+        self.saved_vehicles
             .iter()
             .map(|truck| {
                 let mut truck = truck.clone();
@@ -96,9 +96,9 @@ impl Session {
             .collect()
     }
 
-    /// Marks every worn truck for repair.
-    pub fn repair_all(&mut self, cx: &mut Context<Self>) {
-        for truck in &self.saved_trucks {
+    /// Marks every worn vehicle of a kind for repair.
+    pub fn repair_all(&mut self, kind: VehicleKind, cx: &mut Context<Self>) {
+        for truck in self.saved_vehicles.iter().filter(|v| v.kind == kind) {
             if truck.wear.worst() > 0.0 {
                 self.repaired.insert(truck.id.clone());
             }
@@ -144,6 +144,13 @@ impl Session {
                 amount = thousands(after.experience)
             ),
         );
+        if let (Some(old), Some(new)) = (before.coach_experience, after.coach_experience) {
+            add(
+                t!(cx, "coach-experience"),
+                t!(cx, "experience-amount", amount = thousands(old)),
+                t!(cx, "experience-amount", amount = thousands(new)),
+            );
+        }
         for index in 0..before.skills.levels().len() {
             add(
                 skill_name(cx, index),
@@ -192,7 +199,7 @@ impl Session {
 
     /// After a successful save: what was written is now what's on disk.
     pub fn mark_saved(&mut self, written: LoadedSlot, cx: &mut Context<Self>) {
-        self.saved_trucks = save::trucks(&written.game);
+        self.saved_vehicles = save::vehicles(&written.game);
         self.loaded = written;
         self.saved_career = self.career.clone();
         self.repaired.clear();

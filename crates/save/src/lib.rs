@@ -16,9 +16,9 @@ mod store;
 #[cfg(feature = "native")]
 mod time;
 
-pub use career::{ADR_ALL, Career, MAX_SKILL_LEVEL, Skills};
+pub use career::{ADR_ALL, Career, CoachSkills, MAX_SKILL_LEVEL, Skills};
 pub use error::{Error, Result};
-pub use fleet::{Truck, Wear, model_display_name, repair, trucks, wear_is_known};
+pub use fleet::{Vehicle, VehicleKind, Wear, model_display_name, repair, vehicles, wear_is_known};
 pub use game::Game;
 pub use info::{SlotInfo, read_info, update_info};
 #[cfg(feature = "native")]

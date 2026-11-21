@@ -10,7 +10,7 @@ use gpui_kit::{
 };
 use save::{ADR_ALL, MAX_SKILL_LEVEL, Skills};
 
-use crate::format::{compact, thousands};
+use crate::format::compact;
 use crate::i18n::t;
 use crate::labels::{ADR_CLASS_COUNT, adr_class, skill_description, skill_name};
 use crate::session::Session;
@@ -20,6 +20,8 @@ pub struct OverviewPage {
     session: Entity<Session>,
     money: Entity<AmountField>,
     experience: Entity<AmountField>,
+    /// Coach experience (Coaches DLC); `None` for saves from before coaches.
+    coach_experience: Option<Entity<AmountField>>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -38,10 +40,16 @@ impl OverviewPage {
             AmountField::new(career.experience, t!(cx, "experience-label"), window, cx)
                 .min(0)
                 .suffix(t!(cx, "experience-unit"))
-                .hint(t!(cx, "amount-hint"))
+        });
+        let coach_experience = career.coach_experience.map(|value| {
+            cx.new(|cx| {
+                AmountField::new(value, t!(cx, "coach-experience-label"), window, cx)
+                    .min(0)
+                    .suffix(t!(cx, "experience-unit"))
+            })
         });
 
-        let _subscriptions = vec![
+        let mut _subscriptions = vec![
             cx.subscribe(&money, |this, _, AmountChanged(value), cx| {
                 let value = *value;
                 this.edit(cx, |career| career.money = value);
@@ -56,21 +64,32 @@ impl OverviewPage {
                 cx.notify();
             }),
         ];
+        if let Some(field) = &coach_experience {
+            _subscriptions.push(cx.subscribe(field, |this, _, AmountChanged(value), cx| {
+                let value = *value;
+                this.edit(cx, |career| career.coach_experience = Some(value));
+            }));
+        }
 
         Self {
             session,
             money,
             experience,
+            coach_experience,
             _subscriptions,
         }
     }
 
     fn sync_fields(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let career = self.session.read(cx).career().clone();
-        for (field, value) in [
-            (&self.money, career.money),
-            (&self.experience, career.experience),
-        ] {
+        let mut fields = vec![
+            (self.money.clone(), career.money),
+            (self.experience.clone(), career.experience),
+        ];
+        if let (Some(field), Some(value)) = (&self.coach_experience, career.coach_experience) {
+            fields.push((field.clone(), value));
+        }
+        for (field, value) in fields {
             if field.read(cx).value() != value {
                 field.update(cx, |field, cx| field.set_value(value, window, cx));
             }
@@ -101,8 +120,7 @@ impl OverviewPage {
 
     fn render_experience(&self, cx: &mut Context<Self>) -> Section {
         let steps: [i64; 3] = [10_000, 100_000, 1_000_000];
-        let bus = self.session.read(cx).career().bus_experience;
-        let mut section = Section::new(t!(cx, "experience"))
+        Section::new(t!(cx, "experience"))
             .description(t!(cx, "experience-description"))
             .child(self.experience.clone())
             .child(h_flex().gap_2().flex_wrap().children(steps.map(|step| {
@@ -114,16 +132,30 @@ impl OverviewPage {
                         });
                     },
                 ))
-            })));
-        if let Some(bus) = bus.filter(|bus| *bus > 0) {
-            section = section.child(
-                div()
-                    .text_xs()
-                    .text_color(cx.theme().muted_foreground)
-                    .child(t!(cx, "bus-experience", amount = thousands(bus))),
-            );
-        }
-        section
+            })))
+    }
+
+    fn render_coach_experience(
+        &self,
+        field: &Entity<AmountField>,
+        cx: &mut Context<Self>,
+    ) -> Section {
+        let steps: [i64; 3] = [1_000, 10_000, 100_000];
+        Section::new(t!(cx, "coach-experience"))
+            .description(t!(cx, "coach-experience-description"))
+            .child(field.clone())
+            .child(h_flex().gap_2().flex_wrap().children(steps.map(|step| {
+                StepButtons::new(("coach-xp-step", step as usize), compact(step)).on_step(
+                    cx.listener(move |this, direction: &i64, _, cx| {
+                        let direction = *direction;
+                        this.edit(cx, |career| {
+                            if let Some(value) = &mut career.coach_experience {
+                                *value = (*value + direction * step).max(0);
+                            }
+                        });
+                    }),
+                )
+            })))
     }
 
     fn render_skills(&self, cx: &mut Context<Self>) -> Section {
@@ -217,24 +249,18 @@ impl Render for OverviewPage {
             v_flex()
                 .gap_6()
                 .max_w(rems(60.))
-                .child(
-                    // The two cards sit side by side at the same height.
-                    h_flex()
-                        .items_stretch()
-                        .gap_6()
-                        .child(
-                            v_flex()
-                                .flex_1()
-                                .min_w_0()
-                                .child(self.render_money(cx).flex_1()),
-                        )
-                        .child(
-                            v_flex()
-                                .flex_1()
-                                .min_w_0()
-                                .child(self.render_experience(cx).flex_1()),
-                        ),
-                )
+                .child({
+                    // The big levers side by side, at the same height; they wrap on narrow windows.
+                    let mut cards = vec![self.render_money(cx), self.render_experience(cx)];
+                    if let Some(field) = self.coach_experience.clone() {
+                        cards.push(self.render_coach_experience(&field, cx));
+                    }
+                    h_flex().flex_wrap().items_stretch().gap_6().children(
+                        cards
+                            .into_iter()
+                            .map(|card| v_flex().flex_1().min_w(rems(14.)).child(card.flex_1())),
+                    )
+                })
                 .child(self.render_skills(cx))
                 .child(self.render_adr(cx)),
         )

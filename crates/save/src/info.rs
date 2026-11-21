@@ -78,7 +78,7 @@ pub fn update_info(info: &mut Document, career: &Career) {
         "info_money_account",
         Value::single(career.money.to_string()),
     );
-    let experience = career.experience + career.bus_experience.unwrap_or(0);
+    let experience = career.experience + career.coach_experience.unwrap_or(0);
     unit.set(
         "info_players_experience",
         Value::single(experience.to_string()),

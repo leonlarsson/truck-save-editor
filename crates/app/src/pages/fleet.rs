@@ -1,8 +1,8 @@
 //! Fleet: every truck the company owns, in a sortable table that stays smooth with thousands of rows.
 
 use gpui_kit::component::{
-    ActiveTheme as _, Disableable as _, Sizable as _,
-    button::Button,
+    ActiveTheme as _, Disableable as _, Selectable as _, Sizable as _,
+    button::{Button, ButtonGroup},
     h_flex,
     table::{Column, ColumnSort, DataTable, TableDelegate, TableState},
     v_flex,
@@ -11,7 +11,7 @@ use gpui_kit::{
     App, AppContext as _, Context, Entity, IntoElement, ParentElement as _, Render, SharedString,
     Styled as _, Subscription, Window, div,
 };
-use save::Truck;
+use save::{Vehicle, VehicleKind};
 
 use crate::format::thousands;
 use crate::i18n::t;
@@ -19,32 +19,50 @@ use crate::session::Session;
 
 pub struct FleetPage {
     session: Entity<Session>,
+    /// Which vehicles the table shows: trucks or coaches.
+    kind: VehicleKind,
     table: Entity<TableState<TruckTable>>,
     _subscriptions: Vec<Subscription>,
 }
 
 impl FleetPage {
     pub fn new(session: Entity<Session>, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let kind = VehicleKind::Truck;
         let delegate = TruckTable {
-            trucks: session.read(cx).trucks(),
+            trucks: of_kind(session.read(cx).vehicles(), kind),
             sort: None,
         };
         let table = cx.new(|cx| TableState::new(delegate, window, cx).sortable(true));
-        let _subscriptions = vec![cx.observe(&session, |this, session, cx| {
-            let trucks = session.read(cx).trucks();
-            this.table.update(cx, |table, cx| {
-                table.delegate_mut().set_trucks(trucks);
-                table.refresh(cx);
-                cx.notify();
-            });
-            cx.notify();
-        })];
+        let _subscriptions = vec![cx.observe(&session, |this, _, cx| this.reload(cx))];
         Self {
             session,
+            kind,
             table,
             _subscriptions,
         }
     }
+}
+
+impl FleetPage {
+    /// Puts the session's current vehicles of the shown kind into the table.
+    fn reload(&mut self, cx: &mut Context<Self>) {
+        let vehicles = of_kind(self.session.read(cx).vehicles(), self.kind);
+        self.table.update(cx, |table, cx| {
+            table.delegate_mut().set_trucks(vehicles);
+            table.refresh(cx);
+            cx.notify();
+        });
+        cx.notify();
+    }
+
+    fn show(&mut self, kind: VehicleKind, cx: &mut Context<Self>) {
+        self.kind = kind;
+        self.reload(cx);
+    }
+}
+
+fn of_kind(vehicles: Vec<Vehicle>, kind: VehicleKind) -> Vec<Vehicle> {
+    vehicles.into_iter().filter(|v| v.kind == kind).collect()
 }
 
 impl Render for FleetPage {
@@ -55,22 +73,45 @@ impl Render for FleetPage {
             .iter()
             .filter(|truck| truck.wear.worst() > 0.0)
             .count();
-        let summary = t!(
+        let count = thousands(truck_count as i64);
+        let vehicles = match self.kind {
+            VehicleKind::Truck => t!(cx, "fleet-trucks", count = truck_count, amount = count),
+            VehicleKind::Coach => t!(cx, "fleet-coaches", count = truck_count, amount = count),
+        };
+        let worn = t!(
             cx,
-            "fleet-summary",
-            trucks = t!(
-                cx,
-                "fleet-trucks",
-                count = truck_count,
-                amount = thousands(truck_count as i64)
-            ),
-            worn = t!(
-                cx,
-                "fleet-worn",
-                count = worn_count,
-                amount = thousands(worn_count as i64)
-            ),
+            "fleet-worn",
+            count = worn_count,
+            amount = thousands(worn_count as i64)
         );
+        let summary = t!(cx, "fleet-summary", vehicles = vehicles, worn = worn);
+
+        // Trucks and coaches each get their own list; the switch only shows when there are coaches.
+        let all = self.session.read(cx).vehicles();
+        let coach_count = all.iter().filter(|v| v.kind == VehicleKind::Coach).count();
+        let all_truck_count = all.len() - coach_count;
+        let switch = (coach_count > 0).then(|| {
+            ButtonGroup::new("vehicle-kind")
+                .outline()
+                .small()
+                .child(
+                    Button::new("trucks")
+                        .label(t!(cx, "fleet-tab-trucks", count = all_truck_count))
+                        .selected(self.kind == VehicleKind::Truck),
+                )
+                .child(
+                    Button::new("coaches")
+                        .label(t!(cx, "fleet-tab-coaches", count = coach_count))
+                        .selected(self.kind == VehicleKind::Coach),
+                )
+                .on_click(
+                    cx.listener(|this, clicked: &Vec<usize>, _, cx| match clicked.first() {
+                        Some(0) => this.show(VehicleKind::Truck, cx),
+                        Some(1) => this.show(VehicleKind::Coach, cx),
+                        _ => {}
+                    }),
+                )
+        });
 
         v_flex()
             .size_full()
@@ -83,10 +124,12 @@ impl Render for FleetPage {
                     .items_center()
                     .gap_4()
                     .child(
-                        div()
-                            .text_sm()
-                            .text_color(cx.theme().muted_foreground)
-                            .child(summary),
+                        h_flex().gap_4().items_center().children(switch).child(
+                            div()
+                                .text_sm()
+                                .text_color(cx.theme().muted_foreground)
+                                .child(summary),
+                        ),
                     )
                     .child(
                         Button::new("repair-all")
@@ -95,8 +138,9 @@ impl Render for FleetPage {
                             .label(t!(cx, "repair-all"))
                             .disabled(worn_count == 0)
                             .on_click(cx.listener(|this, _, _, cx| {
+                                let kind = this.kind;
                                 this.session
-                                    .update(cx, |session, cx| session.repair_all(cx));
+                                    .update(cx, |session, cx| session.repair_all(kind, cx));
                             })),
                     ),
             )
@@ -113,7 +157,7 @@ impl Render for FleetPage {
 
 /// Feeds the trucks to GPUI Kit's table. Only the visible rows are ever rendered.
 struct TruckTable {
-    trucks: Vec<Truck>,
+    trucks: Vec<Vehicle>,
     /// The sort in effect, kept so new data (after a repair) stays in the same order.
     sort: Option<(TruckColumn, ColumnSort)>,
 }
@@ -138,7 +182,7 @@ impl TruckColumn {
 }
 
 impl TruckTable {
-    fn set_trucks(&mut self, trucks: Vec<Truck>) {
+    fn set_trucks(&mut self, trucks: Vec<Vehicle>) {
         self.trucks = trucks;
         if let Some((column, sort)) = self.sort {
             self.sort_by(column, sort);

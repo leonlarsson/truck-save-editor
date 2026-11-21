@@ -110,13 +110,15 @@ amount-hint = Try 2.5m, 10k, +1m or -500k.
 money = Money
 money-description = Your company's bank balance.
 money-label = Bank balance
-experience = Experience
-experience-description = Experience points decide your level.
-experience-label = Experience points
+experience = Truck experience
+experience-description = Decides your level as a truck driver.
+experience-label = Truck experience points
+coach-experience = Coach experience
+coach-experience-description = Coaches have a career of their own, with its own levels.
+coach-experience-label = Coach experience points
 experience-unit = XP
 experience-amount = { $amount } XP
-bus-experience = Bus driving: { $amount } XP
-skills = Skills
+skills = Truck skills
 skills-description = Click a level to set it. Click the highest filled level again to lower it.
 skills-max = Max all skills
 skill-level = Level { $level }
@@ -155,15 +157,21 @@ fleet-worn = { $count ->
     [one] 1 needs repairs
    *[other] { $amount } need repairs
 }
-fleet-summary = { $trucks } · { $worn }
+fleet-coaches = { $count ->
+    [one] 1 coach
+   *[other] { $amount } coaches
+}
+fleet-tab-trucks = Trucks · { $count }
+fleet-tab-coaches = Coaches · { $count }
+fleet-summary = { $vehicles } · { $worn }
 repair-all = Repair all
 repairs = Repairs
 repairs-before = Worn
 repairs-after = { $count ->
-    [one] 1 truck repaired
-   *[other] { $count } trucks repaired
+    [one] 1 vehicle repaired
+   *[other] { $count } vehicles repaired
 }
-column-truck = Truck
+column-truck = Model
 column-plate = Plate
 column-garage = Garage
 column-odometer = Odometer
@@ -171,5 +179,5 @@ column-wear = Wear
 no-garage = No garage
 distance-km = { $amount } km
 percent = { $amount }%
-trucks-table = Trucks
-unknown-truck = Unknown truck
+trucks-table = Vehicles
+unknown-truck = Unknown model

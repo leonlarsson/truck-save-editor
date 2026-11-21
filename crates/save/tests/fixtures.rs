@@ -26,7 +26,7 @@ fn real_saves_have_a_career_and_a_fleet() {
         let mut slot = save::load(&dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display()));
         let career =
             save::Career::read(&slot.game).unwrap_or_else(|e| panic!("{}: {e}", dir.display()));
-        let trucks = save::trucks(&slot.game);
+        let trucks = save::vehicles(&slot.game);
         assert!(career.experience >= 0);
         assert!(!career.hq_city.is_empty());
         assert!(

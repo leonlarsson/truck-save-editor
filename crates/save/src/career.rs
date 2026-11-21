@@ -17,8 +17,11 @@ pub struct Career {
     pub money: i64,
     /// Truck experience points.
     pub experience: i64,
-    /// Bus experience points (only in saves from versions with buses).
-    pub bus_experience: Option<i64>,
+    /// Coach experience points (Coaches DLC): a career of its own, with its own levels.
+    /// `None` in saves from before coaches.
+    pub coach_experience: Option<i64>,
+    /// Coach skills (Coaches DLC); `None` in saves from before coaches.
+    pub coach_skills: Option<CoachSkills>,
     pub skills: Skills,
     /// The HQ city's token (`berlin`).
     pub hq_city: String,
@@ -71,6 +74,68 @@ impl Skills {
     }
 }
 
+/// The coach driver's skills (Coaches DLC), as levels by their save field names. What each one
+/// is called in game, and its highest level, are still to be confirmed (see `TODO.md`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CoachSkills {
+    pub long_duty: u8,
+    pub tight_schedule: u8,
+    pub satisfaction_decrease: u8,
+    pub low_acceleration: u8,
+    pub satisfaction_increase: u8,
+    pub ecodriving: u8,
+}
+
+impl CoachSkills {
+    pub const FIELDS: [&'static str; 6] = [
+        "long_duty",
+        "tight_schedule",
+        "satisfaction_decrease",
+        "low_acceleration",
+        "satisfaction_increase",
+        "ecodriving",
+    ];
+
+    /// All six, or `None` if the save predates coaches.
+    fn read(economy: &sii::Unit) -> Option<Self> {
+        let level = |field: &str| -> Option<u8> {
+            let value = value::parse_i64(economy.single(field)?)?;
+            Some(value.clamp(0, i64::from(u8::MAX)) as u8)
+        };
+        Some(Self {
+            long_duty: level("long_duty")?,
+            tight_schedule: level("tight_schedule")?,
+            satisfaction_decrease: level("satisfaction_decrease")?,
+            low_acceleration: level("low_acceleration")?,
+            satisfaction_increase: level("satisfaction_increase")?,
+            ecodriving: level("ecodriving")?,
+        })
+    }
+
+    pub fn levels(&self) -> [(&'static str, u8); 6] {
+        [
+            ("long_duty", self.long_duty),
+            ("tight_schedule", self.tight_schedule),
+            ("satisfaction_decrease", self.satisfaction_decrease),
+            ("low_acceleration", self.low_acceleration),
+            ("satisfaction_increase", self.satisfaction_increase),
+            ("ecodriving", self.ecodriving),
+        ]
+    }
+
+    pub fn set_level(&mut self, index: usize, level: u8) {
+        match index {
+            0 => self.long_duty = level,
+            1 => self.tight_schedule = level,
+            2 => self.satisfaction_decrease = level,
+            3 => self.low_acceleration = level,
+            4 => self.satisfaction_increase = level,
+            5 => self.ecodriving = level,
+            _ => {}
+        }
+    }
+}
+
 impl Career {
     pub fn read(document: &Document) -> Result<Self> {
         let economy = document
@@ -91,9 +156,10 @@ impl Career {
         Ok(Self {
             money: integer(bank, "money_account")?,
             experience: integer(economy, "experience_points")?,
-            bus_experience: economy
+            coach_experience: economy
                 .single("bus_experience_points")
                 .and_then(value::parse_i64),
+            coach_skills: CoachSkills::read(economy),
             skills: Skills {
                 adr: skill("adr")?,
                 long_distance: skill("long_dist")?,
@@ -127,8 +193,13 @@ impl Career {
             "experience_points",
             Value::single(self.experience.to_string()),
         );
-        if let Some(bus) = self.bus_experience {
-            economy.set("bus_experience_points", Value::single(bus.to_string()));
+        if let Some(coach) = self.coach_experience {
+            economy.set("bus_experience_points", Value::single(coach.to_string()));
+        }
+        if let Some(coach_skills) = &self.coach_skills {
+            for (field, level) in coach_skills.levels() {
+                economy.set(field, Value::single(level.to_string()));
+            }
         }
         economy.set("adr", Value::single(self.skills.adr.to_string()));
         for (field, level) in self.skills.levels() {
@@ -158,7 +229,16 @@ impl Career {
             .count();
         usize::from(self.money != other.money)
             + usize::from(self.experience != other.experience)
-            + usize::from(self.bus_experience != other.bus_experience)
+            + usize::from(self.coach_experience != other.coach_experience)
+            + match (&self.coach_skills, &other.coach_skills) {
+                (Some(a), Some(b)) => a
+                    .levels()
+                    .iter()
+                    .zip(b.levels().iter())
+                    .filter(|(a, b)| a != b)
+                    .count(),
+                _ => 0,
+            }
             + usize::from(self.skills.adr != other.skills.adr)
             + usize::from(self.hq_city != other.hq_city)
             + skills
@@ -185,7 +265,7 @@ pub(crate) fn integer(unit: &sii::Unit, field: &'static str) -> Result<i64> {
 mod tests {
     use super::*;
 
-    pub(crate) const SAVE: &str = "SiiNunit\r\n{\r\neconomy : _nameless.1 {\r\n bank: _nameless.2\r\n player: _nameless.3\r\n experience_points: 812400\r\n adr: 7\r\n long_dist: 6\r\n heavy: 5\r\n fragile: 4\r\n urgent: 3\r\n mechanical: 2\r\n bus_experience_points: 1200\r\n}\r\n\r\nbank : _nameless.2 {\r\n money_account: 2480350\r\n loans: 0\r\n}\r\n\r\nplayer : _nameless.3 {\r\n hq_city: berlin\r\n}\r\n\r\n}\r\n";
+    pub(crate) const SAVE: &str = "SiiNunit\r\n{\r\neconomy : _nameless.1 {\r\n bank: _nameless.2\r\n player: _nameless.3\r\n experience_points: 812400\r\n adr: 7\r\n long_dist: 6\r\n heavy: 5\r\n fragile: 4\r\n urgent: 3\r\n mechanical: 2\r\n bus_experience_points: 1200\r\n long_duty: 0\r\n tight_schedule: 3\r\n satisfaction_decrease: 1\r\n low_acceleration: 1\r\n satisfaction_increase: 3\r\n ecodriving: 0\r\n}\r\n\r\nbank : _nameless.2 {\r\n money_account: 2480350\r\n loans: 0\r\n}\r\n\r\nplayer : _nameless.3 {\r\n hq_city: berlin\r\n}\r\n\r\n}\r\n";
 
     #[test]
     fn reads_the_career() {
@@ -193,7 +273,11 @@ mod tests {
         let career = Career::read(&document).expect("reads");
         assert_eq!(career.money, 2_480_350);
         assert_eq!(career.experience, 812_400);
-        assert_eq!(career.bus_experience, Some(1200));
+        assert_eq!(career.coach_experience, Some(1200));
+        assert_eq!(
+            career.coach_skills.map(|s| s.levels().map(|(_, l)| l)),
+            Some([0, 3, 1, 1, 3, 0])
+        );
         assert_eq!(career.skills.adr, 7);
         assert_eq!(career.skills.levels().map(|(_, l)| l), [6, 5, 4, 3, 2]);
         assert_eq!(career.hq_city, "berlin");

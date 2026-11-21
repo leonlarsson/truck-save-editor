@@ -1,15 +1,25 @@
-//! The player's trucks: what they are, where they're kept, how worn they are, and repairing them.
+//! The player's vehicles (trucks, and coaches from the Coaches DLC): what they are, where they're
+//! kept, how worn they are, and repairing them.
 
 use std::collections::HashMap;
 
 use sii::{Document, Value, value};
 
-/// One truck the player owns.
+/// What kind of vehicle it is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum VehicleKind {
+    Truck,
+    /// A coach (Coaches DLC).
+    Coach,
+}
+
+/// One vehicle the player owns.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Truck {
+pub struct Vehicle {
+    pub kind: VehicleKind,
     /// The vehicle unit's id: stable, used for identity everywhere.
     pub id: String,
-    /// `volvo.fh16_2012`, from the truck's definition path.
+    /// `volvo.fh16_2012`, from the vehicle's definition path.
     pub model_id: Option<String>,
     pub plate: String,
     /// The plate's country token (`germany`).
@@ -22,7 +32,7 @@ pub struct Truck {
     pub driver: Option<String>,
 }
 
-impl Truck {
+impl Vehicle {
     /// `Volvo FH16 2012`, from the model id (`None` when the model isn't known).
     pub fn display_name(&self) -> Option<String> {
         self.model_id.as_deref().map(model_display_name)
@@ -62,8 +72,8 @@ const WEAR_FIELDS: [&str; 4] = [
     "chassis_wear",
 ];
 
-/// Every truck the player owns, in the order the save lists them.
-pub fn trucks(document: &Document) -> Vec<Truck> {
+/// Every vehicle the player owns: trucks, then coaches, each in the order the save lists them.
+pub fn vehicles(document: &Document) -> Vec<Vehicle> {
     let Some(player) = player(document) else {
         return Vec::new();
     };
@@ -85,13 +95,21 @@ pub fn trucks(document: &Document) -> Vec<Truck> {
         }
     }
 
-    player
+    let trucks = player
         .items("trucks")
         .iter()
-        .filter_map(|id| document.unit(id))
-        .map(|vehicle| {
+        .map(|id| (VehicleKind::Truck, id));
+    let coaches = player
+        .items("buses")
+        .iter()
+        .map(|id| (VehicleKind::Coach, id));
+    trucks
+        .chain(coaches)
+        .filter_map(|(kind, id)| Some((kind, document.unit(id)?)))
+        .map(|(kind, vehicle)| {
             let (plate, plate_country) = split_plate(vehicle.single("license_plate").unwrap_or(""));
-            Truck {
+            Vehicle {
+                kind,
                 id: vehicle.id.clone(),
                 model_id: model_id(document, vehicle),
                 plate,
@@ -226,13 +244,15 @@ fn player(document: &Document) -> Option<&sii::Unit> {
     document.unit(economy.single("player")?)
 }
 
-/// The model from the truck's accessories: the one whose definition is
-/// `/def/vehicle/truck/<model>/data.sii`.
+/// The model from the vehicle's accessories: the one whose definition is
+/// `/def/vehicle/truck/<model>/data.sii` (or `/def/vehicle/bus/…` for coaches).
 fn model_id(document: &Document, vehicle: &sii::Unit) -> Option<String> {
     vehicle.items("accessories").iter().find_map(|id| {
         let path = document.unit(id)?.single("data_path")?;
         let path = value::parse_string(path);
-        let rest = path.strip_prefix("/def/vehicle/truck/")?;
+        let rest = path
+            .strip_prefix("/def/vehicle/truck/")
+            .or_else(|| path.strip_prefix("/def/vehicle/bus/"))?;
         let (model, file) = rest.split_once('/')?;
         (file == "data.sii").then(|| model.to_string())
     })
@@ -307,7 +327,7 @@ mod tests {
     #[test]
     fn lists_the_trucks() {
         let document = sii::parse_text(SAVE).expect("parses");
-        let trucks = trucks(&document);
+        let trucks = vehicles(&document);
         assert_eq!(trucks.len(), 1);
         let truck = &trucks[0];
         assert_eq!(truck.display_name().as_deref(), Some("Volvo FH16 2012"));
@@ -324,7 +344,7 @@ mod tests {
     fn repairs_fixable_wear_or_everything() {
         let mut document = sii::parse_text(SAVE).expect("parses");
         assert!(repair(&mut document, "_nameless.10", false));
-        let truck = &trucks(&document)[0];
+        let truck = &vehicles(&document)[0];
         assert_eq!(truck.wear.worst(), 0.0);
         let vehicle = document.unit("_nameless.10").expect("vehicle");
         assert_eq!(vehicle.single("engine_wear_unfixable"), Some("&3c23d70a"));
@@ -341,13 +361,13 @@ mod tests {
     fn reads_and_repairs_wear_in_the_older_format() {
         let mut document = sii::parse_text(OLDER_SAVE).expect("parses");
         assert!(wear_is_known(&document, "_nameless.10"));
-        let truck = &trucks(&document)[0];
+        let truck = &vehicles(&document)[0];
         assert_eq!(truck.wear.engine, 0.25);
         assert_eq!(truck.wear.wheels, 0.2);
         assert_eq!(truck.wear.worst(), 0.25);
 
         assert!(repair(&mut document, "_nameless.10", false));
-        assert_eq!(trucks(&document)[0].wear.worst(), 0.0);
+        assert_eq!(vehicles(&document)[0].wear.worst(), 0.0);
     }
 
     #[test]
