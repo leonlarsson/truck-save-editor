@@ -10,6 +10,7 @@ mod icon;
 mod install;
 mod recruitment;
 mod texture;
+mod vehicles;
 
 use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
@@ -58,6 +59,11 @@ pub struct GameData {
     dealer_cities: BTreeSet<String>,
     /// Cities with a recruitment agency (of those the installed game has).
     recruitment_cities: BTreeSet<String>,
+    /// Vehicle models: model id → (brand text key, series text key).
+    models: HashMap<String, (String, String)>,
+    /// Brand logos, by brand token (`volvo`): for trucks, and for coaches.
+    truck_logos: HashMap<String, Arc<GameIcon>>,
+    coach_logos: HashMap<String, Arc<GameIcon>>,
 }
 
 impl GameData {
@@ -93,6 +99,25 @@ impl GameData {
                     data.skill_icons.insert(field, Arc::new(icon));
                 }
             }
+            for (folder, logos) in [
+                ("/material/ui/brand_logo", &mut data.truck_logos),
+                ("/material/ui/bus_brand_logo", &mut data.coach_logos),
+            ] {
+                let names = base
+                    .list(folder)
+                    .ok()
+                    .flatten()
+                    .map(|listing| listing.files)
+                    .unwrap_or_default();
+                for name in names {
+                    let Some(brand) = name.strip_suffix(".mat") else {
+                        continue;
+                    };
+                    if let Some(icon) = GameIcon::load(&mut base, folder, brand) {
+                        logos.insert(brand.to_string(), Arc::new(icon));
+                    }
+                }
+            }
             data.adr_icons = skills
                 .adr_icons
                 .iter()
@@ -100,7 +125,9 @@ impl GameData {
                 .collect();
         }
 
-        let cities = cities::read_cities(install_dir);
+        let archives = def_archives(install_dir);
+        data.models = vehicles::read_models(&archives);
+        let cities = cities::read_cities(&archives);
         data.recruitment_cities = recruitment::RECRUITMENT_CITIES
             .iter()
             .filter(|token| cities.names.contains_key(**token))
@@ -138,6 +165,24 @@ impl GameData {
     pub fn city_name(&self, token: &str) -> Option<String> {
         let key = self.city_names.get(token).map_or(token, String::as_str);
         self.text(key).filter(|name| !name.is_empty())
+    }
+
+    /// A vehicle model's name as the game shows it (`Volvo FH16 Classic`), by model id.
+    pub fn model_name(&self, model_id: &str) -> Option<String> {
+        let (brand, series) = self.models.get(model_id)?;
+        let brand = self.text(brand).filter(|text| !text.is_empty())?;
+        let series = self.text(series).filter(|text| !text.is_empty())?;
+        Some(format!("{brand} {series}"))
+    }
+
+    /// A brand's logo (`volvo`), from the truck or coach set.
+    pub fn brand_logo(&self, brand: &str, is_coach: bool) -> Option<Arc<GameIcon>> {
+        let logos = if is_coach {
+            &self.coach_logos
+        } else {
+            &self.truck_logos
+        };
+        logos.get(brand).cloned()
     }
 
     /// Cities with a truck dealer, in the installed game and its map DLCs. Empty if the game's
@@ -182,6 +227,23 @@ fn rank(ranks: &[(i64, String)], level: i64) -> Option<&str> {
         .rev()
         .find(|(first, _)| level >= *first)
         .map(|(_, key)| key.as_str())
+}
+
+/// The archives that hold definitions: `def.scs`, then every DLC archive (`dlc_*.scs`), sorted.
+fn def_archives(install_dir: &Path) -> Vec<PathBuf> {
+    let mut archives = vec![install_dir.join("def.scs")];
+    if let Ok(entries) = std::fs::read_dir(install_dir) {
+        let mut dlcs: Vec<PathBuf> = entries
+            .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+            .filter(|path| {
+                let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                name.starts_with("dlc_") && name.ends_with(".scs")
+            })
+            .collect();
+        dlcs.sort();
+        archives.extend(dlcs);
+    }
+    archives
 }
 
 /// Reads a game file (any SII form), with its `@include`s.

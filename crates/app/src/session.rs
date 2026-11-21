@@ -204,6 +204,13 @@ impl Session {
             .collect()
     }
 
+    /// Marks one vehicle for repair.
+    pub fn repair(&mut self, id: &str, cx: &mut Context<Self>) {
+        self.change(cx, |pending, _| {
+            pending.repaired.insert(id.to_string());
+        });
+    }
+
     /// Marks every worn vehicle of a kind for repair.
     pub fn repair_all(&mut self, kind: VehicleKind, cx: &mut Context<Self>) {
         self.change(cx, |pending, this| {

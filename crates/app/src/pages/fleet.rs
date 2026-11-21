@@ -2,14 +2,14 @@
 
 use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Selectable as _, Sizable as _,
-    button::{Button, ButtonGroup},
+    button::{Button, ButtonGroup, ButtonVariants as _},
     h_flex,
     table::{Column, ColumnSort, DataTable, TableDelegate, TableState},
     v_flex,
 };
 use gpui_kit::{
     App, AppContext as _, Context, Entity, IntoElement, ParentElement as _, Render, SharedString,
-    Styled as _, Subscription, Window, div,
+    Styled as _, Subscription, Window, div, rems,
 };
 use save::{Vehicle, VehicleKind};
 
@@ -17,6 +17,7 @@ use crate::format::thousands;
 use crate::game_data;
 use crate::i18n::t;
 use crate::session::Session;
+use crate::ui::GameIconView;
 
 pub struct FleetPage {
     session: Entity<Session>,
@@ -30,7 +31,8 @@ impl FleetPage {
     pub fn new(session: Entity<Session>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let kind = VehicleKind::Truck;
         let delegate = TruckTable {
-            trucks: of_kind(session.read(cx).vehicles(), kind),
+            trucks: rows(of_kind(session.read(cx).vehicles(), kind), cx),
+            session: session.clone(),
             sort: None,
         };
         let table = cx.new(|cx| TableState::new(delegate, window, cx).sortable(true));
@@ -50,7 +52,7 @@ impl FleetPage {
 impl FleetPage {
     /// Puts the session's current vehicles of the shown kind into the table.
     fn reload(&mut self, cx: &mut Context<Self>) {
-        let vehicles = of_kind(self.session.read(cx).vehicles(), self.kind);
+        let vehicles = rows(of_kind(self.session.read(cx).vehicles(), self.kind), cx);
         self.table.update(cx, |table, cx| {
             table.delegate_mut().set_trucks(vehicles);
             table.refresh(cx);
@@ -69,13 +71,26 @@ fn of_kind(vehicles: Vec<Vehicle>, kind: VehicleKind) -> Vec<Vehicle> {
     vehicles.into_iter().filter(|v| v.kind == kind).collect()
 }
 
+fn rows(vehicles: Vec<Vehicle>, cx: &App) -> Vec<Row> {
+    vehicles
+        .into_iter()
+        .map(|vehicle| Row {
+            name: game_data::model_name(cx, &vehicle)
+                .map(SharedString::from)
+                .unwrap_or_else(|| t!(cx, "unknown-truck")),
+            logo: game_data::brand_logo(cx, &vehicle),
+            vehicle,
+        })
+        .collect()
+}
+
 impl Render for FleetPage {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let trucks = &self.table.read(cx).delegate().trucks;
         let truck_count = trucks.len();
         let worn_count = trucks
             .iter()
-            .filter(|truck| truck.wear.worst() > 0.0)
+            .filter(|row| row.vehicle.wear.worst() > 0.0)
             .count();
         let count = thousands(truck_count as i64);
         let vehicles = match self.kind {
@@ -159,9 +174,19 @@ impl Render for FleetPage {
     }
 }
 
+/// A vehicle with what the table shows of it that needs the game's data (made once per reload,
+/// so sorting doesn't look names up again).
+struct Row {
+    vehicle: Vehicle,
+    name: SharedString,
+    logo: Option<std::sync::Arc<gamedata::GameIcon>>,
+}
+
 /// Feeds the trucks to GPUI Kit's table. Only the visible rows are ever rendered.
 struct TruckTable {
-    trucks: Vec<Vehicle>,
+    trucks: Vec<Row>,
+    /// Asks for one vehicle's repair (by id); the page passes it to the session.
+    session: Entity<Session>,
     /// The sort in effect, kept so new data (after a repair) stays in the same order.
     sort: Option<(TruckColumn, ColumnSort)>,
 }
@@ -186,7 +211,7 @@ impl TruckColumn {
 }
 
 impl TruckTable {
-    fn set_trucks(&mut self, trucks: Vec<Vehicle>) {
+    fn set_trucks(&mut self, trucks: Vec<Row>) {
         self.trucks = trucks;
         if let Some((column, sort)) = self.sort {
             self.sort_by(column, sort);
@@ -199,8 +224,10 @@ impl TruckTable {
             return;
         }
         self.trucks.sort_by(|a, b| {
+            let (name_a, name_b) = (&a.name, &b.name);
+            let (a, b) = (&a.vehicle, &b.vehicle);
             let ordering = match column {
-                TruckColumn::Truck => a.display_name().cmp(&b.display_name()),
+                TruckColumn::Truck => name_a.cmp(name_b),
                 TruckColumn::Plate => a.plate.cmp(&b.plate),
                 TruckColumn::Garage => a.garage_city.cmp(&b.garage_city),
                 TruckColumn::Odometer => a.odometer_km.cmp(&b.odometer_km),
@@ -215,14 +242,16 @@ impl TruckTable {
     }
 
     fn text(&self, row: usize, column: TruckColumn, cx: &App) -> SharedString {
-        let Some(truck) = self.trucks.get(row) else {
+        let Some(Row {
+            vehicle: truck,
+            name,
+            ..
+        }) = self.trucks.get(row)
+        else {
             return SharedString::default();
         };
         match column {
-            TruckColumn::Truck => truck
-                .display_name()
-                .map(SharedString::from)
-                .unwrap_or_else(|| t!(cx, "unknown-truck")),
+            TruckColumn::Truck => name.clone(),
             TruckColumn::Plate => truck.plate.clone().into(),
             TruckColumn::Garage => truck
                 .garage_city
@@ -252,7 +281,7 @@ impl TableDelegate for TruckTable {
     fn column(&self, col_ix: usize, cx: &App) -> Column {
         match TruckColumn::ALL.get(col_ix) {
             Some(TruckColumn::Truck) => Column::new("truck", t!(cx, "column-truck"))
-                .width(220.)
+                .width(260.)
                 .sortable(),
             Some(TruckColumn::Plate) => Column::new("plate", t!(cx, "column-plate"))
                 .width(110.)
@@ -265,7 +294,7 @@ impl TableDelegate for TruckTable {
                 .text_right()
                 .sortable(),
             Some(TruckColumn::Wear) | None => Column::new("wear", t!(cx, "column-wear"))
-                .width(80.)
+                .width(170.)
                 .text_right()
                 .sortable(),
         }
@@ -296,18 +325,56 @@ impl TableDelegate for TruckTable {
             .get(col_ix)
             .copied()
             .unwrap_or(TruckColumn::Truck);
-        let truck = self.trucks.get(row_ix);
+        let row = self.trucks.get(row_ix);
+        let truck = row.map(|row| &row.vehicle);
         let is_muted = match column {
             TruckColumn::Garage => truck.is_some_and(|truck| truck.garage_city.is_none()),
             TruckColumn::Wear => truck.is_some_and(|truck| truck.wear.worst() == 0.0),
             _ => false,
         };
         let text = self.text(row_ix, column, cx);
-        if is_muted {
-            div().text_color(cx.theme().muted_foreground).child(text)
+        let cell = h_flex().gap_2().w_full().items_center();
+        let cell = if is_muted {
+            cell.text_color(cx.theme().muted_foreground)
         } else {
-            div().child(text)
+            cell
+        };
+        match column {
+            // The brand's logo from the game, in the text colour, then the model's name.
+            // The brand's logo from the game, in a slot of its own so names line up even where
+            // there's no logo, then the model's name.
+            TruckColumn::Truck => cell
+                .child(
+                    div()
+                        .w(rems(2.2))
+                        .flex_shrink_0()
+                        .flex()
+                        .justify_center()
+                        .children(row.and_then(|row| row.logo.clone()).map(|logo| {
+                            GameIconView::new(logo)
+                                .size(1.1)
+                                .channel(gamedata::RED, cx.theme().muted_foreground)
+                        })),
+                )
+                .child(text),
+            // The wear, and Repair for a worn vehicle: always shown, not only on hover.
+            TruckColumn::Wear => {
+                let repair = truck.filter(|truck| truck.wear.worst() > 0.0).map(|truck| {
+                    let id = truck.id.clone();
+                    let session = self.session.clone();
+                    Button::new(("repair", row_ix))
+                        .xsmall()
+                        .ghost()
+                        .label(t!(cx, "repair"))
+                        .on_click(move |_, _, cx| {
+                            session.update(cx, |session, cx| session.repair(&id, cx));
+                        })
+                });
+                cell.justify_end().children(repair).child(text)
+            }
+            _ => cell.child(text),
         }
+        .into_any_element()
     }
 
     fn cell_label(&self, row_ix: usize, col_ix: usize, cx: &App) -> Option<SharedString> {

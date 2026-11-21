@@ -29,6 +29,9 @@ fn main() {
             for city in ["malmo", "krakow", "zurich", "berlin"] {
                 println!("{city}: {:?}", data.city_name(city));
             }
+            for model in ["volvo.fh16_2012", "scania.s_2016", "man.lions_24"] {
+                println!("{model}: {:?}", data.model_name(model));
+            }
             println!(
                 "{} cities with a dealer, {} with a recruitment agency",
                 data.dealer_cities().len(),

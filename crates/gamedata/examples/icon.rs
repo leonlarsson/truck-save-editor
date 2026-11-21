@@ -20,7 +20,7 @@ fn main() {
             eprintln!("{path}: couldn't read that icon");
             std::process::exit(1);
         };
-        let bgra = icon.render(size, [None; 4], Some([18, 18, 18, 255]));
+        let bgra = icon.render(size, size, [None; 4], Some([18, 18, 18, 255]));
         // On mid grey, so every colour shows.
         let pixels: Vec<u8> = bgra
             .as_chunks::<4>()

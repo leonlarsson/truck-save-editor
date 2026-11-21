@@ -3,7 +3,7 @@
 //! truck dealer (`vehicle_brands[]`).
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
+use std::path::PathBuf;
 
 use crate::read_document;
 
@@ -15,24 +15,12 @@ pub(crate) struct Cities {
     pub dealers: BTreeSet<String>,
 }
 
-/// Reads the city definitions from `def.scs` and every DLC archive in the install folder. An
-/// archive or file that can't be read is skipped: the rest still count.
-pub(crate) fn read_cities(install_dir: &Path) -> Cities {
+/// Reads the city definitions from the given archives (see `def_archives`). An archive or file
+/// that can't be read is skipped: the rest still count.
+pub(crate) fn read_cities(archives: &[PathBuf]) -> Cities {
     let mut cities = Cities::default();
-    let mut archives = vec![install_dir.join("def.scs")];
-    if let Ok(entries) = std::fs::read_dir(install_dir) {
-        let mut dlcs: Vec<_> = entries
-            .filter_map(|entry| entry.ok().map(|entry| entry.path()))
-            .filter(|path| {
-                let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                name.starts_with("dlc_") && name.ends_with(".scs")
-            })
-            .collect();
-        dlcs.sort();
-        archives.extend(dlcs);
-    }
     for path in archives {
-        let Ok(mut archive) = hashfs::Archive::open(&path) else {
+        let Ok(mut archive) = hashfs::Archive::open(path) else {
             continue;
         };
         let Ok(Some(listing)) = archive.list("/def") else {

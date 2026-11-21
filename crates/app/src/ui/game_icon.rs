@@ -19,7 +19,8 @@ impl Global for Drawn {}
 #[derive(Clone, PartialEq, Eq, Hash)]
 struct Key {
     name: String,
-    pixels: u32,
+    width: u32,
+    height: u32,
     colours: [Option<[u8; 4]>; 4],
     backdrop: Option<[u8; 4]>,
 }
@@ -27,7 +28,7 @@ struct Key {
 #[derive(IntoElement)]
 pub struct GameIconView {
     icon: Arc<GameIcon>,
-    /// Width and height, in rems.
+    /// Height, in rems; the width follows the icon's shape.
     size: f32,
     colours: [Option<Hsla>; 4],
     backdrop: Option<Hsla>,
@@ -45,7 +46,7 @@ impl GameIconView {
         }
     }
 
-    /// Width and height in rems.
+    /// Height in rems; the width follows the icon's shape (square icons are this wide too).
     pub fn size(mut self, rems: f32) -> Self {
         self.size = rems;
         self
@@ -79,13 +80,17 @@ fn to_rgba(colour: Hsla) -> [u8; 4] {
 
 impl RenderOnce for GameIconView {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let size = rems(self.size);
-        let pixels = (f32::from(size.to_pixels(window.rem_size())) * window.scale_factor())
-            .round()
-            .max(1.) as u32;
+        let height = rems(self.size);
+        let width = rems(self.size * self.icon.aspect());
+        let to_device = |length: gpui_kit::Rems| {
+            (f32::from(length.to_pixels(window.rem_size())) * window.scale_factor())
+                .round()
+                .max(1.) as u32
+        };
         let key = Key {
             name: self.icon.name.clone(),
-            pixels,
+            width: to_device(width),
+            height: to_device(height),
             colours: self.colours.map(|colour| colour.map(to_rgba)),
             backdrop: self.backdrop.map(to_rgba),
         };
@@ -97,8 +102,10 @@ impl RenderOnce for GameIconView {
             Some(image) => Some(image),
             None => {
                 // Small (a few thousand pixels), so drawing it here doesn't hold up the frame.
-                let bgra = self.icon.render(pixels, key.colours, key.backdrop);
-                let image = image::RgbaImage::from_raw(pixels, pixels, bgra)
+                let bgra = self
+                    .icon
+                    .render(key.width, key.height, key.colours, key.backdrop);
+                let image = image::RgbaImage::from_raw(key.width, key.height, bgra)
                     .map(|buffer| Arc::new(RenderImage::new(vec![image::Frame::new(buffer)])));
                 if let Some(image) = &image {
                     cx.global_mut::<Drawn>().0.insert(key, image.clone());
@@ -106,7 +113,11 @@ impl RenderOnce for GameIconView {
                 image
             }
         };
-        let frame = div().size(size).flex_shrink_0().opacity(self.opacity);
+        let frame = div()
+            .w(width)
+            .h(height)
+            .flex_shrink_0()
+            .opacity(self.opacity);
         match image {
             Some(image) => frame.child(img(image).size_full()),
             None => frame,

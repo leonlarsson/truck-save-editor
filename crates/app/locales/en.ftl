@@ -378,6 +378,7 @@ column-plate = Plate
 column-garage = Garage
 column-odometer = Odometer
 column-wear = Wear
+repair = Repair
 no-garage = No garage
 distance-km = { $amount } km
 percent = { $amount }%

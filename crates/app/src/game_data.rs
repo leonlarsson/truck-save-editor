@@ -95,3 +95,17 @@ pub fn observe<V: 'static>(
 ) -> Subscription {
     cx.observe_global::<Loaded>(on_loaded)
 }
+
+/// A vehicle's model name: the game's own (`Volvo FH4`), else made from its id.
+pub fn model_name(cx: &App, vehicle: &save::Vehicle) -> Option<String> {
+    let model_id = vehicle.model_id.as_deref()?;
+    data(cx)
+        .and_then(|d| d.model_name(model_id))
+        .or_else(|| vehicle.display_name())
+}
+
+/// A vehicle's brand logo from the game, if there is one.
+pub fn brand_logo(cx: &App, vehicle: &save::Vehicle) -> Option<Arc<GameIcon>> {
+    let brand = vehicle.model_id.as_deref()?.split('.').next()?;
+    data(cx)?.brand_logo(brand, vehicle.kind == save::VehicleKind::Coach)
+}

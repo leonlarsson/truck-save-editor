@@ -11,7 +11,7 @@ use crate::texture::decode_rgba;
 /// One of the game's icons: four coverage masks at the texture's size, and the material's colours.
 #[derive(Clone, Debug, PartialEq)]
 pub struct GameIcon {
-    /// The material's name (`long_distance`, `adr_1` …).
+    /// The material's path without `.mat` (`/material/ui/skills/adr_1`): unique per icon.
     pub name: String,
     pub width: u32,
     pub height: u32,
@@ -31,6 +31,11 @@ pub const ALPHA: usize = 3;
 const DRAW_ORDER: [usize; 4] = [ALPHA, BLUE, GREEN, RED];
 
 impl GameIcon {
+    /// Width over height (brand logos are wide; skill icons square).
+    pub fn aspect(&self) -> f32 {
+        self.width as f32 / self.height.max(1) as f32
+    }
+
     /// Reads `<folder>/<name>.mat` and its texture. `None` if either is missing or unreadable.
     pub fn load(archive: &mut Archive, folder: &str, name: &str) -> Option<Self> {
         let material_path = format!("{folder}/{name}.mat");
@@ -54,7 +59,7 @@ impl GameIcon {
                 .collect();
         }
         Some(GameIcon {
-            name: name.to_string(),
+            name: format!("{folder}/{name}"),
             width: texture.width,
             height: texture.height,
             masks,
@@ -62,7 +67,7 @@ impl GameIcon {
         })
     }
 
-    /// The icon at `size`×`size` pixels, as blue, green, red, alpha bytes (what GPUI draws).
+    /// The icon at `width`×`height` pixels, as blue, green, red, alpha bytes (what GPUI draws).
     /// `colours` replaces the material's colour of a channel where it's `Some`; a channel whose
     /// colour is fully transparent isn't drawn.
     ///
@@ -71,13 +76,17 @@ impl GameIcon {
     /// the icon's own shape: every channel that isn't a solid square.
     pub fn render(
         &self,
-        size: u32,
+        width: u32,
+        height: u32,
         colours: [Option<[u8; 4]>; 4],
         backdrop: Option<[u8; 4]>,
     ) -> Vec<u8> {
-        let size = size.max(1);
-        let masks = self.masks.each_ref().map(|mask| self.shrink(mask, size));
-        let mut bgra = vec![0u8; (size * size * 4) as usize];
+        let (width, height) = (width.max(1), height.max(1));
+        let masks = self
+            .masks
+            .each_ref()
+            .map(|mask| self.shrink(mask, width, height));
+        let mut bgra = vec![0u8; (width * height * 4) as usize];
         if let Some(backdrop) = backdrop {
             let shapes: Vec<&Vec<u8>> = (0..4)
                 .filter(|channel| !self.masks[*channel].iter().all(|coverage| *coverage > 250))
@@ -102,15 +111,16 @@ impl GameIcon {
         bgra
     }
 
-    /// Averages a mask down to `size`×`size` (a box filter, so small sizes stay smooth).
-    fn shrink(&self, mask: &[u8], size: u32) -> Vec<u8> {
+    /// Averages a mask down to `out_width`×`out_height` (a box filter, so small sizes stay
+    /// smooth).
+    fn shrink(&self, mask: &[u8], out_width: u32, out_height: u32) -> Vec<u8> {
         let (width, height) = (self.width as usize, self.height as usize);
-        let size = size as usize;
-        let mut out = Vec::with_capacity(size * size);
-        for y in 0..size {
-            let (top, bottom) = span(y, size, height);
-            for x in 0..size {
-                let (left, right) = span(x, size, width);
+        let (out_width, out_height) = (out_width as usize, out_height as usize);
+        let mut out = Vec::with_capacity(out_width * out_height);
+        for y in 0..out_height {
+            let (top, bottom) = span(y, out_height, height);
+            for x in 0..out_width {
+                let (left, right) = span(x, out_width, width);
                 let mut sum = 0u32;
                 for row in top..bottom {
                     for column in left..right {
@@ -234,7 +244,7 @@ mod tests {
 
     #[test]
     fn draws_layers_back_to_front() {
-        let bgra = icon().render(2, [None; 4], None);
+        let bgra = icon().render(2, 2, [None; 4], None);
         // Left: green's red colour over the blue fill. Right: the blue fill. (BGRA.)
         assert_eq!(&bgra[0..4], &[0, 0, 255, 255]);
         assert_eq!(&bgra[4..8], &[255, 0, 0, 255]);
@@ -243,7 +253,7 @@ mod tests {
     #[test]
     fn shrinks_by_averaging_and_takes_colour_overrides() {
         let colours = [None, Some([0, 255, 0, 255]), None, Some([0, 0, 0, 0])];
-        let bgra = icon().render(1, colours, None);
+        let bgra = icon().render(1, 1, colours, None);
         // Half covered by green, nothing below: green at half opacity.
         assert_eq!(bgra, vec![0, 255, 0, 127]);
     }
@@ -253,7 +263,7 @@ mod tests {
         let mut icon = icon();
         // Only green is a shape; the solid alpha square isn't, and its colour is transparent.
         icon.colours = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]];
-        let bgra = icon.render(2, [None; 4], Some([10, 20, 30, 255]));
+        let bgra = icon.render(2, 2, [None; 4], Some([10, 20, 30, 255]));
         assert_eq!(&bgra[0..4], &[30, 20, 10, 255]);
         assert_eq!(&bgra[4..8], &[0, 0, 0, 0]);
     }

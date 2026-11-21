@@ -2,7 +2,8 @@
 
 use hashfs::{Texture, TextureFormat};
 
-/// A texture's pixels as red, green, blue, alpha bytes, row by row.
+/// A texture's pixels as red, green, blue, alpha bytes, row by row. Single-channel formats (R8,
+/// BC4) fill red only: their one channel is a shape of its own, like each channel of an icon.
 pub fn decode_rgba(texture: &Texture) -> Option<Vec<u8>> {
     let width = texture.width as usize;
     let height = texture.height as usize;
@@ -13,7 +14,7 @@ pub fn decode_rgba(texture: &Texture) -> Option<Vec<u8>> {
         }
         TextureFormat::R8 => {
             for (pixel, value) in rgba.as_chunks_mut::<4>().0.iter_mut().zip(&texture.data) {
-                pixel.copy_from_slice(&[*value, *value, *value, 255]);
+                pixel.copy_from_slice(&[*value, 0, 0, 255]);
             }
         }
         format => decode_blocks(texture, format, &mut rgba)?,
@@ -42,7 +43,7 @@ fn decode_blocks(texture: &Texture, format: TextureFormat, rgba: &mut [u8]) -> O
                     bcdec_rs::bc4(block, &mut single, 4, false);
                     for (pixel, value) in block_pixels.as_chunks_mut::<4>().0.iter_mut().zip(single)
                     {
-                        pixel.copy_from_slice(&[value, value, value, 255]);
+                        pixel.copy_from_slice(&[value, 0, 0, 255]);
                     }
                 }
                 TextureFormat::Bc5 => {
@@ -115,7 +116,7 @@ mod tests {
         };
         assert_eq!(
             decode_rgba(&texture),
-            Some(vec![0, 0, 0, 255, 200, 200, 200, 255])
+            Some(vec![0, 0, 0, 255, 200, 0, 0, 255])
         );
     }
 

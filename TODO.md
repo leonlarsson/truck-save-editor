@@ -4,14 +4,14 @@ Agreed work, in order. Each step should end with something the owner can see or 
 
 ## 1. Foundations
 
-- [ ] Cargo workspace (edition 2024) with `crates/sii`, `crates/save`, `crates/app`; mise tasks working.
-- [ ] **GPUI test app:** a window with a styled money field, a skills picker and a virtual table of 2,000 rows, in light and dark. Run it under WSLg, and build it for Windows with `mise run win` and run it there. Decides whether GPUI stays (`docs/decisions.md`).
+- [x] Cargo workspace (edition 2024) with `crates/sii`, `crates/save`, `crates/app`; mise tasks working.
+- [x] **GPUI test app:** a window with a styled money field, a skills picker and a virtual table of 2,000 rows, in light and dark. Run it under WSLg, and build it for Windows with `mise run win` and run it there. Decides whether GPUI stays (`docs/decisions.md`).
 
 ## 2. Reading saves (`sii`)
 
-- [ ] ScsC decrypt, binary SII decode, text SII parse, text SII write.
-- [ ] Round-trip tests on synthetic samples (committed) and on fixtures (local, skipped when missing).
-- [ ] Decoding a large save takes well under a second in a release build.
+- [x] ScsC decrypt, binary SII decode, text SII parse, text SII write.
+- [x] Round-trip tests on synthetic samples (committed) and on fixtures (local, skipped when missing).
+- [x] Decoding a large save takes well under a second in a release build.
 
 ## 3. The in-game check
 
@@ -19,17 +19,17 @@ Agreed work, in order. Each step should end with something the owner can see or 
 
 ## 4. Picking a save
 
-- [ ] Find Steam Cloud and local profiles; decode profile names; list slots with preview image, date, money and level from `info.sii`.
-- [ ] Load in the background with progress.
+- [x] Find Steam Cloud and local profiles; decode profile names; list slots with preview image, date, money and level from `info.sii`.
+- [x] Load in the background with progress.
 
 ## 5. Overview
 
-- [ ] Money, level and XP, skills, ADR, HQ city: shown, then editable, with "max" buttons.
+- [x] Money, level and XP, skills, ADR, HQ city: shown, then editable, with "max" buttons.
 - [x] Changes list, undo and redo.
 
 ## 6. Saving
 
-- [ ] Backup, game-running check, changes shown before writing, write `game.sii` + `info.sii`, restore a backup.
+- [x] Backup, game-running check, changes shown before writing, write `game.sii` + `info.sii`, restore a backup.
 
 ## 7. Sections
 
@@ -42,7 +42,8 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [ ] All data: show All data edits on the typed pages too (an edited money_account in Overview), and search values across units.
 - [x] Reading the game's archives (HashFS v1/v2) and its data: levels, ranks, skill limits, text and city names (`hashfs`, `gamedata`).
 - [x] The game's own icons for skills and ADR classes: GDeflate and texture decoding in `hashfs`, the icon materials in `gamedata`, drawn at exact pixel size by `GameIconView`. Nothing of SCS's is bundled; without the game, the rows show no icon.
-- [ ] Brand logos (Fleet), cargo icons (Jobs), company logos, from the same decoder.
+- [x] Brand logos and the game's model names in Fleet.
+- [ ] Cargo icons (Jobs), company logos, from the same decoder.
 - [ ] Use the game's language for its names when the app gets more languages (gamedata already takes a language code).
 - [ ] Coach garages: coaches show "No garage"; find where the save keeps them.
 - [x] HQ city: pick from the cities the company has garages in (Garages page).
