@@ -92,3 +92,23 @@ fn real_saves_have_a_career_and_a_fleet() {
         );
     }
 }
+
+/// What the editor writes reads back exactly the same: the check after every save passes on real
+/// saves. Written to a scratch folder; the fixtures aren't touched.
+#[test]
+fn real_saves_read_back_the_way_they_were_written() {
+    for (index, dir) in slot_dirs().into_iter().enumerate() {
+        let slot = save::load(&dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display()));
+        let scratch =
+            std::env::temp_dir().join(format!("tse-verify-{}-{index}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&scratch);
+        std::fs::create_dir_all(&scratch).expect("makes the scratch folder");
+        std::fs::write(scratch.join("game.sii"), sii::to_text(&slot.game)).expect("writes");
+        if let Some(info) = &slot.info {
+            std::fs::write(scratch.join("info.sii"), sii::to_text(info)).expect("writes");
+        }
+        let result = save::verify(&scratch, &slot.game, slot.info.as_ref());
+        let _ = std::fs::remove_dir_all(&scratch);
+        assert!(result.is_ok(), "slot {index}: {result:?}");
+    }
+}

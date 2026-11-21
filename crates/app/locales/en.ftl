@@ -100,13 +100,14 @@ cancel = Cancel
 save-as-new-slot = Save as new slot
 save-as-new-slot-tooltip = Write the changes into a new slot and keep this one as it is.
 new-slot-name = { $name } (edited)
-saved-as-new-title = Saved as “{ $name }”
+saved-as-new-title = Saved and checked as “{ $name }”
 saved-as-new-body = “{ $original }” is unchanged. You're now editing the new slot.
-save-confirm-note = A backup of the slot is made first. Close the game before saving: it overwrites saves when it exits.
+save-confirm-note = A backup of the slot is made first, and the save is read back and checked after writing. Close the game before saving: it overwrites saves when it exits.
+save-confirm-cloud = This profile is in Steam Cloud. If Steam asks which copy to keep the next time the game starts, choose the one on this PC.
 save-prepare-failed = Couldn't prepare the save
 save-no-backup-folder-title = Couldn't save
 save-no-backup-folder = There's no folder to keep backups in, so nothing was written.
-saved-title = Saved “{ $name }”
+saved-title = Saved and checked “{ $name }”
 saved-backup = The old version is backed up in { $path }
 save-failed = Couldn't save “{ $name }”
 

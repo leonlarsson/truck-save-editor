@@ -43,6 +43,7 @@ pub use profiles::{
 #[cfg(feature = "native")]
 pub use store::{
     Backup, LoadedSlot, back_up, backups, is_game_running, load, restore, save, save_as_new_slot,
+    verify,
 };
 #[cfg(feature = "native")]
 pub use time::{utc_parts, utc_timestamp};

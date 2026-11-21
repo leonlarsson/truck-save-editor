@@ -34,6 +34,9 @@ pub enum Error {
 
     #[error("{} isn't a save slot (it has no game.sii)", .0.display())]
     NotASlot(PathBuf),
+
+    #[error("the save didn't read back the way it was written, so nothing was kept: {0}")]
+    NotVerified(String),
 }
 
 #[cfg(feature = "native")]

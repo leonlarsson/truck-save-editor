@@ -124,3 +124,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** pages used to overlay their own pending changes on the save as loaded, so a repair didn't show in All data and an All data edit of money didn't show on the Overview: two pictures of one save. One preview makes them agree by construction, and every new kind of change shows everywhere without page code. Building it costs one document copy (about 30 ms on a big save, release build), at most once per change.
 
 **Considered:** overlays per page (the old way; every page must know every change); applying changes to the loaded save directly (loses the "as on disk" side that Undo, Discard and the changes list need).
+
+## 2026-11-21: Read every save back before calling it saved
+
+**Decided:** after writing a slot (or a new slot), the editor reads it back from disk and checks it writes the same text as what was meant to be written. If not, the slot is put back from the backup just made (a new slot is removed) and the save is reported as failed. The comparison is of text, not documents: in the text format an empty array (`loans: 0`) reads back as a single value, which only the game's schema tells apart, and both write the same text. A fixture test runs the check on every real save.
+
+**Why:** "never lose a save" needs more than a backup: a write that didn't land (a full disk, an antivirus, a bug) should be caught before the game, or Steam Cloud, ever sees it.
+
+**Considered:** comparing bytes only (doesn't prove the file parses); comparing documents (fails on every real save because of the empty-array ambiguity, as the fixture test showed).

@@ -468,9 +468,13 @@ impl Workspace {
             return;
         };
         let session = opened.session.clone();
-        let (name, changes) = {
+        let (name, changes, is_cloud) = {
             let session = session.read(cx);
-            (labels::slot_name(cx, session.slot()), session.changes(cx))
+            (
+                labels::slot_name(cx, session.slot()),
+                session.changes(cx),
+                session.profile().location == save::Location::SteamCloud,
+            )
         };
 
         window.open_alert_dialog(cx, move |alert, _, cx| {
@@ -497,12 +501,24 @@ impl Workspace {
             alert
                 .title(t!(cx, "save-confirm-title", name = &name))
                 .description(
-                    v_flex().gap_3().child(list).child(
-                        div()
-                            .text_sm()
-                            .text_color(cx.theme().muted_foreground)
-                            .child(t!(cx, "save-confirm-note")),
-                    ),
+                    v_flex()
+                        .gap_3()
+                        .child(list)
+                        .child(
+                            div()
+                                .text_sm()
+                                .text_color(cx.theme().muted_foreground)
+                                .child(t!(cx, "save-confirm-note")),
+                        )
+                        // Steam Cloud keeps its own copy: say which one to keep when it asks.
+                        .when(is_cloud, |this| {
+                            this.child(
+                                div()
+                                    .text_sm()
+                                    .text_color(cx.theme().muted_foreground)
+                                    .child(t!(cx, "save-confirm-cloud")),
+                            )
+                        }),
                 )
                 .width(px(560.))
                 .footer({

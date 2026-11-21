@@ -70,14 +70,45 @@ pub fn save(game: Game, slot: &LoadedSlot, backups_root: &Path, profile: &str) -
         return Err(Error::GameRunning);
     }
     let backup = back_up(&slot.dir, backups_root, profile)?;
-    write_atomically(
-        &slot.dir.join("game.sii"),
-        sii::to_text(&slot.game).as_bytes(),
-    )?;
-    if let Some(info) = &slot.info {
-        write_atomically(&slot.dir.join("info.sii"), sii::to_text(info).as_bytes())?;
+    let written = write_slot(&slot.dir, &slot.game, slot.info.as_ref())
+        .and_then(|()| verify(&slot.dir, &slot.game, slot.info.as_ref()));
+    if let Err(error) = written {
+        // Put the slot back as it was before saving; the backup is still there either way.
+        copy_files(&backup.dir, &slot.dir)?;
+        return Err(error);
     }
     Ok(backup)
+}
+
+fn write_slot(dir: &Path, game: &sii::Document, info: Option<&sii::Document>) -> Result<()> {
+    write_atomically(&dir.join("game.sii"), sii::to_text(game).as_bytes())?;
+    if let Some(info) = info {
+        write_atomically(&dir.join("info.sii"), sii::to_text(info).as_bytes())?;
+    }
+    Ok(())
+}
+
+/// Reads a slot back from disk and checks it's exactly what was meant to be written: a disk that
+/// lies, an antivirus that interferes or a bug in writing shows up here, not in the game.
+///
+/// It compares the two as the text they write to, not as documents: in the text format an empty
+/// array (`loans: 0`) reads back as a single value, and only the game's own schema knows which it
+/// is, but both write the same text, which is what the game reads.
+pub fn verify(dir: &Path, game: &sii::Document, info: Option<&sii::Document>) -> Result<()> {
+    let read_back = load(dir).map_err(|error| Error::NotVerified(error.to_string()))?;
+    if sii::to_text(&read_back.game) != sii::to_text(game) {
+        return Err(Error::NotVerified("game.sii differs".into()));
+    }
+    if let Some(info) = info {
+        let same = read_back
+            .info
+            .as_ref()
+            .is_some_and(|read| sii::to_text(read) == sii::to_text(info));
+        if !same {
+            return Err(Error::NotVerified("info.sii differs".into()));
+        }
+    }
+    Ok(())
 }
 
 /// Writes a slot's save into a new slot next to it (the next free number in the profile's `save`
@@ -111,11 +142,16 @@ pub fn save_as_new_slot(game: Game, slot: &LoadedSlot, name: &str) -> Result<Pat
         }
     }
 
-    write_atomically(&dir.join("game.sii"), sii::to_text(&slot.game).as_bytes())?;
-    if let Some(info) = &slot.info {
-        let mut info = info.clone();
+    let info = slot.info.clone().map(|mut info| {
         crate::info::set_name(&mut info, name);
-        write_atomically(&dir.join("info.sii"), sii::to_text(&info).as_bytes())?;
+        info
+    });
+    let written = write_slot(&dir, &slot.game, info.as_ref())
+        .and_then(|()| verify(&dir, &slot.game, info.as_ref()));
+    if let Err(error) = written {
+        // A new slot that didn't come out right isn't left behind for the game to find.
+        let _ = std::fs::remove_dir_all(&dir);
+        return Err(error);
     }
     Ok(dir)
 }
@@ -180,15 +216,21 @@ pub fn restore(
         return Err(Error::GameRunning);
     }
     let before = back_up(slot_dir, backups_root, profile)?;
-    let entries = std::fs::read_dir(&backup.dir).map_err(io("couldn't read", &backup.dir))?;
+    copy_files(&backup.dir, slot_dir)?;
+    Ok(before)
+}
+
+/// Copies every file of one folder into another, each replaced atomically.
+fn copy_files(from: &Path, to: &Path) -> Result<()> {
+    let entries = std::fs::read_dir(from).map_err(io("couldn't read", from))?;
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_file() {
             let bytes = std::fs::read(&path).map_err(io("couldn't read", &path))?;
-            write_atomically(&slot_dir.join(entry.file_name()), &bytes)?;
+            write_atomically(&to.join(entry.file_name()), &bytes)?;
         }
     }
-    Ok(before)
+    Ok(())
 }
 
 /// Writes a file by writing a temporary one beside it and moving it into place.
@@ -258,6 +300,23 @@ mod tests {
         assert_eq!(Career::read(&restored.game).expect("reads").money, 100);
         assert!(before_restore.dir.join("game.sii").is_file());
         assert_eq!(backups(&backups_root, "John", "9").len(), 2);
+    }
+
+    #[test]
+    fn verifying_catches_a_save_that_reads_back_different() {
+        let scratch = Scratch::new("verify");
+        std::fs::write(scratch.0.join("game.sii"), SAVE).expect("writes the save");
+        let slot = load(&scratch.0).expect("loads");
+        assert!(verify(&scratch.0, &slot.game, None).is_ok());
+
+        let mut other = slot.game.clone();
+        let mut career = Career::read(&other).expect("reads the career");
+        career.money = 1;
+        career.write(&mut other).expect("changes it");
+        assert!(matches!(
+            verify(&scratch.0, &other, None),
+            Err(Error::NotVerified(_))
+        ));
     }
 
     #[test]
