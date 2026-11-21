@@ -1,0 +1,35 @@
+//! Shows what the editor reads from the installed game: `cargo run -p gamedata --example gamedata`.
+
+fn main() {
+    let game = save::Game::Ets2;
+    let Some(dir) = gamedata::find_install(game) else {
+        println!("{} wasn't found", game.name());
+        return;
+    };
+    println!("{}: {}", game.name(), dir.display());
+    match gamedata::GameData::load(game, &dir, "en_us") {
+        Ok(data) => {
+            for level in [0, 5, 30, 100, 182] {
+                println!(
+                    "level {level}: starts at {} XP, rank {:?}, coach rank {:?}",
+                    data.truck_levels.experience_for(level),
+                    data.truck_rank(level),
+                    data.coach_rank(level)
+                );
+            }
+            for skill in [
+                "long_dist",
+                "adr",
+                "long_duty",
+                "satisfaction_increase",
+                "ecodriving",
+            ] {
+                println!("{skill}: up to {:?}", data.max_skill_level(skill));
+            }
+            for city in ["malmo", "krakow", "zurich", "berlin"] {
+                println!("{city}: {:?}", data.city_name(city));
+            }
+        }
+        Err(error) => println!("couldn't read it: {error}"),
+    }
+}

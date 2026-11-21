@@ -66,8 +66,7 @@ pub fn parse(text: &str) -> Result<Document> {
     let mut current: Option<Unit> = None;
     let mut in_block_comment = false;
 
-    for (index, raw_line) in text.lines().enumerate() {
-        let line_number = index + 1;
+    for (line_number, raw_line) in logical_lines(text) {
         let error = |message: &str| Error::Text {
             line: line_number,
             message: message.to_string(),
@@ -146,7 +145,7 @@ pub fn parse(text: &str) -> Result<Document> {
                 let (name, value) = line
                     .split_once(':')
                     .ok_or_else(|| error("expected a field, like `name: value`"))?;
-                add_field(unit, name.trim(), value.trim()).map_err(&error)?;
+                add_field(unit, name.trim(), strip_comment(value.trim())).map_err(&error)?;
             }
             State::Done => return Err(error("text after the closing `}`")),
         }
@@ -159,6 +158,124 @@ pub fn parse(text: &str) -> Result<Document> {
             message: "the file ends before its closing `}`".to_string(),
         }),
     }
+}
+
+/// The lines of a file, numbered from 1, with a quoted value that runs over several lines
+/// (game definition files have some) joined back into one line.
+fn logical_lines(text: &str) -> Vec<(usize, std::borrow::Cow<'_, str>)> {
+    let mut lines = Vec::new();
+    let mut pending: Option<(usize, String)> = None;
+    for (index, line) in text.lines().enumerate() {
+        if let Some((start, mut joined)) = pending.take() {
+            joined.push('\n');
+            joined.push_str(line);
+            if has_open_quote(&joined) {
+                pending = Some((start, joined));
+            } else {
+                lines.push((start, std::borrow::Cow::Owned(joined)));
+            }
+            continue;
+        }
+        let trimmed = line.trim_start();
+        let is_comment = trimmed.starts_with('#') || trimmed.starts_with("//");
+        if !is_comment && has_open_quote(line) {
+            pending = Some((index + 1, line.to_string()));
+        } else {
+            lines.push((index + 1, std::borrow::Cow::Borrowed(line)));
+        }
+    }
+    if let Some((start, joined)) = pending {
+        lines.push((start, std::borrow::Cow::Owned(joined)));
+    }
+    lines
+}
+
+/// Whether a line ends inside a quoted string (an odd number of unescaped quotes before any
+/// comment).
+fn has_open_quote(line: &str) -> bool {
+    let (_, open) = scan_quotes(line);
+    open
+}
+
+/// Where a trailing comment (`#` or `//` outside quotes) starts, and whether the line ends inside
+/// a quoted string.
+fn scan_quotes(line: &str) -> (Option<usize>, bool) {
+    let mut open = false;
+    let mut escaped = false;
+    let bytes = line.as_bytes();
+    for (index, &byte) in bytes.iter().enumerate() {
+        if open {
+            match byte {
+                b'\\' if !escaped => escaped = true,
+                b'"' if !escaped => open = false,
+                _ => escaped = false,
+            }
+            continue;
+        }
+        match byte {
+            b'"' => open = true,
+            b'#' => return (Some(index), false),
+            b'/' if bytes.get(index + 1) == Some(&b'/') => return (Some(index), false),
+            _ => {}
+        }
+    }
+    (None, open)
+}
+
+/// A value without a trailing comment: `"Title" # note` → `"Title"`.
+fn strip_comment(value: &str) -> &str {
+    match scan_quotes(value) {
+        (Some(start), _) => value[..start].trim_end(),
+        (None, _) => value,
+    }
+}
+
+/// Inlines `@include "file"` lines, as game definition files use them (saves never do).
+/// `path` is this file's path in the game's file system (`/locale/en_us/local.sii`); relative
+/// includes are looked up next to it. `read` returns an included file's text.
+pub fn expand_includes(
+    text: &str,
+    path: &str,
+    read: &mut dyn FnMut(&str) -> Option<String>,
+) -> Result<String> {
+    expand(text, path, read, 0)
+}
+
+fn expand(
+    text: &str,
+    path: &str,
+    read: &mut dyn FnMut(&str) -> Option<String>,
+    depth: usize,
+) -> Result<String> {
+    if depth > 16 {
+        return Err(Error::Text {
+            line: 0,
+            message: format!("{path}: includes go too deep (or include themselves)"),
+        });
+    }
+    let directory = path.rsplit_once('/').map(|(dir, _)| dir).unwrap_or("");
+    let mut out = String::with_capacity(text.len());
+    for (index, line) in text.lines().enumerate() {
+        let Some(rest) = line.trim().strip_prefix("@include") else {
+            out.push_str(line);
+            out.push('\n');
+            continue;
+        };
+        let included = rest.trim().trim_matches('"');
+        let full = if included.starts_with('/') {
+            included.to_string()
+        } else {
+            format!("{directory}/{included}")
+        };
+        let content = read(&full).ok_or_else(|| Error::Text {
+            line: index + 1,
+            message: format!("{path} includes {full}, which wasn't found"),
+        })?;
+        let content = content.strip_prefix('\u{feff}').unwrap_or(&content);
+        out.push_str(&expand(content, &full, read, depth + 1)?);
+        out.push('\n');
+    }
+    Ok(out)
 }
 
 enum State {
@@ -247,6 +364,42 @@ mod tests {
         let thing = document.unit("x.y").expect("thing");
         assert_eq!(thing.items("list"), ["1", "2"]);
         assert_eq!(thing.single("v"), Some("(1, 2, 3) (1, 0, 0, 0)"));
+    }
+
+    #[test]
+    fn joins_quoted_values_over_several_lines() {
+        let text = "SiiNunit\n{\nskill : s {\n # a \"quote in a comment\n text[]: \"first\nsecond\"\n max_rank: 3\n}\n}\n";
+        let document = parse(text).expect("parses");
+        let skill = document.unit("s").expect("skill");
+        assert_eq!(skill.items("text"), ["\"first\nsecond\""]);
+        assert_eq!(skill.single("max_rank"), Some("3"));
+    }
+
+    #[test]
+    fn drops_comments_after_values() {
+        let text = "SiiNunit\n{\ndb : .db {\n val[]: \"TRUCK\" #+ Keep \"upper case.\"\n val[]: \"a # b\" // note\n next: 1\n}\n}\n";
+        let document = parse(text).expect("parses");
+        let db = document.unit(".db").expect("db");
+        assert_eq!(db.items("val"), ["\"TRUCK\"", "\"a # b\""]);
+        assert_eq!(db.single("next"), Some("1"));
+    }
+
+    #[test]
+    fn inlines_includes() {
+        let mut files = std::collections::HashMap::new();
+        files.insert(
+            "/locale/en_us/strings.sui",
+            " key[]: \"a\"\n val[]: \"A\"\n@include \"/locale/common.sui\"\n",
+        );
+        files.insert("/locale/common.sui", " key[]: \"b\"\n val[]: \"B\"\n");
+        let text = "SiiNunit\n{\ndb : .db {\n@include \"strings.sui\"\n}\n}\n";
+        let mut read = |path: &str| files.get(path).map(|s| s.to_string());
+        let expanded =
+            expand_includes(text, "/locale/en_us/local.sii", &mut read).expect("expands");
+        let document = parse(&expanded).expect("parses");
+        let db = document.unit(".db").expect("db");
+        assert_eq!(db.items("key"), ["\"a\"", "\"b\""]);
+        assert!(expand_includes("@include \"missing.sui\"", "/x.sii", &mut |_| None).is_err());
     }
 
     #[test]

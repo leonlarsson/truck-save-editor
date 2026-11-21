@@ -12,6 +12,7 @@ path = "src/main.rs"
 
 [dependencies]
 save.workspace = true
+gamedata = { path = "../gamedata" }
 gpui-kit.workspace = true
 dirs = "7.0.0"
 fluent-bundle = "0.16.0"

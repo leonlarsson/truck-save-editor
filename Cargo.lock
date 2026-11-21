@@ -219,6 +219,7 @@ version = "0.1.0"
 dependencies = [
  "dirs 7.0.0",
  "fluent-bundle",
+ "gamedata",
  "gpui-kit",
  "save",
  "unic-langid",
@@ -2117,6 +2118,18 @@ dependencies = [
  "memchr",
  "pin-project-lite",
  "slab",
+]
+
+[[package]]
+name = "gamedata"
+version = "0.1.0"
+dependencies = [
+ "dirs 7.0.0",
+ "hashfs",
+ "save",
+ "sii",
+ "thiserror 2.0.21",
+ "winreg",
 ]
 
 [[package]]

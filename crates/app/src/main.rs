@@ -5,6 +5,7 @@
 
 mod assets;
 mod format;
+mod game_data;
 mod i18n;
 mod labels;
 mod pages;
@@ -28,6 +29,7 @@ fn main() {
             gpui_kit::init(cx);
             i18n::init(cx);
             theme::init(cx);
+            game_data::init(cx);
 
             let options = WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(Bounds::centered(

@@ -34,6 +34,8 @@ pub enum Format {
     Binary,
     /// `SiiNunit`: text.
     Text,
+    /// `3nK`: text or binary with its bytes scrambled (some game files, never saves).
+    Scrambled,
 }
 
 /// Which form a file is in, from its first bytes.
@@ -45,6 +47,8 @@ pub fn detect(bytes: &[u8]) -> Option<Format> {
         Some(Format::Binary)
     } else if bytes.starts_with(b"SiiN") {
         Some(Format::Text)
+    } else if bytes.starts_with(b"3nK\x01") {
+        Some(Format::Scrambled)
     } else {
         None
     }
@@ -63,6 +67,15 @@ pub fn read(bytes: &[u8]) -> Result<Document> {
             }
         }
         Some(Format::Binary) => bsii::decode(bytes),
+        Some(Format::Scrambled) => {
+            let inner = unscramble(bytes);
+            match detect(&inner) {
+                Some(Format::Scrambled) | None => Err(Error::UnknownFormat {
+                    start: inner.iter().take(4).copied().collect(),
+                }),
+                Some(_) => read(&inner),
+            }
+        }
         Some(Format::Text) => {
             let text = std::str::from_utf8(bytes).map_err(|error| Error::NotUtf8 {
                 offset: error.valid_up_to(),
@@ -75,13 +88,34 @@ pub fn read(bytes: &[u8]) -> Result<Document> {
     }
 }
 
-/// Unwraps an `ScsC` file into what it holds. Other forms come back unchanged.
+/// Unwraps an `ScsC` or `3nK` file into what it holds. Other forms come back unchanged.
 pub fn decrypt(bytes: &[u8]) -> Result<Vec<u8>> {
     match detect(bytes) {
         Some(Format::Encrypted) => scsc::decrypt(bytes),
+        Some(Format::Scrambled) => Ok(unscramble(bytes)),
         _ => Ok(bytes.to_vec()),
     }
 }
+
+/// Undoes `3nK` scrambling: a 6-byte header (`3nK\x01`, a byte, a seed), then each byte XORed
+/// with a fixed 256-byte key, starting at the seed.
+fn unscramble(bytes: &[u8]) -> Vec<u8> {
+    let seed = bytes.get(5).copied().unwrap_or(0);
+    bytes
+        .get(6..)
+        .unwrap_or(&[])
+        .iter()
+        .enumerate()
+        .map(|(index, byte)| {
+            let i = (usize::from(seed) + index) & 0xFF;
+            let key = (((i << 2) ^ !i) << 3) ^ i;
+            byte ^ (key as u8)
+        })
+        .collect()
+}
+
+/// Inlines `@include` lines (game definition files; see `text::expand_includes`).
+pub use text::expand_includes;
 
 /// Parses text SII.
 pub fn parse_text(text: &str) -> Result<Document> {
@@ -122,6 +156,21 @@ mod tests {
             read(&scsc::tests::encrypt(&binary.0)).expect("encrypted binary"),
             from_text
         );
+    }
+
+    #[test]
+    fn unscrambles_3nk() {
+        let text = b"SiiNunit\n{\nthing : t {\n a: 1\n}\n}\n";
+        let seed = 77u8;
+        let mut scrambled = b"3nK\x01\x00".to_vec();
+        scrambled.push(seed);
+        for (index, byte) in text.iter().enumerate() {
+            let i = (usize::from(seed) + index) & 0xFF;
+            let key = (((i << 2) ^ !i) << 3) ^ i;
+            scrambled.push(byte ^ (key as u8));
+        }
+        let document = read(&scrambled).expect("reads");
+        assert_eq!(document.unit("t").and_then(|u| u.single("a")), Some("1"));
     }
 
     #[test]

@@ -14,6 +14,7 @@ use gpui_kit::{
 use save::{Vehicle, VehicleKind};
 
 use crate::format::thousands;
+use crate::game_data;
 use crate::i18n::t;
 use crate::session::Session;
 
@@ -223,7 +224,7 @@ impl TruckTable {
             TruckColumn::Garage => truck
                 .garage_city
                 .as_deref()
-                .map(|city| SharedString::from(save::city_display_name(city)))
+                .map(|city| SharedString::from(game_data::city_name(cx, city)))
                 .unwrap_or_else(|| t!(cx, "no-garage")),
             TruckColumn::Odometer => t!(cx, "distance-km", amount = thousands(truck.odometer_km)),
             // Rounded up, so any wear at all shows (and matches the "need repairs" count).

@@ -35,7 +35,11 @@ Agreed work, in order. Each step should end with something the owner can see or 
 
 - [ ] Fleet (trucks and trailers: repair, odometer, plates), Garages (sizes, upgrade all), Drivers (skills, max all), Map (visited cities, unlock dealers and recruitment agencies), Jobs.
 - [ ] All data: every unit and field, searchable and editable.
-- [ ] The game's own icons (skills, ADR classes, brands, cities), read at runtime from the player's installed game: an SCS archive (HashFS) reader and a texture (.tobj/.dds) decoder. Never commit or bundle SCS artwork; fall back to Lucide icons when the game isn't found.
+- [x] Reading the game's archives (HashFS v1/v2) and its data: levels, ranks, skill limits, text and city names (`hashfs`, `gamedata`).
+- [ ] The game's own icons (skills, ADR classes, brands): a texture decoder (.tobj, GDeflate-compressed DDS). Never commit or bundle SCS artwork; fall back to Lucide icons when the game isn't found.
+- [ ] Use the game's language for its names when the app gets more languages (gamedata already takes a language code).
+- [ ] Coach garages: coaches show "No garage"; find where the save keeps them.
+- [ ] HQ city: pick from the cities the company has garages in.
 
 ## Keeping up with the game
 

@@ -10,6 +10,7 @@ use gpui_kit::{App, Context, SharedString};
 use save::{Career, Game, LoadedSlot, Profile, Slot, Vehicle, VehicleKind};
 
 use crate::format::thousands;
+use crate::game_data;
 use crate::i18n::t;
 use crate::labels::{adr_summary, coach_skill_name, skill_name};
 
@@ -174,8 +175,8 @@ impl Session {
         );
         add(
             t!(cx, "hq"),
-            save::city_display_name(&before.hq_city).into(),
-            save::city_display_name(&after.hq_city).into(),
+            game_data::city_name(cx, &before.hq_city).into(),
+            game_data::city_name(cx, &after.hq_city).into(),
         );
         if !self.repaired.is_empty() {
             add(

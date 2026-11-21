@@ -1,0 +1,20 @@
+[package]
+name = "gamedata"
+description = "The installed game's own data (level tables, skill limits, names in every language), read from its archives."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+hashfs = { path = "../hashfs" }
+save.workspace = true
+sii.workspace = true
+thiserror = "2.0.21"
+dirs = "7.0.0"
+
+[target."cfg(windows)".dependencies]
+winreg = "0.56.0"
+
+[lints]
+workspace = true

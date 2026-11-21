@@ -5,12 +5,13 @@ use gpui_kit::component::{
     progress::Progress, v_flex,
 };
 use gpui_kit::{
-    AppContext as _, Context, Entity, IntoElement, ParentElement as _, Render, Styled as _,
+    App, AppContext as _, Context, Entity, IntoElement, ParentElement as _, Render, Styled as _,
     Subscription, Window, div, rems,
 };
 use save::{ADR_ALL, CoachSkills, LevelTable, MAX_COACH_SKILL_LEVEL, MAX_SKILL_LEVEL, Skills};
 
 use crate::format::compact;
+use crate::game_data;
 use crate::i18n::t;
 use crate::labels::{
     ADR_CLASS_COUNT, adr_class, coach_skill_description, coach_skill_name, skill_description,
@@ -154,8 +155,9 @@ impl OverviewPage {
         career: Career,
         cx: &mut Context<Self>,
     ) -> Section {
-        let table = LevelTable::default();
+        let table = career.levels(cx);
         let level = table.level(experience);
+        let rank = career.rank(cx, level.number);
         let percent = (level.fraction() * 100.0).floor() as i64;
         section
             .child(
@@ -165,11 +167,20 @@ impl OverviewPage {
                         h_flex()
                             .justify_between()
                             .items_end()
-                            .child(div().text_2xl().font_semibold().child(t!(
-                                cx,
-                                "level-number",
-                                level = level.number
-                            )))
+                            .child(
+                                v_flex()
+                                    .child(div().text_2xl().font_semibold().child(t!(
+                                        cx,
+                                        "level-number",
+                                        level = level.number
+                                    )))
+                                    .children(rank.map(|rank| {
+                                        div()
+                                            .text_sm()
+                                            .text_color(cx.theme().muted_foreground)
+                                            .child(rank)
+                                    })),
+                            )
                             .child(
                                 div()
                                     .text_sm()
@@ -201,7 +212,7 @@ impl OverviewPage {
                         .on_step(cx.listener(
                             move |this, direction: &i64, _, cx| {
                                 let direction = *direction;
-                                let table = LevelTable::default();
+                                let table = career.levels(cx);
                                 this.edit(cx, |c| {
                                     let current = career.experience(c);
                                     let target =
@@ -400,6 +411,22 @@ impl Career {
                     career.coach_experience = Some(value);
                 }
             }
+        }
+    }
+
+    /// How much XP each level needs: the game's own table when it was read.
+    fn levels(self, cx: &App) -> LevelTable {
+        match self {
+            Career::Truck => game_data::truck_levels(cx),
+            Career::Coach => game_data::coach_levels(cx),
+        }
+    }
+
+    /// The game's rank name for a level (`Divine Champion`), when the game's data was read.
+    fn rank(self, cx: &App, level: i64) -> Option<String> {
+        match self {
+            Career::Truck => game_data::truck_rank(cx, level),
+            Career::Coach => game_data::coach_rank(cx, level),
         }
     }
 

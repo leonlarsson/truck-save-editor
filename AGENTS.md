@@ -47,13 +47,15 @@ Before finishing a change, run `mise run check`, and add or update tests for wha
 crates/
   sii/     the file formats: ScsC decrypt, binary SII decode, text SII parse + write. Bytes in, bytes out. No UI, no disk.
   save/    the ETS2 save: profiles and slots on disk, the document model, typed access (bank, economy, vehicles …), edits, backups, writing.
-  app/     the GPUI desktop app: screens, the UI kit (src/ui/), theme.
+  hashfs/  the game's .scs archives (HashFS v1 and v2): list directories, read files. Read-only.
+  gamedata/ the installed game's own data via hashfs: level tables, rank names, skill limits, the game's text (city names) in a language. Never copied into this repo.
+  app/     the GPUI desktop app: screens, the UI kit (src/ui/), theme, locales/ (the app's own text).
 docs/      sii-format.md, decisions.md
 reference/ the Python prototypes the format was worked out with
 fixtures/  copies of real saves for local tests (gitignored, never committed)
 ```
 
-Dependencies point downward: `app` → `save` → `sii`. **`sii` and `save` have no UI dependencies and must build for `wasm32-unknown-unknown`** (a web version later). Disk access in `save` (finding profiles, backups, writing) sits behind its `native` feature, so the rest builds for wasm.
+Dependencies point downward: `app` → `gamedata` → `save` → `sii`, and `gamedata` → `hashfs`. **`sii` and `save` have no UI dependencies and must build for `wasm32-unknown-unknown`** (a web version later). Disk access in `save` (finding profiles, backups, writing) sits behind its `native` feature, so the rest builds for wasm.
 
 ## Rust conventions
 

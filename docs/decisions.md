@@ -84,3 +84,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Decided:** recorded in `docs/compatibility.md`: saves are edited in place (unknown units, fields and values pass through untouched); unknown binary types stop reading instead of being guessed at; a fixture corpus per game version and a weekly game-update check keep it honest.
 
 **Why:** research into why other editors broke: rebuilding units from fixed field lists silently dropped data the game had added, and crashes mid-write emptied saves.
+
+## 2026-11-21: Read the game's own data from its archives
+
+**Decided:** level tables, rank names, skill limits and the game's text (city names, with accents) are read at runtime from the installed game's `.scs` archives (`hashfs` and `gamedata` crates), found through Steam's library list. Built-in fallbacks (game 1.62's level table, skill limits) cover a missing install.
+
+**Why:** the save holds raw XP and city tokens; showing levels, ranks and proper names needs the game's data, and reading it from the player's own install keeps it right when SCS changes it, works in every language the game has, and keeps SCS's text and artwork out of this open-source repo. The HashFS reader follows `scs_tools`' published format description (MIT) and uses the same CityHash64 variant as the game.
+
+**Considered:** copying tables and names into the repo (goes stale, and redistributes SCS's text); asking players to extract files themselves (friction).
