@@ -9,6 +9,7 @@ pub mod jobs;
 pub mod map;
 pub mod open_save;
 pub mod overview;
+pub mod settings;
 
 use gpui_kit::{App, SharedString};
 
@@ -26,10 +27,11 @@ pub enum Page {
     Map,
     Jobs,
     AllData,
+    Settings,
 }
 
 impl Page {
-    pub const ALL: [Page; 7] = [
+    pub const ALL: [Page; 8] = [
         Page::Overview,
         Page::Fleet,
         Page::Garages,
@@ -37,6 +39,7 @@ impl Page {
         Page::Map,
         Page::Jobs,
         Page::AllData,
+        Page::Settings,
     ];
     pub const CAREER: [Page; 1] = [Page::Overview];
     pub const COMPANY: [Page; 5] = [
@@ -46,7 +49,7 @@ impl Page {
         Page::Map,
         Page::Jobs,
     ];
-    pub const ADVANCED: [Page; 1] = [Page::AllData];
+    pub const ADVANCED: [Page; 2] = [Page::AllData, Page::Settings];
 
     pub fn title(self, cx: &App) -> SharedString {
         match self {
@@ -57,6 +60,7 @@ impl Page {
             Page::Map => t!(cx, "page-map"),
             Page::Jobs => t!(cx, "page-jobs"),
             Page::AllData => t!(cx, "page-all-data"),
+            Page::Settings => t!(cx, "page-settings"),
         }
     }
 
@@ -70,6 +74,7 @@ impl Page {
             Page::Map => "map",
             Page::Jobs => "jobs",
             Page::AllData => "all-data",
+            Page::Settings => "settings",
         }
     }
 
@@ -82,6 +87,7 @@ impl Page {
             Page::Map => IconName::Map,
             Page::Jobs => IconName::Container,
             Page::AllData => IconName::Database,
+            Page::Settings => IconName::Settings,
         }
     }
 }

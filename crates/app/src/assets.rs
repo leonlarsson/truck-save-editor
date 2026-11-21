@@ -21,6 +21,7 @@ gpui_kit::assets::icon_assets!(
         Redo2,
         Rocket,
         Save,
+        Settings,
         Search,
         Sun,
         TriangleAlert,

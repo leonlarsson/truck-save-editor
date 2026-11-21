@@ -16,13 +16,28 @@ impl Global for Loaded {}
 /// Starts reading the game's data in the background; windows redraw when it arrives.
 pub fn init(cx: &mut App) {
     cx.set_global(Loaded::default());
+    reload(cx);
+}
+
+/// Where the game is: the folder picked in the settings, else the one Steam knows.
+pub fn install_dir(cx: &App) -> Option<std::path::PathBuf> {
+    crate::settings::get(cx)
+        .game_dir
+        .or_else(|| gamedata::find_install(Game::Ets2))
+}
+
+/// Reads the game's data again (after the language or the game's folder changed). What's shown
+/// until it arrives is the data read before.
+pub fn reload(cx: &mut App) {
+    let dir = install_dir(cx);
+    let language = crate::settings::get(cx).language.game_code();
     cx.spawn(async move |cx| {
         let data = cx
             .background_spawn(async move {
                 let game = Game::Ets2;
-                let dir = gamedata::find_install(game)?;
-                // The game's text in English for now; this follows the app's language later.
-                GameData::load(game, &dir, "en_us").ok()
+                let dir = dir?;
+                // The game's text in the app's language, else English (`load` falls back).
+                GameData::load(game, &dir, language).ok()
             })
             .await;
         cx.update(|cx| {

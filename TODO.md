@@ -48,7 +48,8 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [x] The game's own icons for skills and ADR classes: GDeflate and texture decoding in `hashfs`, the icon materials in `gamedata`, drawn at exact pixel size by `GameIconView`. Nothing of SCS's is bundled; without the game, the rows show no icon.
 - [x] Brand logos and the game's model names in Fleet.
 - [ ] Cargo icons (Jobs), company logos, from the same decoder.
-- [ ] Use the game's language for its names when the app gets more languages (gamedata already takes a language code).
+- [x] Swedish, and the game's names in the app's language; Settings (language, appearance, game folder, backups).
+- [ ] More languages: a `Language`, a `locales/<code>.ftl` (the completeness test lists what's missing).
 - [x] Coach garages: coaches have none. Fleet says where each is: driven now (`player.assigned_vehicles`) or parked in a city (`player.my_vehicles[]` → `stored_vehicle_city`).
 - [x] HQ city: pick from the cities the company has garages in (Garages page).
 - [x] City names from the game's city definitions (`city_name_localized`), not only by token: a few tokens (`vasteraas`) differ from their text keys.

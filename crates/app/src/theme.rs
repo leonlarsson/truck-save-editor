@@ -6,6 +6,8 @@ use gpui_kit::{
     component::{Theme, ThemeMode, ThemeRegistry},
 };
 
+use crate::settings::Appearance;
+
 const THEMES: &str = include_str!("../themes/truck.json");
 const LIGHT: &str = "Truck Light";
 const DARK: &str = "Truck Dark";
@@ -29,7 +31,7 @@ pub fn init(cx: &mut App) {
             theme.dark_theme = dark;
         }
     });
-    Theme::sync_system_appearance(None, cx);
+    apply(crate::settings::get(cx).appearance, None, cx);
 
     // Development builds only: `TSE_THEME=dark` or `light` overrides the system setting, so a
     // screenshot can show either theme.
@@ -42,14 +44,29 @@ pub fn init(cx: &mut App) {
     }
 }
 
-/// Switches between light and dark.
+/// Shows the app light, dark, or as the system is.
+pub fn apply(appearance: Appearance, window: Option<&mut Window>, cx: &mut App) {
+    match appearance {
+        Appearance::System => Theme::sync_system_appearance(window, cx),
+        Appearance::Light => Theme::change(ThemeMode::Light, window, cx),
+        Appearance::Dark => Theme::change(ThemeMode::Dark, window, cx),
+    }
+}
+
+/// Chooses an appearance and keeps it for next time.
+pub fn set_appearance(appearance: Appearance, window: &mut Window, cx: &mut App) {
+    crate::settings::update(cx, |settings| settings.appearance = appearance);
+    apply(appearance, Some(window), cx);
+}
+
+/// Switches between light and dark (and keeps the choice).
 pub fn toggle_mode(window: &mut Window, cx: &mut App) {
     let next = if cx.theme_is_dark() {
-        ThemeMode::Light
+        Appearance::Light
     } else {
-        ThemeMode::Dark
+        Appearance::Dark
     };
-    Theme::change(next, Some(window), cx);
+    set_appearance(next, window, cx);
 }
 
 /// Small helper so callers don't need to import `ActiveTheme` just to ask this.

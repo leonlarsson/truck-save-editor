@@ -13,6 +13,7 @@ A save editor for **Euro Truck Simulator 2** and **American Truck Simulator**: f
 - **Everything else**: All data shows every unit and value in the save, editable, with checks so a typo can't break the save.
 - **Never lose a save**: every change listed before saving, a backup of the slot before every write (kept outside the game's folders), Save as new slot to leave the original untouched, and no writing while the game is running.
 - **Uses the game's own data** from your install: level tables, rank names, skill limits, city names (Malmö, Kraków), and the skill icons and ADR placards, so it stays right when the game changes.
+- **In English and Swedish**, with the game's own names (cities, cargo, ranks) in the same language, and a Settings page for the language, light or dark, and the game's folder.
 - **Undo and redo** (Ctrl+Z, Ctrl+Shift+Z) for every change, Discard included, and a **command palette** (Ctrl+K) for every page and bulk action.
 
 Built in Rust with [GPUI](https://www.gpui.rs/) through [GPUI Kit](https://gpui-kit.com). Windows first; ETS2 first, then ATS.

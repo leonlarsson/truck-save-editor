@@ -220,6 +220,31 @@ quick-start-no-hq = This save has no headquarters city yet.
 quick-start-hq-large = Your headquarters garage is already large.
 quick-start-needs-game = Needs the game installed on this PC: its data says which cities have them.
 
+## Settings
+
+page-settings = Settings
+settings-language = Language
+settings-language-description = The app's language. The game's own names (cities, cargo, ranks) follow it when the game has them in that language.
+settings-appearance = Appearance
+settings-appearance-system = Same as the system
+settings-appearance-light = Light
+settings-appearance-dark = Dark
+settings-game = Game folder
+settings-game-description = Where Euro Truck Simulator 2 is installed. The editor reads level tables, names and icons from it, and never changes anything there.
+settings-game-found = Found automatically
+settings-game-picked = Chosen by you
+settings-game-not-found = Not found. Choose the folder the game is installed in.
+settings-game-not-game = That folder doesn't hold the game: it has no def.scs.
+settings-game-choose = Choose folder…
+settings-game-automatic = Find it automatically
+settings-backups = Backups
+settings-backups-description = A backup of a slot is made every time you save it, kept here, outside the game's folders.
+settings-backups-open = Open folder
+settings-about = About
+settings-version = Version { $version }
+settings-source = Source code on GitHub
+settings-not-affiliated = Not affiliated with or endorsed by SCS Software.
+
 ## Command palette
 
 palette-open = Commands

@@ -10,6 +10,7 @@ mod pages;
 mod palette;
 mod quick_start;
 mod session;
+mod settings;
 #[cfg(test)]
 mod tests;
 mod theme;
@@ -47,6 +48,7 @@ fn main() {
         .run(|cx| {
             // GPUI Kit first, then our theme on top of it.
             gpui_kit::init(cx);
+            settings::init(cx);
             i18n::init(cx);
             theme::init(cx);
             game_data::init(cx);

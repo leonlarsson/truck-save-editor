@@ -5,7 +5,7 @@
 use gpui_kit::assets::IconName;
 use gpui_kit::component::{
     ActiveTheme as _, Icon, Selectable as _, Sizable as _, StyledExt as _,
-    button::{Button, ButtonGroup},
+    button::{Button, ButtonGroup, ButtonVariants as _},
     h_flex,
     list::ListItem,
     spinner::Spinner,
@@ -271,6 +271,7 @@ impl Render for OpenSavePage {
             )
             .child(
                 v_flex()
+                    .flex_1()
                     .child(div().text_lg().font_semibold().child(APP_NAME))
                     .child(
                         div()
@@ -278,6 +279,16 @@ impl Render for OpenSavePage {
                             .text_color(cx.theme().muted_foreground)
                             .child(t!(cx, "start-choose")),
                     ),
+            )
+            // Settings before a save is open too: the language, and the game's folder if it
+            // wasn't found.
+            .child(
+                Button::new("start-settings")
+                    .ghost()
+                    .small()
+                    .icon(Icon::new(IconName::Settings))
+                    .label(t!(cx, "page-settings"))
+                    .on_click(|_, window, cx| crate::pages::settings::open_sheet(window, cx)),
             );
 
         let body = match &self.found {

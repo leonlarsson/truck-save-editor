@@ -36,6 +36,7 @@ use crate::pages::{
     map::MapPage,
     open_save::{OpenSavePage, OpenSlot},
     overview::OverviewPage,
+    settings::SettingsPage,
 };
 use crate::palette::{self, OpenPalette, PaletteCommand};
 use crate::quick_start;
@@ -111,6 +112,7 @@ struct Opened {
     all_data: Entity<AllDataPage>,
     map: Entity<MapPage>,
     jobs: Entity<JobsPage>,
+    settings: Entity<SettingsPage>,
     _observe: Subscription,
 }
 
@@ -130,6 +132,12 @@ impl Workspace {
         let focus_handle = cx.focus_handle();
         // Keyboard shortcuts (Ctrl+K) reach the workspace when nothing inside it has focus yet.
         focus_handle.focus(window, cx);
+        let language_changed =
+            cx.observe_global_in::<crate::i18n::Strings>(window, |this, window, cx| {
+                if let Some(session) = this.opened.as_ref().map(|opened| opened.session.clone()) {
+                    this.build_pages(session, window, cx);
+                }
+            });
         let mut workspace = Self {
             page: dev_start_page().unwrap_or(Page::Overview),
             focus_handle,
@@ -137,7 +145,7 @@ impl Workspace {
             open_save,
             opened: None,
             opening: None,
-            _subscriptions: vec![subscription],
+            _subscriptions: vec![subscription, language_changed],
         };
         if let Some((profile, slot)) = dev_start_slot() {
             workspace.open(profile, slot, window, cx);
@@ -184,6 +192,18 @@ impl Workspace {
 
     fn show(&mut self, session: Session, window: &mut Window, cx: &mut Context<Self>) {
         let session = cx.new(|_| session);
+        self.build_pages(session, window, cx);
+    }
+
+    /// Makes the pages for an open save. Also after a language change: pages make some of their
+    /// text when they're built (table headings, field hints), so they're built again. The session,
+    /// with every pending change and the Undo history, stays.
+    fn build_pages(
+        &mut self,
+        session: Entity<Session>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let overview = cx.new(|cx| OverviewPage::new(session.clone(), window, cx));
         let fleet = cx.new(|cx| FleetPage::new(session.clone(), window, cx));
         let garages = cx.new(|cx| GaragesPage::new(session.clone(), window, cx));
@@ -191,6 +211,7 @@ impl Workspace {
         let all_data = cx.new(|cx| AllDataPage::new(session.clone(), window, cx));
         let map = cx.new(|cx| MapPage::new(session.clone(), window, cx));
         let jobs = cx.new(|cx| JobsPage::new(session.clone(), window, cx));
+        let settings = cx.new(|cx| SettingsPage::new(window, cx));
         let _observe = cx.observe(&session, |_, _, cx| cx.notify());
         self.opened = Some(Opened {
             session,
@@ -201,8 +222,10 @@ impl Workspace {
             all_data,
             map,
             jobs,
+            settings,
             _observe,
         });
+        cx.notify();
     }
 
     /// The open save's session, if a save is open.
@@ -824,6 +847,12 @@ impl Workspace {
                 .size_full()
                 .child(opened.jobs.clone())
                 .into_any_element(),
+            Page::Settings => div()
+                .id("settings-scroll")
+                .size_full()
+                .overflow_y_scroll()
+                .child(opened.settings.clone())
+                .into_any_element(),
             Page::AllData => div()
                 .size_full()
                 .child(opened.all_data.clone())
@@ -1098,7 +1127,7 @@ fn start_restore(
 
 /// Where backups go: the app's own data folder (outside the game's folders, which Steam Cloud
 /// uploads).
-fn backups_root() -> Option<PathBuf> {
+pub(crate) fn backups_root() -> Option<PathBuf> {
     dirs::data_dir().map(|dir| dir.join(APP_NAME).join("backups"))
 }
 
