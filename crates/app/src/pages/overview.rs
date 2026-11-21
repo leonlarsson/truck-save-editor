@@ -5,7 +5,8 @@ use gpui_kit::component::{
     progress::Progress, v_flex,
 };
 use gpui_kit::{
-    App, AppContext as _, Context, Entity, IntoElement, ParentElement as _, Render, Styled as _,
+    App, AppContext as _, Context, Entity, Hsla, InteractiveElement as _, IntoElement,
+    ParentElement as _, Render, SharedString, StatefulInteractiveElement as _, Styled as _,
     Subscription, Window, div, rems,
 };
 use save::{ADR_ALL, CoachSkills, LevelTable, MAX_COACH_SKILL_LEVEL, MAX_SKILL_LEVEL, Skills};
@@ -18,7 +19,9 @@ use crate::labels::{
     skill_name,
 };
 use crate::session::Session;
-use crate::ui::{AmountChanged, AmountField, LevelPicker, Section, StepButtons, page_body};
+use crate::ui::{
+    AmountChanged, AmountField, GameIconView, LevelPicker, Section, StepButtons, page_body,
+};
 
 pub struct OverviewPage {
     session: Entity<Session>,
@@ -229,21 +232,17 @@ impl OverviewPage {
         let skills = self.session.read(cx).career().skills;
         let rows = (0..skills.levels().len()).map(|index| {
             let name = skill_name(cx, index);
+            let (field, level) = skills.levels()[index];
             h_flex()
                 .justify_between()
                 .gap_4()
                 .py_1()
-                .child(
-                    v_flex()
-                        .min_w_0()
-                        .child(div().text_sm().font_medium().child(name.clone()))
-                        .child(
-                            div()
-                                .text_xs()
-                                .text_color(cx.theme().muted_foreground)
-                                .child(skill_description(cx, index)),
-                        ),
-                )
+                .child(skill_label(
+                    skill_icon(field, level, cx),
+                    name.clone(),
+                    skill_description(cx, index),
+                    cx,
+                ))
                 .child(
                     LevelPicker::new(("skill", index), name)
                         .max(MAX_SKILL_LEVEL)
@@ -278,21 +277,17 @@ impl OverviewPage {
         let skills = self.session.read(cx).career().coach_skills?;
         let rows = (0..skills.levels().len()).map(|index| {
             let name = coach_skill_name(cx, index);
+            let (field, level) = skills.levels()[index];
             h_flex()
                 .justify_between()
                 .gap_4()
                 .py_1()
-                .child(
-                    v_flex()
-                        .min_w_0()
-                        .child(div().text_sm().font_medium().child(name.clone()))
-                        .child(
-                            div()
-                                .text_xs()
-                                .text_color(cx.theme().muted_foreground)
-                                .child(coach_skill_description(cx, index)),
-                        ),
-                )
+                .child(skill_label(
+                    skill_icon(field, level, cx),
+                    name.clone(),
+                    coach_skill_description(cx, index),
+                    cx,
+                ))
                 .child(
                     LevelPicker::new(("coach-skill", index), name)
                         .max(MAX_COACH_SKILL_LEVEL)
@@ -331,20 +326,39 @@ impl OverviewPage {
         let adr = self.session.read(cx).career().skills.adr;
         let classes = (0..ADR_CLASS_COUNT).map(|bit| {
             let mask = 1u8 << bit;
-            div().w(rems(13.)).child(
+            let is_on = adr & mask != 0;
+            let set = move |this: &mut Self, on: bool, cx: &mut Context<Self>| {
+                this.edit(cx, |career| {
+                    if on {
+                        career.skills.adr |= mask;
+                    } else {
+                        career.skills.adr &= !mask;
+                    }
+                });
+            };
+            // The game's placard, when it's there: on when the class is, faded when it isn't
+            // (the checkbox says which too, so it's never colour alone). Clicking it toggles.
+            let placard = game_data::adr_icon(cx, bit).map(|icon| {
+                div()
+                    .id(("adr-placard", bit))
+                    .cursor_pointer()
+                    .child(
+                        GameIconView::new(icon)
+                            .size(2.5)
+                            .backdrop(PLACARD_BACKDROP)
+                            .opacity(if is_on { 1. } else { 0.35 }),
+                    )
+                    .on_click(cx.listener(move |this, _, _, cx| set(this, !is_on, cx)))
+            });
+            h_flex().min_w_0().gap_2().children(placard).child(
                 Checkbox::new(("adr", bit))
+                    .flex_1()
+                    .min_w_0()
                     .label(adr_class(cx, bit))
-                    .checked(adr & mask != 0)
-                    .on_change(cx.listener(move |this, checked: &bool, _, cx| {
-                        let checked = *checked;
-                        this.edit(cx, |career| {
-                            if checked {
-                                career.skills.adr |= mask;
-                            } else {
-                                career.skills.adr &= !mask;
-                            }
-                        });
-                    })),
+                    .checked(is_on)
+                    .on_change(
+                        cx.listener(move |this, checked: &bool, _, cx| set(this, *checked, cx)),
+                    ),
             )
         });
 
@@ -359,8 +373,63 @@ impl OverviewPage {
                         this.edit(cx, |career| career.skills.adr = ADR_ALL);
                     })),
             )
-            .child(h_flex().flex_wrap().gap_y_3().children(classes))
+            .child(
+                div()
+                    .grid()
+                    .grid_cols(3)
+                    .gap_x_4()
+                    .gap_y_3()
+                    .children(classes),
+            )
     }
+}
+
+/// The dark of the game's own panels, which its placards are drawn over (the black half of the
+/// corrosive placard is that panel showing through). The same in both themes: it's the sign's.
+const PLACARD_BACKDROP: Hsla = Hsla {
+    h: 0.,
+    s: 0.,
+    l: 0.07,
+    a: 1.,
+};
+
+/// A skill's icon from the game: the highlight in the theme's accent once the skill is learned,
+/// all quiet while it's at level 0.
+fn skill_icon(field: &str, level: u8, cx: &App) -> Option<GameIconView> {
+    let icon = game_data::skill_icon(cx, field)?;
+    let base = cx.theme().muted_foreground;
+    let highlight = if level > 0 {
+        cx.theme().primary
+    } else {
+        cx.theme().muted_foreground.opacity(0.6)
+    };
+    Some(
+        GameIconView::new(icon)
+            .size(2.)
+            .channel(gamedata::RED, base)
+            .channel(gamedata::GREEN, highlight)
+            .channel(gamedata::BLUE, base),
+    )
+}
+
+/// A skill's icon, name and what it does.
+fn skill_label(
+    icon: Option<GameIconView>,
+    name: SharedString,
+    description: SharedString,
+    cx: &App,
+) -> impl IntoElement {
+    h_flex().gap_3().min_w_0().children(icon).child(
+        v_flex()
+            .min_w_0()
+            .child(div().text_sm().font_medium().child(name))
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(cx.theme().muted_foreground)
+                    .child(description),
+            ),
+    )
 }
 
 impl Render for OverviewPage {

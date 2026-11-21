@@ -47,8 +47,8 @@ Before finishing a change, run `mise run check`, and add or update tests for wha
 crates/
   sii/     the file formats: ScsC decrypt, binary SII decode, text SII parse + write. Bytes in, bytes out. No UI, no disk.
   save/    the ETS2 save: profiles and slots on disk, the document model, typed access (bank, economy, vehicles …), edits, backups, writing.
-  hashfs/  the game's .scs archives (HashFS v1 and v2): list directories, read files. Read-only.
-  gamedata/ the installed game's own data via hashfs: level tables, rank names, skill limits, the game's text (city names) in a language. Never copied into this repo.
+  hashfs/  the game's .scs archives (HashFS v1 and v2): list directories, read files and textures. Read-only.
+  gamedata/ the installed game's own data via hashfs: level tables, rank names, skill limits, the game's text (city names) in a language, its icons. Never copied into this repo.
   app/     the GPUI desktop app: screens, the UI kit (src/ui/), theme, locales/ (the app's own text).
 docs/      sii-format.md, decisions.md
 reference/ the Python prototypes the format was worked out with
@@ -80,7 +80,8 @@ Dependencies point downward: `app` → `gamedata` → `save` → `sii`, and `gam
 
 - **One `Session` entity holds the open save** (`crates/app/src/session.rs`): what was loaded, and every pending change (career, repairs, garage upgrades, maxed drivers, visited cities, All data edits). Pages read from it and change it only through its methods; it counts and describes the changes for the header and the save dialog, and `prepared()` builds the slot as it would be written. A new kind of change gets a field there, a line in `changes()`, its count in `change_count()`, and its application in `prepared()`.
 - **Pages** (`crates/app/src/pages/`): `open_save` (the start screen), `overview`, `fleet`, `garages`, `drivers`, `map`, `all_data`. Each observes the session and redraws from it.
-- **The kit** (`crates/app/src/ui/`): `Section`, `PageHeader`, `AmountField` (amounts with 2.5m / +1m), `LevelPicker`, `StepButtons`, `TextTable` (a virtualized table of text).
+- **The kit** (`crates/app/src/ui/`): `Section`, `PageHeader`, `AmountField` (amounts with 2.5m / +1m), `LevelPicker`, `StepButtons`, `TextTable` (a virtualized table of text), `GameIconView` (one of the game's icons, drawn at exact pixel size).
+- **The command palette** (`crates/app/src/palette.rs`, Ctrl+K): a new page or bulk action gets a `PaletteCommand` too.
 - **The game's own data** (levels, ranks, city names) comes from `game_data.rs`, loaded in the background at startup; always have a fallback for when it isn't there.
 
 - **Build screens from the UI kit** in `crates/app/src/ui/` (our own components, wrapping `gpui-component` where it helps). Screens don't style raw elements ad hoc. A missing component goes in the kit.

@@ -58,6 +58,14 @@ pub fn coach_skill_description(cx: &App, index: usize) -> SharedString {
 /// An ADR class, by bit (bit 0 first): classes 1, 2, 3, 4, 6 and 8, as the game's `adr_info_icon[]`
 /// in `def/economy_data.sii` orders them.
 pub fn adr_class(cx: &App, bit: usize) -> SharedString {
+    // The game's own name when it's there (`skill_adr_classt<class number>`).
+    const CLASS_NUMBERS: [u8; 6] = [1, 2, 3, 4, 6, 8];
+    if let Some(name) = CLASS_NUMBERS
+        .get(bit)
+        .and_then(|class| crate::game_data::text(cx, &format!("skill_adr_classt{class}")))
+    {
+        return name.into();
+    }
     match bit {
         0 => t!(cx, "adr-explosives"),
         1 => t!(cx, "adr-gases"),

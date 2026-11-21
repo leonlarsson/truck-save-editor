@@ -5,14 +5,19 @@
 //!
 //! Everything here is read-only. When the game isn't found, the app falls back to built-in values.
 
+mod icon;
 mod install;
+mod texture;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use save::{Game, LevelTable};
 
+pub use icon::{ALPHA, BLUE, GREEN, GameIcon, RED};
 pub use install::find_install;
+pub use texture::{decode_rgba, distance_field_coverage};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -39,6 +44,10 @@ pub struct GameData {
     coach_ranks: Vec<(i64, String)>,
     /// Each skill's highest level, by its save field name (`long_dist`, `long_duty` …).
     skill_max: HashMap<String, u8>,
+    /// Each skill's icon, by its save field name.
+    skill_icons: HashMap<String, Arc<GameIcon>>,
+    /// The ADR class placards, in the order of the save's ADR bits.
+    adr_icons: Vec<Arc<GameIcon>>,
     /// The game's text: key → text, in the loaded language.
     strings: HashMap<String, String>,
 }
@@ -65,7 +74,23 @@ impl GameData {
             data.coach_levels = coach_levels;
             data.coach_ranks = coach_ranks;
         }
-        data.skill_max = read_skill_limits(&mut definitions).unwrap_or_default();
+        let skills = read_skills(&mut definitions).unwrap_or_default();
+        data.skill_max = skills.limits;
+        // Icons are a nicety: without `base.scs`, or with an icon the editor can't read, the
+        // app shows none.
+        if let Ok(mut base) = hashfs::Archive::open(install_dir.join("base.scs")) {
+            let folder = "/material/ui/skills";
+            for (field, name) in skills.icons {
+                if let Some(icon) = GameIcon::load(&mut base, folder, &name) {
+                    data.skill_icons.insert(field, Arc::new(icon));
+                }
+            }
+            data.adr_icons = skills
+                .adr_icons
+                .iter()
+                .map_while(|name| GameIcon::load(&mut base, folder, name).map(Arc::new))
+                .collect();
+        }
 
         if let Ok(mut locale) = hashfs::Archive::open(install_dir.join("locale.scs")) {
             data.strings = read_strings(&mut locale, language)
@@ -109,6 +134,16 @@ impl GameData {
     /// A skill's highest level, by its save field name.
     pub fn max_skill_level(&self, field: &str) -> Option<u8> {
         self.skill_max.get(field).copied()
+    }
+
+    /// A skill's icon, by its save field name (`long_dist`, `long_duty` …).
+    pub fn skill_icon(&self, field: &str) -> Option<Arc<GameIcon>> {
+        self.skill_icons.get(field).cloned()
+    }
+
+    /// An ADR class's placard, by its bit in the save (0 = explosives).
+    pub fn adr_icon(&self, bit: usize) -> Option<Arc<GameIcon>> {
+        self.adr_icons.get(bit).cloned()
     }
 }
 
@@ -168,8 +203,17 @@ fn read_levels(
     Ok((LevelTable::new(steps), ranks))
 }
 
-/// Each skill's `max_rank`, keyed by the field name the save uses for it.
-fn read_skill_limits(archive: &mut hashfs::Archive) -> Result<HashMap<String, u8>> {
+/// What `skill_data.sii` says about each skill, keyed by the field name the save uses for it.
+#[derive(Default)]
+struct SkillDefinitions {
+    limits: HashMap<String, u8>,
+    /// Field → icon material name.
+    icons: HashMap<String, String>,
+    /// The ADR skill's `rank_icons[]`: one placard per class, in bit order.
+    adr_icons: Vec<String>,
+}
+
+fn read_skills(archive: &mut hashfs::Archive) -> Result<SkillDefinitions> {
     let document = read_document(archive, "/def/skill_data.sii")?;
     let index = document
         .first_of_kind("skills_data")
@@ -189,19 +233,33 @@ fn read_skill_limits(archive: &mut hashfs::Archive) -> Result<HashMap<String, u8
         ("satisfaction_increase_skill_data", "satisfaction_increase"),
         ("bus_ecodriving_skill_data", "ecodriving"),
     ];
-    let mut limits = HashMap::new();
+    let mut skills = SkillDefinitions::default();
     for (definition, save_field) in fields {
-        let max = index
-            .single(definition)
-            .and_then(|id| document.unit(id))
-            .and_then(|skill| skill.single("max_rank"))
+        let Some(skill) = index.single(definition).and_then(|id| document.unit(id)) else {
+            continue;
+        };
+        let max = skill
+            .single("max_rank")
             .and_then(sii::value::parse_i64)
             .and_then(|max| u8::try_from(max).ok());
         if let Some(max) = max {
-            limits.insert(save_field.to_string(), max);
+            skills.limits.insert(save_field.to_string(), max);
+        }
+        if let Some(icon) = skill.single("icon_mat") {
+            let icon = sii::value::parse_string(icon);
+            skills
+                .icons
+                .insert(save_field.to_string(), icon.to_string());
+        }
+        if save_field == "adr" {
+            skills.adr_icons = skill
+                .items("rank_icons")
+                .iter()
+                .map(|icon| sii::value::parse_string(icon).to_string())
+                .collect();
         }
     }
-    Ok(limits)
+    Ok(skills)
 }
 
 /// The game's text in a language: `key[]` and `val[]` pairs in `locale/<language>/local.sii` and

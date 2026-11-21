@@ -40,7 +40,8 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [x] All data: every unit and field, editable (shape-checked).
 - [ ] All data: show All data edits on the typed pages too (an edited money_account in Overview), and search values across units.
 - [x] Reading the game's archives (HashFS v1/v2) and its data: levels, ranks, skill limits, text and city names (`hashfs`, `gamedata`).
-- [ ] The game's own icons (skills, ADR classes, brands): a texture decoder (.tobj, GDeflate-compressed DDS). Never commit or bundle SCS artwork; fall back to Lucide icons when the game isn't found.
+- [x] The game's own icons for skills and ADR classes: GDeflate and texture decoding in `hashfs`, the icon materials in `gamedata`, drawn at exact pixel size by `GameIconView`. Nothing of SCS's is bundled; without the game, the rows show no icon.
+- [ ] Brand logos (Fleet), cargo icons (Jobs), company logos, from the same decoder.
 - [ ] Use the game's language for its names when the app gets more languages (gamedata already takes a language code).
 - [ ] Coach garages: coaches show "No garage"; find where the save keeps them.
 - [x] HQ city: pick from the cities the company has garages in (Garages page).

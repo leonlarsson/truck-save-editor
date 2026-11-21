@@ -1,0 +1,115 @@
+//! One of the game's own icons (a skill, an ADR placard), drawn at the exact number of pixels it
+//! covers on screen so it stays crisp at any display scaling, in colours that suit the theme.
+
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use gamedata::GameIcon;
+use gpui_kit::{
+    App, Global, Hsla, IntoElement, ParentElement as _, RenderImage, RenderOnce, Rgba, Styled as _,
+    Window, div, img, rems,
+};
+
+/// Drawn icons, by what was drawn: the icon, its size in pixels, and its colours.
+#[derive(Default)]
+struct Drawn(HashMap<Key, Arc<RenderImage>>);
+
+impl Global for Drawn {}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+struct Key {
+    name: String,
+    pixels: u32,
+    colours: [Option<[u8; 4]>; 4],
+    backdrop: Option<[u8; 4]>,
+}
+
+#[derive(IntoElement)]
+pub struct GameIconView {
+    icon: Arc<GameIcon>,
+    /// Width and height, in rems.
+    size: f32,
+    colours: [Option<Hsla>; 4],
+    backdrop: Option<Hsla>,
+    opacity: f32,
+}
+
+impl GameIconView {
+    pub fn new(icon: Arc<GameIcon>) -> Self {
+        Self {
+            icon,
+            size: 2.,
+            colours: [None; 4],
+            backdrop: None,
+            opacity: 1.,
+        }
+    }
+
+    /// Width and height in rems.
+    pub fn size(mut self, rems: f32) -> Self {
+        self.size = rems;
+        self
+    }
+
+    /// Draws one of the texture's channels (`gamedata::RED` …) in this colour instead of the
+    /// game's.
+    pub fn channel(mut self, channel: usize, colour: Hsla) -> Self {
+        if let Some(slot) = self.colours.get_mut(channel) {
+            *slot = Some(colour);
+        }
+        self
+    }
+
+    /// Paints the dark panel the game draws this icon on, in the icon's shape.
+    pub fn backdrop(mut self, colour: Hsla) -> Self {
+        self.backdrop = Some(colour);
+        self
+    }
+
+    pub fn opacity(mut self, opacity: f32) -> Self {
+        self.opacity = opacity;
+        self
+    }
+}
+
+fn to_rgba(colour: Hsla) -> [u8; 4] {
+    let rgba = Rgba::from(colour);
+    [rgba.r, rgba.g, rgba.b, rgba.a].map(|value| (value.clamp(0., 1.) * 255.).round() as u8)
+}
+
+impl RenderOnce for GameIconView {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let size = rems(self.size);
+        let pixels = (f32::from(size.to_pixels(window.rem_size())) * window.scale_factor())
+            .round()
+            .max(1.) as u32;
+        let key = Key {
+            name: self.icon.name.clone(),
+            pixels,
+            colours: self.colours.map(|colour| colour.map(to_rgba)),
+            backdrop: self.backdrop.map(to_rgba),
+        };
+        if !cx.has_global::<Drawn>() {
+            cx.set_global(Drawn::default());
+        }
+        let cached = cx.global::<Drawn>().0.get(&key).cloned();
+        let image = match cached {
+            Some(image) => Some(image),
+            None => {
+                // Small (a few thousand pixels), so drawing it here doesn't hold up the frame.
+                let bgra = self.icon.render(pixels, key.colours, key.backdrop);
+                let image = image::RgbaImage::from_raw(pixels, pixels, bgra)
+                    .map(|buffer| Arc::new(RenderImage::new(vec![image::Frame::new(buffer)])));
+                if let Some(image) = &image {
+                    cx.global_mut::<Drawn>().0.insert(key, image.clone());
+                }
+                image
+            }
+        };
+        let frame = div().size(size).flex_shrink_0().opacity(self.opacity);
+        match image {
+            Some(image) => frame.child(img(image).size_full()),
+            None => frame,
+        }
+    }
+}

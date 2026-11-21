@@ -1,9 +1,9 @@
-//! The installed game's own data (level tables, rank names, city names), loaded in the background
+//! The installed game's own data (level tables, rank names, city names, icons), loaded in the background
 //! at startup. Until it arrives, or if the game isn't found, the app uses built-in fallbacks.
 
 use std::sync::Arc;
 
-use gamedata::GameData;
+use gamedata::{GameData, GameIcon};
 use gpui_kit::{App, AppContext as _, Global};
 use save::{Game, LevelTable};
 
@@ -58,4 +58,19 @@ pub fn city_name(cx: &App, token: &str) -> String {
     data(cx)
         .and_then(|d| d.city_name(token))
         .unwrap_or_else(|| save::city_display_name(token))
+}
+
+/// A skill's icon from the game, by its save field name (`long_dist`, `long_duty` …).
+pub fn skill_icon(cx: &App, field: &str) -> Option<Arc<GameIcon>> {
+    data(cx)?.skill_icon(field)
+}
+
+/// An ADR class's placard from the game, by its bit in the save.
+pub fn adr_icon(cx: &App, bit: usize) -> Option<Arc<GameIcon>> {
+    data(cx)?.adr_icon(bit)
+}
+
+/// The game's own text for a key, if the game was found and has it.
+pub fn text(cx: &App, key: &str) -> Option<String> {
+    data(cx)?.text(key).filter(|text| !text.is_empty())
 }

@@ -92,3 +92,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** the save holds raw XP and city tokens; showing levels, ranks and proper names needs the game's data, and reading it from the player's own install keeps it right when SCS changes it, works in every language the game has, and keeps SCS's text and artwork out of this open-source repo. The HashFS reader follows `scs_tools`' published format description (MIT) and uses the same CityHash64 variant as the game.
 
 **Considered:** copying tables and names into the repo (goes stale, and redistributes SCS's text); asking players to extract files themselves (friction).
+
+## 2026-11-21: The game's icons, drawn from its textures
+
+**Decided:** `hashfs` decompresses GDeflate (compression `0x30`, ported from `scs_tools`, MIT; see `THIRD_PARTY_NOTICES.md`) and cuts a texture's first image out of its GPU upload layout. The pixel format is checked against the data's size, since some format codes aren't in the known table. `gamedata` decodes BC formats with `bcdec_rs` (a safe pure-Rust port of bcdec), reads the icon materials (`ui.sdf.rfx`: four channels, one colour each from `aux[1..4]`) and draws an icon at a given pixel size. The app draws each icon at the exact device-pixel size it covers, cached, and gives skill icons the theme's colours. ADR placards keep the game's colours over the dark panel the game draws them on.
+
+**Why:** the game's icons make the screens speak the game's language at a glance, and drawing them from the player's install keeps SCS's artwork out of the repo. Drawing at the exact size keeps them crisp at any display scale; letting GPUI scale a 260-pixel texture down blurs or aliases it.
+
+**Considered:** extracting the icons once into the repo (SCS's artwork; not ours to redistribute); Lucide stand-ins (fine as the fallback, but generic); a full DDS export (not needed: only the first image is shown).
