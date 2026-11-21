@@ -547,8 +547,14 @@ impl Render for AllDataPage {
                 .gap_2()
                 .h_full()
                 .min_h_0()
-                .when_some(width, |this, width| this.w(rems(width)).flex_shrink_0())
-                .when(width.is_none(), |this| this.flex_1().min_w_0())
+                // The lists start at their width and give some up in a small window; Values
+                // takes the rest. None gets narrower than its minimum.
+                .when_some(width, |this, width| {
+                    this.flex_basis(rems(width))
+                        .flex_shrink(1.)
+                        .min_w(rems(10.))
+                })
+                .when(width.is_none(), |this| this.flex_1().min_w(rems(12.)))
                 .child(div().text_xs().font_medium().child(title))
                 .child(div().flex_1().min_h_0().child(body))
         };
@@ -560,7 +566,10 @@ impl Render for AllDataPage {
             .py_6()
             .child(
                 h_flex()
-                    .gap_4()
+                    // The intro sits beside the search, or below it when the window is narrow.
+                    .flex_wrap()
+                    .gap_x_4()
+                    .gap_y_2()
                     .items_center()
                     .child(
                         div().w(rems(22.)).flex_shrink_0().child(
@@ -571,7 +580,11 @@ impl Render for AllDataPage {
                         ),
                     )
                     .child(
+                        // Takes what's left of the row and wraps there, rather than running off
+                        // the window (longer in some languages).
                         div()
+                            .flex_1()
+                            .min_w(rems(20.))
                             .text_sm()
                             .text_color(cx.theme().muted_foreground)
                             .child(if is_searching {
