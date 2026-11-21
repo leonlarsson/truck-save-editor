@@ -16,10 +16,12 @@ use gpui_kit::{
     ParentElement as _, Render, SharedString, StatefulInteractiveElement as _, Styled as _, Task,
     Window, div, prelude::FluentBuilder as _, rems,
 };
-use save::{Game, Location, Profile, Slot};
+use save::{Game, Profile, Slot};
 
 use crate::APP_NAME;
-use crate::format::{ago, thousands};
+use crate::format::thousands;
+use crate::i18n::t;
+use crate::labels;
 
 /// Asks the workspace to open a slot.
 pub struct OpenSlot {
@@ -77,14 +79,17 @@ impl OpenSavePage {
         profiles: &[(Profile, Vec<Slot>)],
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
-        let describe = |profile: &Profile| -> String {
-            let place = match profile.location {
-                Location::SteamCloud => "Steam Cloud",
-                Location::Local => "This PC",
-            };
+        let describe = |profile: &Profile| -> SharedString {
+            let place = labels::location(cx, profile.location);
             match profile.game {
-                Game::Ets2 => format!("{} · {place}", profile.name),
-                Game::Ats => format!("{} · ATS · {place}", profile.name),
+                Game::Ets2 => t!(cx, "profile-place", name = &profile.name, place = place),
+                Game::Ats => t!(
+                    cx,
+                    "profile-game-place",
+                    name = &profile.name,
+                    game = "ATS",
+                    place = place
+                ),
             }
         };
 
@@ -122,7 +127,7 @@ impl OpenSavePage {
             slots.iter().partition(|slot| slot.kind.is_manual());
         let currency = profile.game.currency_symbol();
 
-        let group = |title: &'static str, slots: Vec<&Slot>, cx: &mut Context<Self>| {
+        let group = |title: SharedString, slots: Vec<&Slot>, cx: &mut Context<Self>| {
             v_flex()
                 .gap_1()
                 .child(
@@ -138,10 +143,10 @@ impl OpenSavePage {
                     let detail = {
                         let mut parts = Vec::new();
                         if let save::SlotKind::Manual(number) = slot.kind {
-                            parts.push(format!("Slot {number}"));
+                            parts.push(t!(cx, "start-slot-number", number = number).to_string());
                         }
                         if let Some(modified) = slot.modified {
-                            parts.push(ago(modified));
+                            parts.push(labels::ago(cx, modified).to_string());
                         }
                         parts.join(" · ")
                     };
@@ -156,7 +161,7 @@ impl OpenSavePage {
                         .py_2()
                         .px_3()
                         .rounded(cx.theme().radius)
-                        .accessibility_label(slot.display_name())
+                        .accessibility_label(labels::slot_name(cx, slot))
                         .on_click(cx.listener(move |_, _, _, cx| {
                             cx.emit(OpenSlot {
                                 profile: profile.clone(),
@@ -175,7 +180,7 @@ impl OpenSavePage {
                                             div()
                                                 .text_sm()
                                                 .font_medium()
-                                                .child(slot.display_name()),
+                                                .child(labels::slot_name(cx, slot)),
                                         )
                                         .child(
                                             div()
@@ -197,10 +202,10 @@ impl OpenSavePage {
         v_flex()
             .gap_6()
             .when(!own.is_empty(), |this| {
-                this.child(group("Your saves", own, cx))
+                this.child(group(t!(cx, "start-your-saves"), own, cx))
             })
             .when(!game_made.is_empty(), |this| {
-                this.child(group("Saved by the game", game_made, cx))
+                this.child(group(t!(cx, "start-game-saves"), game_made, cx))
             })
     }
 }
@@ -228,7 +233,7 @@ impl Render for OpenSavePage {
                         div()
                             .text_sm()
                             .text_color(cx.theme().muted_foreground)
-                            .child("Choose a save to edit"),
+                            .child(t!(cx, "start-choose")),
                     ),
             );
 
@@ -238,25 +243,22 @@ impl Render for OpenSavePage {
                 .text_sm()
                 .text_color(cx.theme().muted_foreground)
                 .child(Spinner::new().small())
-                .child("Looking for your saves…")
+                .child(t!(cx, "start-looking"))
                 .into_any_element(),
             Some(profiles) if profiles.is_empty() => v_flex()
                 .gap_3()
                 .items_start()
-                .child(div().font_medium().child("No saves found"))
+                .child(div().font_medium().child(t!(cx, "start-none-title")))
                 .child(
                     div()
                         .text_sm()
                         .text_color(cx.theme().muted_foreground)
-                        .child(
-                            "Saves are looked for in Steam Cloud and in Documents\\Euro Truck \
-                             Simulator 2\\profiles. Save once in the game, then look again.",
-                        ),
+                        .child(t!(cx, "start-none-body")),
                 )
                 .child(
                     Button::new("search-again")
                         .outline()
-                        .label("Look again")
+                        .label(t!(cx, "start-look-again"))
                         .on_click(cx.listener(|this, _, _, cx| this.search(cx))),
                 )
                 .into_any_element(),

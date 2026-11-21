@@ -4,6 +4,8 @@
 
 use std::rc::Rc;
 
+use crate::i18n::t;
+
 use gpui_kit::component::{
     Sizable as _,
     button::{Button, ButtonGroup, ButtonVariants as _},
@@ -51,7 +53,7 @@ impl LevelPicker {
 }
 
 impl RenderOnce for LevelPicker {
-    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
+    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
         let value = self.value;
         let max = self.max;
         let segments = (1..=max).map(|level| {
@@ -59,7 +61,13 @@ impl RenderOnce for LevelPicker {
                 .label(level.to_string())
                 // Every segment the same width, so meters line up from row to row.
                 .w(rems(1.75))
-                .accessibility_label(format!("{}: level {level} of {max}", self.label));
+                .accessibility_label(t!(
+                    cx,
+                    "skill-level-of",
+                    skill = &self.label,
+                    level = level,
+                    max = max
+                ));
             if level <= value {
                 button.primary()
             } else {

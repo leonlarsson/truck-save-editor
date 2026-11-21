@@ -72,3 +72,15 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 ## 2026-11-21: GPUI passes its test
 
 **Decided:** GPUI (through GPUI Kit) stays. The test app (sidebar shell, Overview with amount fields and level meters, Fleet with a 2,000-row sortable table, light and dark themes) builds and runs on Windows through `scripts/windows.sh`, and under WSLg. Tauri is no longer the fallback.
+
+## 2026-11-21: Text through Fluent, English first
+
+**Decided:** every word the app shows lives in `crates/app/locales/en.ftl` (Mozilla's Fluent format), looked up with `t!`. English is the only language for now; adding one is adding a file. The game's own names (cities, cargo, DLC) will come from the game's language files.
+
+**Why:** localizing later means hunting down hundreds of strings and sentences glued from pieces. Fluent handles plural forms and word order per language (Polish and Czech have several plural forms), which simpler key-value systems (like `rust-i18n`, which GPUI Kit uses) get wrong.
+
+## 2026-11-21: Never rebuild units, stop on the unknown
+
+**Decided:** recorded in `docs/compatibility.md`: saves are edited in place (unknown units, fields and values pass through untouched); unknown binary types stop reading instead of being guessed at; a fixture corpus per game version and a weekly game-update check keep it honest.
+
+**Why:** research into why other editors broke: rebuilding units from fixed field lists silently dropped data the game had added, and crashes mid-write emptied saves.

@@ -16,7 +16,7 @@ fn main() {
                 println!(
                     "    {:<20} {:<28} saved {}",
                     slot.folder,
-                    slot.display_name(),
+                    slot.info.name.as_deref().unwrap_or("(no name)"),
                     slot.info
                         .saved_at
                         .map(|t| {

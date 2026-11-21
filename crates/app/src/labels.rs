@@ -1,40 +1,105 @@
-//! What the game calls things, for showing them. One place, so every screen uses the same words.
+//! What the game calls things, in the current language. One place, so every screen uses the same
+//! words. (Each key is written out literally, so the i18n test can check it has text.)
 
-/// The leveled skills in the order the game lists them (matching `save::Skills::levels`).
-pub const SKILLS: [SkillLabel; 5] = [
-    SkillLabel {
-        name: "Long distance",
-        description: "Unlocks jobs over longer routes",
-    },
-    SkillLabel {
-        name: "High value cargo",
-        description: "Valuable loads that pay more",
-    },
-    SkillLabel {
-        name: "Fragile cargo",
-        description: "Loads that break easily",
-    },
-    SkillLabel {
-        name: "Just-in-time delivery",
-        description: "Urgent jobs with tight deadlines",
-    },
-    SkillLabel {
-        name: "Ecodriving",
-        description: "Uses less fuel",
-    },
-];
+use std::time::SystemTime;
 
-/// The ADR classes, in bit order (bit 0 first). Check the order against the game before shipping.
-pub const ADR_CLASSES: [&str; 6] = [
-    "Explosives",
-    "Gases",
-    "Flammable liquids",
-    "Flammable solids",
-    "Toxic",
-    "Corrosive",
-];
+use gpui_kit::{App, SharedString};
+use save::{Location, Slot, SlotKind};
 
-pub struct SkillLabel {
-    pub name: &'static str,
-    pub description: &'static str,
+use crate::i18n::t;
+
+/// How many ADR classes there are (one bit each).
+pub const ADR_CLASS_COUNT: usize = 6;
+
+/// A leveled skill's name, in the order the game lists them (matching `save::Skills::levels`).
+pub fn skill_name(cx: &App, index: usize) -> SharedString {
+    match index {
+        0 => t!(cx, "skill-long-distance"),
+        1 => t!(cx, "skill-high-value-cargo"),
+        2 => t!(cx, "skill-fragile-cargo"),
+        3 => t!(cx, "skill-just-in-time"),
+        _ => t!(cx, "skill-ecodriving"),
+    }
+}
+
+pub fn skill_description(cx: &App, index: usize) -> SharedString {
+    match index {
+        0 => t!(cx, "skill-long-distance-description"),
+        1 => t!(cx, "skill-high-value-cargo-description"),
+        2 => t!(cx, "skill-fragile-cargo-description"),
+        3 => t!(cx, "skill-just-in-time-description"),
+        _ => t!(cx, "skill-ecodriving-description"),
+    }
+}
+
+/// An ADR class, by bit (bit 0 first). Check the order against the game before shipping.
+pub fn adr_class(cx: &App, bit: usize) -> SharedString {
+    match bit {
+        0 => t!(cx, "adr-explosives"),
+        1 => t!(cx, "adr-gases"),
+        2 => t!(cx, "adr-flammable-liquids"),
+        3 => t!(cx, "adr-flammable-solids"),
+        4 => t!(cx, "adr-toxic"),
+        _ => t!(cx, "adr-corrosive"),
+    }
+}
+
+/// `3 of 6 classes`, `All classes`, `None`.
+pub fn adr_summary(cx: &App, bits: u8) -> SharedString {
+    let count = (0..ADR_CLASS_COUNT)
+        .filter(|bit| bits & (1 << bit) != 0)
+        .count();
+    match count {
+        0 => t!(cx, "adr-none"),
+        n if n == ADR_CLASS_COUNT => t!(cx, "adr-all"),
+        n => t!(cx, "adr-some", count = n, total = ADR_CLASS_COUNT),
+    }
+}
+
+/// The name to show for a slot: the player's own, or what kind of save it is.
+pub fn slot_name(cx: &App, slot: &Slot) -> SharedString {
+    if let Some(name) = &slot.info.name {
+        return name.clone().into();
+    }
+    match slot.kind {
+        SlotKind::Manual(_) => t!(cx, "slot-unnamed"),
+        SlotKind::Autosave => t!(cx, "slot-autosave"),
+        SlotKind::AutosaveDrive => t!(cx, "slot-autosave-drive"),
+        SlotKind::AutosaveJob => t!(cx, "slot-autosave-job"),
+        SlotKind::Quicksave => t!(cx, "slot-quicksave"),
+        SlotKind::MultiplayerBackup => t!(cx, "slot-multiplayer-backup"),
+        SlotKind::Other => slot.folder.clone().into(),
+    }
+}
+
+pub fn location(cx: &App, location: Location) -> SharedString {
+    match location {
+        Location::SteamCloud => t!(cx, "location-steam-cloud"),
+        Location::Local => t!(cx, "location-this-pc"),
+    }
+}
+
+/// How long ago something happened, roughly: `just now`, `5 minutes ago`, `3 years ago`.
+/// (Relative times need no time zone, and read better than dates in lists.)
+pub fn ago(cx: &App, when: SystemTime) -> SharedString {
+    let seconds = SystemTime::now()
+        .duration_since(when)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let count = |size: u64| (seconds / size) as i64;
+    if seconds >= 365 * 86_400 {
+        t!(cx, "time-years-ago", count = count(365 * 86_400))
+    } else if seconds >= 30 * 86_400 {
+        t!(cx, "time-months-ago", count = count(30 * 86_400))
+    } else if seconds >= 7 * 86_400 {
+        t!(cx, "time-weeks-ago", count = count(7 * 86_400))
+    } else if seconds >= 86_400 {
+        t!(cx, "time-days-ago", count = count(86_400))
+    } else if seconds >= 3_600 {
+        t!(cx, "time-hours-ago", count = count(3_600))
+    } else if seconds >= 60 {
+        t!(cx, "time-minutes-ago", count = count(60))
+    } else {
+        t!(cx, "time-just-now")
+    }
 }

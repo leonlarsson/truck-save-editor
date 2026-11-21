@@ -11,12 +11,10 @@ use gpui_kit::{
 use save::{ADR_ALL, MAX_SKILL_LEVEL, Skills};
 
 use crate::format::{compact, thousands};
-use crate::labels::{ADR_CLASSES, SKILLS};
+use crate::i18n::t;
+use crate::labels::{ADR_CLASS_COUNT, adr_class, skill_description, skill_name};
 use crate::session::Session;
 use crate::ui::{AmountChanged, AmountField, LevelPicker, Section, StepButtons, page_body};
-
-/// What typing in an amount field can do, said once under each field.
-const AMOUNT_HINT: &str = "Try 2.5m, 10k, +1m or -500k.";
 
 pub struct OverviewPage {
     session: Entity<Session>,
@@ -32,15 +30,15 @@ impl OverviewPage {
             (session.career().clone(), session.game().currency_symbol())
         };
         let money = cx.new(|cx| {
-            AmountField::new(career.money, "Bank balance", window, cx)
+            AmountField::new(career.money, t!(cx, "money-label"), window, cx)
                 .prefix(currency)
-                .hint(AMOUNT_HINT)
+                .hint(t!(cx, "amount-hint"))
         });
         let experience = cx.new(|cx| {
-            AmountField::new(career.experience, "Experience points", window, cx)
+            AmountField::new(career.experience, t!(cx, "experience-label"), window, cx)
                 .min(0)
-                .suffix("XP")
-                .hint(AMOUNT_HINT)
+                .suffix(t!(cx, "experience-unit"))
+                .hint(t!(cx, "amount-hint"))
         });
 
         let _subscriptions = vec![
@@ -86,8 +84,8 @@ impl OverviewPage {
 
     fn render_money(&self, cx: &mut Context<Self>) -> Section {
         let steps: [i64; 3] = [100_000, 1_000_000, 10_000_000];
-        Section::new("Money")
-            .description("Your company's bank balance.")
+        Section::new(t!(cx, "money"))
+            .description(t!(cx, "money-description"))
             .child(self.money.clone())
             .child(h_flex().gap_2().flex_wrap().children(steps.map(|step| {
                 StepButtons::new(("money-step", step as usize), compact(step)).on_step(cx.listener(
@@ -104,8 +102,8 @@ impl OverviewPage {
     fn render_experience(&self, cx: &mut Context<Self>) -> Section {
         let steps: [i64; 3] = [10_000, 100_000, 1_000_000];
         let bus = self.session.read(cx).career().bus_experience;
-        let mut section = Section::new("Experience")
-            .description("Experience points decide your level.")
+        let mut section = Section::new(t!(cx, "experience"))
+            .description(t!(cx, "experience-description"))
             .child(self.experience.clone())
             .child(h_flex().gap_2().flex_wrap().children(steps.map(|step| {
                 StepButtons::new(("xp-step", step as usize), compact(step)).on_step(cx.listener(
@@ -122,7 +120,7 @@ impl OverviewPage {
                 div()
                     .text_xs()
                     .text_color(cx.theme().muted_foreground)
-                    .child(format!("Bus driving: {} XP", thousands(bus))),
+                    .child(t!(cx, "bus-experience", amount = thousands(bus))),
             );
         }
         section
@@ -130,7 +128,8 @@ impl OverviewPage {
 
     fn render_skills(&self, cx: &mut Context<Self>) -> Section {
         let skills = self.session.read(cx).career().skills;
-        let rows = SKILLS.iter().enumerate().map(|(index, skill)| {
+        let rows = (0..skills.levels().len()).map(|index| {
+            let name = skill_name(cx, index);
             h_flex()
                 .justify_between()
                 .gap_4()
@@ -138,16 +137,16 @@ impl OverviewPage {
                 .child(
                     v_flex()
                         .min_w_0()
-                        .child(div().text_sm().font_medium().child(skill.name))
+                        .child(div().text_sm().font_medium().child(name.clone()))
                         .child(
                             div()
                                 .text_xs()
                                 .text_color(cx.theme().muted_foreground)
-                                .child(skill.description),
+                                .child(skill_description(cx, index)),
                         ),
                 )
                 .child(
-                    LevelPicker::new(("skill", index), skill.name)
+                    LevelPicker::new(("skill", index), name)
                         .max(MAX_SKILL_LEVEL)
                         .value(skills.levels()[index].1)
                         .on_change(cx.listener(move |this, level: &u8, _, cx| {
@@ -157,15 +156,13 @@ impl OverviewPage {
                 )
         });
 
-        Section::new("Skills")
-            .description(
-                "Click a level to set it. Click the highest filled level again to lower it.",
-            )
+        Section::new(t!(cx, "skills"))
+            .description(t!(cx, "skills-description"))
             .action(
                 Button::new("max-skills")
                     .small()
                     .outline()
-                    .label("Max all skills")
+                    .label(t!(cx, "skills-max"))
                     .on_click(cx.listener(|this, _, _, cx| {
                         this.edit(cx, |career| {
                             career.skills = Skills {
@@ -180,11 +177,11 @@ impl OverviewPage {
 
     fn render_adr(&self, cx: &mut Context<Self>) -> Section {
         let adr = self.session.read(cx).career().skills.adr;
-        let classes = ADR_CLASSES.iter().enumerate().map(|(bit, name)| {
+        let classes = (0..ADR_CLASS_COUNT).map(|bit| {
             let mask = 1u8 << bit;
             div().w(rems(13.)).child(
                 Checkbox::new(("adr", bit))
-                    .label(*name)
+                    .label(adr_class(cx, bit))
                     .checked(adr & mask != 0)
                     .on_change(cx.listener(move |this, checked: &bool, _, cx| {
                         let checked = *checked;
@@ -199,13 +196,13 @@ impl OverviewPage {
             )
         });
 
-        Section::new("ADR")
-            .description("Dangerous goods your driver may haul.")
+        Section::new(t!(cx, "adr"))
+            .description(t!(cx, "adr-description"))
             .action(
                 Button::new("all-adr")
                     .small()
                     .outline()
-                    .label("All classes")
+                    .label(t!(cx, "adr-all"))
                     .on_click(cx.listener(|this, _, _, cx| {
                         this.edit(cx, |career| career.skills.adr = ADR_ALL);
                     })),

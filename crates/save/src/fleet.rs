@@ -23,12 +23,9 @@ pub struct Truck {
 }
 
 impl Truck {
-    /// `Volvo FH16 2012`, from the model id; `Unknown truck` without one.
-    pub fn display_name(&self) -> String {
-        self.model_id
-            .as_deref()
-            .map(model_display_name)
-            .unwrap_or_else(|| "Unknown truck".to_string())
+    /// `Volvo FH16 2012`, from the model id (`None` when the model isn't known).
+    pub fn display_name(&self) -> Option<String> {
+        self.model_id.as_deref().map(model_display_name)
     }
 }
 
@@ -244,7 +241,7 @@ mod tests {
         let trucks = trucks(&document);
         assert_eq!(trucks.len(), 1);
         let truck = &trucks[0];
-        assert_eq!(truck.display_name(), "Volvo FH16 2012");
+        assert_eq!(truck.display_name().as_deref(), Some("Volvo FH16 2012"));
         assert_eq!(truck.plate, "XY 123");
         assert_eq!(truck.plate_country.as_deref(), Some("germany"));
         assert_eq!(truck.odometer_km, 12345);

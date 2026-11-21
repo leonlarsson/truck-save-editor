@@ -37,6 +37,18 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [ ] All data: every unit and field, searchable and editable.
 - [ ] The game's own icons (skills, ADR classes, brands, cities), read at runtime from the player's installed game: an SCS archive (HashFS) reader and a texture (.tobj/.dds) decoder. Never commit or bundle SCS artwork; fall back to Lucide icons when the game isn't found.
 
+## Keeping up with the game
+
+- [ ] Inventory diff: list every unit kind, field and value type in a save, and compare two saves' lists (`docs/compatibility.md`).
+- [ ] Weekly GitHub Actions check for new game versions (steamcmd.net build id + Steam News); opens an issue with the checklist.
+- [ ] Fixtures from more game versions and forms: text saves, Coaches, ATS.
+- [ ] Read the save `version` and warn when it's newer than any version the editor was tested with.
+
+## Starting fresh
+
+- [ ] Save as a new slot: write the edited save into an empty slot instead of over the original.
+- [ ] Presets for a fresh start ("Rich start": money, all skills and ADR, a garage), applied to a new profile made in the game.
+
 ## Later
 
 - [ ] Web version (GPUI's web target, or a page around the core compiled to wasm).

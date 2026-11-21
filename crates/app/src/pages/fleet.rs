@@ -14,6 +14,7 @@ use gpui_kit::{
 use save::Truck;
 
 use crate::format::thousands;
+use crate::i18n::t;
 use crate::session::Session;
 
 pub struct FleetPage {
@@ -54,18 +55,22 @@ impl Render for FleetPage {
             .iter()
             .filter(|truck| truck.wear.worst() > 0.0)
             .count();
-        let summary = match worn_count {
-            0 => format!(
-                "{} trucks · all in good shape",
-                thousands(truck_count as i64)
+        let summary = t!(
+            cx,
+            "fleet-summary",
+            trucks = t!(
+                cx,
+                "fleet-trucks",
+                count = truck_count,
+                amount = thousands(truck_count as i64)
             ),
-            1 => format!("{} trucks · 1 needs repairs", thousands(truck_count as i64)),
-            n => format!(
-                "{} trucks · {} need repairs",
-                thousands(truck_count as i64),
-                thousands(n as i64)
+            worn = t!(
+                cx,
+                "fleet-worn",
+                count = worn_count,
+                amount = thousands(worn_count as i64)
             ),
-        };
+        );
 
         v_flex()
             .size_full()
@@ -87,7 +92,7 @@ impl Render for FleetPage {
                         Button::new("repair-all")
                             .small()
                             .outline()
-                            .label("Repair all")
+                            .label(t!(cx, "repair-all"))
                             .disabled(worn_count == 0)
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.session
@@ -100,7 +105,7 @@ impl Render for FleetPage {
                     DataTable::new(&self.table)
                         .stripe(true)
                         .bordered(true)
-                        .accessibility_label("Trucks"),
+                        .accessibility_label(t!(cx, "trucks-table")),
                 ),
             )
     }
@@ -161,22 +166,28 @@ impl TruckTable {
         });
     }
 
-    fn text(&self, row: usize, column: TruckColumn) -> SharedString {
+    fn text(&self, row: usize, column: TruckColumn, cx: &App) -> SharedString {
         let Some(truck) = self.trucks.get(row) else {
             return SharedString::default();
         };
         match column {
-            TruckColumn::Truck => truck.display_name().into(),
+            TruckColumn::Truck => truck
+                .display_name()
+                .map(SharedString::from)
+                .unwrap_or_else(|| t!(cx, "unknown-truck")),
             TruckColumn::Plate => truck.plate.clone().into(),
             TruckColumn::Garage => truck
                 .garage_city
                 .as_deref()
-                .map(save::city_display_name)
-                .unwrap_or_else(|| "No garage".to_string())
-                .into(),
-            TruckColumn::Odometer => format!("{} km", thousands(truck.odometer_km)).into(),
+                .map(|city| SharedString::from(save::city_display_name(city)))
+                .unwrap_or_else(|| t!(cx, "no-garage")),
+            TruckColumn::Odometer => t!(cx, "distance-km", amount = thousands(truck.odometer_km)),
             // Rounded up, so any wear at all shows (and matches the "need repairs" count).
-            TruckColumn::Wear => format!("{}%", (truck.wear.worst() * 100.0).ceil()).into(),
+            TruckColumn::Wear => t!(
+                cx,
+                "percent",
+                amount = (truck.wear.worst() * 100.0).ceil() as i64
+            ),
         }
     }
 }
@@ -190,16 +201,22 @@ impl TableDelegate for TruckTable {
         self.trucks.len()
     }
 
-    fn column(&self, col_ix: usize, _: &App) -> Column {
+    fn column(&self, col_ix: usize, cx: &App) -> Column {
         match TruckColumn::ALL.get(col_ix) {
-            Some(TruckColumn::Truck) => Column::new("truck", "Truck").width(220.).sortable(),
-            Some(TruckColumn::Plate) => Column::new("plate", "Plate").width(110.).sortable(),
-            Some(TruckColumn::Garage) => Column::new("garage", "Garage").width(150.).sortable(),
-            Some(TruckColumn::Odometer) => Column::new("odometer", "Odometer")
+            Some(TruckColumn::Truck) => Column::new("truck", t!(cx, "column-truck"))
+                .width(220.)
+                .sortable(),
+            Some(TruckColumn::Plate) => Column::new("plate", t!(cx, "column-plate"))
+                .width(110.)
+                .sortable(),
+            Some(TruckColumn::Garage) => Column::new("garage", t!(cx, "column-garage"))
+                .width(150.)
+                .sortable(),
+            Some(TruckColumn::Odometer) => Column::new("odometer", t!(cx, "column-odometer"))
                 .width(130.)
                 .text_right()
                 .sortable(),
-            Some(TruckColumn::Wear) | None => Column::new("wear", "Wear")
+            Some(TruckColumn::Wear) | None => Column::new("wear", t!(cx, "column-wear"))
                 .width(80.)
                 .text_right()
                 .sortable(),
@@ -237,7 +254,7 @@ impl TableDelegate for TruckTable {
             TruckColumn::Wear => truck.is_some_and(|truck| truck.wear.worst() == 0.0),
             _ => false,
         };
-        let text = self.text(row_ix, column);
+        let text = self.text(row_ix, column, cx);
         if is_muted {
             div().text_color(cx.theme().muted_foreground).child(text)
         } else {
@@ -245,15 +262,15 @@ impl TableDelegate for TruckTable {
         }
     }
 
-    fn cell_label(&self, row_ix: usize, col_ix: usize, _: &App) -> Option<SharedString> {
+    fn cell_label(&self, row_ix: usize, col_ix: usize, cx: &App) -> Option<SharedString> {
         let column = TruckColumn::ALL.get(col_ix).copied()?;
-        Some(self.text(row_ix, column))
+        Some(self.text(row_ix, column, cx))
     }
 
-    fn cell_text(&self, row_ix: usize, col_ix: usize, _: &App) -> String {
+    fn cell_text(&self, row_ix: usize, col_ix: usize, cx: &App) -> String {
         TruckColumn::ALL
             .get(col_ix)
-            .map(|column| self.text(row_ix, *column).to_string())
+            .map(|column| self.text(row_ix, *column, cx).to_string())
             .unwrap_or_default()
     }
 }

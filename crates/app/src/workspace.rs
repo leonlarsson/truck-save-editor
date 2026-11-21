@@ -22,6 +22,8 @@ use gpui_kit::{
 use save::{Profile, Slot};
 
 use crate::APP_NAME;
+use crate::i18n::t;
+use crate::labels;
 use crate::pages::{
     Page,
     fleet::FleetPage,
@@ -77,7 +79,7 @@ impl Workspace {
         if self.opening.is_some() {
             return;
         }
-        let name: SharedString = slot.display_name().into();
+        let name = labels::slot_name(cx, &slot);
         self.opening = Some(name.clone());
         cx.notify();
 
@@ -92,7 +94,7 @@ impl Workspace {
                     Err(error) => window.push_notification(
                         Notification::new()
                             .with_type(NotificationType::Error)
-                            .title(format!("Couldn't open “{name}”"))
+                            .title(t!(cx, "open-failed", name = &name))
                             .message(error.to_string()),
                         cx,
                     ),
@@ -129,17 +131,14 @@ impl Workspace {
             return;
         }
         let this = cx.entity().downgrade();
-        let name = opened.session.read(cx).slot().display_name();
-        window.open_alert_dialog(cx, move |alert, _, _| {
+        let name = labels::slot_name(cx, opened.session.read(cx).slot());
+        window.open_alert_dialog(cx, move |alert, _, cx| {
             let this = this.clone();
             alert
-                .title(format!("Close “{name}” without saving?"))
-                .description(match changes {
-                    1 => "Your change will be lost.".to_string(),
-                    n => format!("Your {n} changes will be lost."),
-                })
+                .title(t!(cx, "close-unsaved-title", name = &name))
+                .description(t!(cx, "close-unsaved-body", count = changes))
                 .confirm()
-                .ok_text("Close without saving")
+                .ok_text(t!(cx, "close-unsaved-confirm"))
                 .ok_variant(gpui_kit::component::button::ButtonVariant::Danger)
                 .on_ok(move |_, _, cx| {
                     let _ = this.update(cx, |this, cx| {
@@ -159,7 +158,7 @@ impl Workspace {
         let session = opened.session.clone();
         let (name, changes) = {
             let session = session.read(cx);
-            (session.slot().display_name(), session.changes())
+            (labels::slot_name(cx, session.slot()), session.changes(cx))
         };
 
         window.open_alert_dialog(cx, move |alert, _, cx| {
@@ -184,21 +183,18 @@ impl Workspace {
                     .child(div().child(change.after.clone()))
             }));
             alert
-                .title(format!("Save changes to “{name}”?"))
+                .title(t!(cx, "save-confirm-title", name = &name))
                 .description(
                     v_flex().gap_3().child(list).child(
                         div()
                             .text_sm()
                             .text_color(cx.theme().muted_foreground)
-                            .child(
-                                "A backup of the slot is made first. Close the game before \
-                                     saving: it overwrites saves when it exits.",
-                            ),
+                            .child(t!(cx, "save-confirm-note")),
                     ),
                 )
                 .width(px(520.))
                 .confirm()
-                .ok_text("Save")
+                .ok_text(t!(cx, "save"))
                 .on_ok(move |_, window, cx| {
                     start_save(session.clone(), window, cx);
                     true
@@ -225,7 +221,7 @@ impl Workspace {
                                 .gap_2()
                                 .text_sm()
                                 .child(Spinner::new().small())
-                                .child(format!("Opening “{name}”…")),
+                                .child(t!(cx, "opening", name = &name)),
                         ),
                 )
             })
@@ -240,7 +236,7 @@ impl Workspace {
         let (slot_name, profile_name) = {
             let session = session.read(cx);
             (
-                session.slot().display_name(),
+                labels::slot_name(cx, session.slot()),
                 session.profile().name.clone(),
             )
         };
@@ -276,9 +272,13 @@ impl Workspace {
                             ),
                     ),
             )
-            .child(SidebarGroup::new("Career").child(self.menu(&Page::CAREER, cx)))
-            .child(SidebarGroup::new("Company").child(self.menu(&Page::COMPANY, cx)))
-            .child(SidebarGroup::new("Advanced").child(self.menu(&Page::ADVANCED, cx)))
+            .child(SidebarGroup::new(t!(cx, "sidebar-career")).child(self.menu(&Page::CAREER, cx)))
+            .child(
+                SidebarGroup::new(t!(cx, "sidebar-company")).child(self.menu(&Page::COMPANY, cx)),
+            )
+            .child(
+                SidebarGroup::new(t!(cx, "sidebar-advanced")).child(self.menu(&Page::ADVANCED, cx)),
+            )
             .footer(
                 // Plain content, not `SidebarFooter` (a menu trigger that lights up on hover).
                 h_flex()
@@ -290,7 +290,7 @@ impl Workspace {
                             .ghost()
                             .small()
                             .icon(Icon::new(IconName::FolderOpen))
-                            .label("Switch save")
+                            .label(t!(cx, "switch-save"))
                             .on_click(cx.listener(|this, _, window, cx| this.close(window, cx))),
                     )
                     .child(
@@ -302,7 +302,11 @@ impl Workspace {
                             } else {
                                 IconName::Moon
                             }))
-                            .tooltip(if is_dark { "Light mode" } else { "Dark mode" })
+                            .tooltip(if is_dark {
+                                t!(cx, "theme-light")
+                            } else {
+                                t!(cx, "theme-dark")
+                            })
                             .on_click(|_, window, cx| theme::toggle_mode(window, cx)),
                     ),
             )
@@ -310,7 +314,7 @@ impl Workspace {
 
     fn menu(&self, pages: &[Page], cx: &mut Context<Self>) -> SidebarMenu {
         SidebarMenu::new().children(pages.iter().map(|&page| {
-            SidebarMenuItem::new(page.title())
+            SidebarMenuItem::new(page.title(cx))
                 .icon(Icon::new(page.icon()))
                 .active(page == self.page)
                 .disable(!page.is_built())
@@ -324,23 +328,21 @@ impl Workspace {
     fn render_header(&self, session: &Entity<Session>, cx: &mut Context<Self>) -> PageHeader {
         let (changes, is_saving, subtitle) = {
             let session = session.read(cx);
-            let place = match session.profile().location {
-                save::Location::SteamCloud => "Steam Cloud",
-                save::Location::Local => "This PC",
-            };
+            let place = labels::location(cx, session.profile().location);
             (
                 session.change_count(),
                 session.is_saving(),
-                format!("{} · {place}", session.game().name()),
+                t!(
+                    cx,
+                    "header-subtitle",
+                    game = session.game().name(),
+                    place = place
+                ),
             )
         };
-        let summary = match changes {
-            0 => "No changes".to_string(),
-            1 => "1 change".to_string(),
-            n => format!("{n} changes"),
-        };
+        let summary = t!(cx, "changes-count", count = changes);
 
-        PageHeader::new(self.page.title())
+        PageHeader::new(self.page.title(cx))
             .subtitle(subtitle)
             .action(
                 div()
@@ -352,7 +354,7 @@ impl Workspace {
                 Button::new("discard")
                     .ghost()
                     .icon(Icon::new(IconName::Undo2))
-                    .label("Discard")
+                    .label(t!(cx, "discard"))
                     .disabled(changes == 0 || is_saving)
                     .on_click(cx.listener(|this, _, _, cx| {
                         if let Some(opened) = &this.opened {
@@ -364,14 +366,18 @@ impl Workspace {
                 Button::new("save")
                     .primary()
                     .icon(Icon::new(IconName::Save))
-                    .label(if is_saving { "Saving…" } else { "Save" })
+                    .label(if is_saving {
+                        t!(cx, "saving")
+                    } else {
+                        t!(cx, "save")
+                    })
                     .loading(is_saving)
                     .disabled(changes == 0 || is_saving)
                     .on_click(cx.listener(|this, _, window, cx| this.confirm_save(window, cx))),
             )
     }
 
-    fn render_page(&self, opened: &Opened) -> impl IntoElement {
+    fn render_page(&self, opened: &Opened, cx: &App) -> impl IntoElement {
         match self.page {
             Page::Overview => div()
                 .id("overview-scroll")
@@ -392,11 +398,14 @@ impl Workspace {
                     Empty::new().header(
                         EmptyHeader::new()
                             .media(EmptyMedia::new().child(Icon::new(other.icon())))
-                            .title(
-                                EmptyTitle::new()
-                                    .child(format!("{} isn't built yet", other.title())),
-                            )
-                            .description(EmptyDescription::new().child("It's on the way.")),
+                            .title(EmptyTitle::new().child(t!(
+                                cx,
+                                "page-not-built",
+                                page = other.title(cx)
+                            )))
+                            .description(
+                                EmptyDescription::new().child(t!(cx, "page-not-built-body")),
+                            ),
                     ),
                 )
                 .into_any_element(),
@@ -421,7 +430,7 @@ impl Render for Workspace {
                     .min_w_0()
                     .h_full()
                     .child(self.render_header(&session, cx))
-                    .child(div().flex_1().min_h_0().child(self.render_page(opened))),
+                    .child(div().flex_1().min_h_0().child(self.render_page(opened, cx))),
             )
             .into_any_element()
     }
@@ -436,7 +445,7 @@ fn start_save(session: Entity<Session>, window: &mut Window, cx: &mut App) {
             window.push_notification(
                 Notification::new()
                     .with_type(NotificationType::Error)
-                    .title("Couldn't prepare the save")
+                    .title(t!(cx, "save-prepare-failed"))
                     .message(error.to_string()),
                 cx,
             );
@@ -447,8 +456,8 @@ fn start_save(session: Entity<Session>, window: &mut Window, cx: &mut App) {
         window.push_notification(
             Notification::new()
                 .with_type(NotificationType::Error)
-                .title("Couldn't save")
-                .message("There's no folder to keep backups in, so nothing was written."),
+                .title(t!(cx, "save-no-backup-folder-title"))
+                .message(t!(cx, "save-no-backup-folder")),
             cx,
         );
         return;
@@ -458,7 +467,7 @@ fn start_save(session: Entity<Session>, window: &mut Window, cx: &mut App) {
         (
             session.game(),
             session.profile_folder(),
-            session.slot().display_name(),
+            labels::slot_name(cx, session.slot()),
         )
     };
     session.update(cx, |session, cx| session.set_saving(true, cx));
@@ -477,10 +486,11 @@ fn start_save(session: Entity<Session>, window: &mut Window, cx: &mut App) {
                     window.push_notification(
                         Notification::new()
                             .with_type(NotificationType::Success)
-                            .title(format!("Saved “{name}”"))
-                            .message(format!(
-                                "The old version is backed up in {}",
-                                backup.dir.display()
+                            .title(t!(cx, "saved-title", name = &name))
+                            .message(t!(
+                                cx,
+                                "saved-backup",
+                                path = backup.dir.display().to_string()
                             )),
                         cx,
                     );
@@ -490,7 +500,7 @@ fn start_save(session: Entity<Session>, window: &mut Window, cx: &mut App) {
                     window.push_notification(
                         Notification::new()
                             .with_type(NotificationType::Error)
-                            .title(format!("Couldn't save “{name}”"))
+                            .title(t!(cx, "save-failed", name = &name))
                             .message(error.to_string()),
                         cx,
                     );
@@ -513,9 +523,7 @@ fn dev_start_page() -> Option<Page> {
         return None;
     }
     let wanted = std::env::var("TSE_PAGE").ok()?.to_lowercase();
-    Page::ALL
-        .into_iter()
-        .find(|page| page.title().to_lowercase().replace(' ', "-") == wanted)
+    Page::ALL.into_iter().find(|page| page.slug() == wanted)
 }
 
 /// Development builds only: `TSE_SLOT=<slot folder>` opens that slot on launch. Point it at a copy

@@ -4,7 +4,9 @@ pub mod fleet;
 pub mod open_save;
 pub mod overview;
 
-use gpui_kit::SharedString;
+use gpui_kit::{App, SharedString};
+
+use crate::i18n::t;
 
 use gpui_kit::assets::IconName;
 
@@ -32,16 +34,27 @@ impl Page {
     pub const COMPANY: [Page; 4] = [Page::Fleet, Page::Garages, Page::Drivers, Page::Map];
     pub const ADVANCED: [Page; 1] = [Page::AllData];
 
-    pub fn title(self) -> SharedString {
+    pub fn title(self, cx: &App) -> SharedString {
         match self {
-            Page::Overview => "Overview",
-            Page::Fleet => "Fleet",
-            Page::Garages => "Garages",
-            Page::Drivers => "Drivers",
-            Page::Map => "Map",
-            Page::AllData => "All data",
+            Page::Overview => t!(cx, "page-overview"),
+            Page::Fleet => t!(cx, "page-fleet"),
+            Page::Garages => t!(cx, "page-garages"),
+            Page::Drivers => t!(cx, "page-drivers"),
+            Page::Map => t!(cx, "page-map"),
+            Page::AllData => t!(cx, "page-all-data"),
         }
-        .into()
+    }
+
+    /// A stable name for the page, for `TSE_PAGE` (not shown, not translated).
+    pub fn slug(self) -> &'static str {
+        match self {
+            Page::Overview => "overview",
+            Page::Fleet => "fleet",
+            Page::Garages => "garages",
+            Page::Drivers => "drivers",
+            Page::Map => "map",
+            Page::AllData => "all-data",
+        }
     }
 
     pub fn icon(self) -> IconName {

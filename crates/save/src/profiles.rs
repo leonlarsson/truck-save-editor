@@ -81,24 +81,6 @@ impl SlotKind {
     }
 }
 
-impl Slot {
-    /// The name to show: the player's own, or what kind of save it is.
-    pub fn display_name(&self) -> String {
-        if let Some(name) = &self.info.name {
-            return name.clone();
-        }
-        match self.kind {
-            SlotKind::Manual(_) => "Unnamed save".to_string(),
-            SlotKind::Autosave => "Autosave".to_string(),
-            SlotKind::AutosaveDrive => "Autosave while driving".to_string(),
-            SlotKind::AutosaveJob => "Autosave at a job".to_string(),
-            SlotKind::Quicksave => "Quicksave".to_string(),
-            SlotKind::MultiplayerBackup => "Before convoy".to_string(),
-            SlotKind::Other => self.folder.clone(),
-        }
-    }
-}
-
 /// Every profile of the game on this computer, most recently played first.
 pub fn find_profiles(game: Game) -> Vec<Profile> {
     let mut profiles = Vec::new();

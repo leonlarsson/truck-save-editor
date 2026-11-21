@@ -5,6 +5,7 @@
 
 mod assets;
 mod format;
+mod i18n;
 mod labels;
 mod pages;
 mod session;
@@ -25,6 +26,7 @@ fn main() {
         .run(|cx| {
             // GPUI Kit first, then our theme on top of it.
             gpui_kit::init(cx);
+            i18n::init(cx);
             theme::init(cx);
 
             let options = WindowOptions {

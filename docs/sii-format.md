@@ -2,7 +2,7 @@
 
 **SII** is SCS Software's own definition format (used by both Euro Truck Simulator 2 and American Truck Simulator). A SII file is a list of **units**: typed records with an id and named fields. The game keeps its config, its data and your saves in it. Saves get extra layers on top (encryption, a binary form), described below.
 
-Confirmed on a real save from game version 1.62.x (save `version: 105`).
+Confirmed on real saves from game version 1.62.x (save `version: 105`, binary version 3) and from 2020 (binary version 2). What changes between game versions, and how this editor copes, is in `compatibility.md`.
 
 ## Where saves are
 
@@ -87,9 +87,10 @@ Arrays are `u32 count` followed by the items. An array's type is the single type
 | 0x19 / 0x1A | vec8 f32 (placement) | 0x35 / 0x36 | bool (u8) |
 | 0x37 | lookup value: u32 index into the field's table | 0x39–0x3E | id (odd = single, even = array) |
 
-**Placement (0x19) in BSII version 3:** read 8 × f32 `[x, y, z, bias, qw, qx, qy, qz]`, then
+**Placement (0x19):** in BSII version 1, 7 × f32 `[x, y, z, qw, qx, qy, qz]`. In version 2 and later, 8 × f32 `[x, y, z, bias, qw, qx, qy, qz]`, then
 `b = bias as i32; x += ((b & 0xFFF) - 2048) << 9; z += (((b >> 12) & 0xFFF) - 2048) << 9`.
-The text form is `(x, y, z) (qw, qx, qy, qz)`; the bias isn't written.
+The neutral bias is `8390656` (2048 in both parts). The text form is `(x, y, z) (qw, qx, qy, qz)`; the bias isn't written.
+(Confirmed on a real version 2 save, whose placements carry other biases.)
 
 ## Text SII
 
@@ -112,7 +113,7 @@ unit_type : unit_id {
 
 The plan is to write `game.sii` as **plain text SII**, with no re-encryption or binary encoding (see `decisions.md`).
 
-- **Not yet checked:** that game 1.62 loads a plain-text `game.sii` in place of the encrypted binary one, and accepts decimal floats. It's widely reported to work. Check by decoding a save, writing it back unchanged into a backed-up slot and loading it in game.
+- **Not yet checked:** that game 1.62 loads a plain-text `game.sii` in place of the encrypted binary one, and accepts decimal floats. It's widely reported to work (guides and tools from 2026), never officially confirmed. The game's own setting `g_save_format` (in `config.cfg`) chooses what it writes; sources disagree on the values (most say 2 = text). Check by decoding a save, writing it back unchanged into a backed-up slot and loading it in game.
 - **Not yet checked:** whether `info.sii` needs updating to match, or whether the game recomputes it. Until known, update the fields it mirrors.
 
 ## What's in a save

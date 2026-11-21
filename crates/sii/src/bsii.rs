@@ -225,27 +225,27 @@ fn write_floats(out: &mut String, reader: &mut Reader, count: usize) -> Result<(
     Ok(())
 }
 
-/// A position and rotation: `(x, y, z) (w, x, y, z)`. In version 3 the fourth float holds the
-/// position's coarse part (the "bias"), which is added to x and z.
+/// A position and rotation: `(x, y, z) (w, x, y, z)`.
+///
+/// Version 1 stores 7 floats. Version 2 and later store 8: the fourth holds the position's coarse
+/// part (the "bias"), which is added to x and z and isn't written in text.
 fn write_placement(out: &mut String, reader: &mut Reader, version: u32) -> Result<()> {
-    let mut values = [0f32; 8];
-    for value in &mut values {
-        *value = reader.f32()?;
+    let mut position = [reader.f32()?, reader.f32()?, reader.f32()?];
+    if version >= 2 {
+        let bias = reader.f32()? as i32;
+        position[0] += (((bias & 0xFFF) - 2048) << 9) as f32;
+        position[2] += ((((bias >> 12) & 0xFFF) - 2048) << 9) as f32;
     }
-    if version >= 3 {
-        let bias = values[3] as i32;
-        values[0] += (((bias & 0xFFF) - 2048) << 9) as f32;
-        values[2] += ((((bias >> 12) & 0xFFF) - 2048) << 9) as f32;
-    }
+    let rotation = [reader.f32()?, reader.f32()?, reader.f32()?, reader.f32()?];
     out.push('(');
-    for (index, value) in values[0..3].iter().enumerate() {
+    for (index, value) in position.iter().enumerate() {
         if index > 0 {
             out.push_str(", ");
         }
         write_f32(out, *value);
     }
     out.push_str(") (");
-    for (index, value) in values[4..8].iter().enumerate() {
+    for (index, value) in rotation.iter().enumerate() {
         if index > 0 {
             out.push_str(", ");
         }
@@ -443,9 +443,8 @@ pub(crate) mod tests {
         assert!(matches!(decode(&wrong), Err(Error::UnsupportedVersion(9))));
     }
 
-    #[test]
-    fn adds_the_placement_bias_in_version_3() {
-        let mut b = Builder::new(3);
+    fn placement(version: u32, values: &[f32]) -> String {
+        let mut b = Builder::new(version);
         b.u32(0)
             .u8(1)
             .u32(1)
@@ -454,16 +453,31 @@ pub(crate) mod tests {
             .string("placement")
             .u32(0);
         b.u32(1).token_id("thing");
-        // bias: x part 2049 (+512), z part 2047 (−512)
-        let bias = (2047 << 12) | 2049;
-        b.f32(10.0).f32(1.0).f32(20.0).f32(bias as f32);
-        b.f32(1.0).f32(0.0).f32(0.0).f32(0.0);
+        for value in values {
+            b.f32(*value);
+        }
         b.u32(0).u8(0);
         let document = decode(&b.0).expect("decodes");
         let thing = document.unit("thing").expect("thing");
-        assert_eq!(
-            thing.single("placement"),
-            Some("(522, 1, -492) (1, 0, 0, 0)")
-        );
+        thing.single("placement").expect("placement").to_string()
+    }
+
+    #[test]
+    fn adds_the_placement_bias_from_version_2() {
+        // Bias: x part 2049 (+512), z part 2047 (−512).
+        let bias = ((2047 << 12) | 2049) as f32;
+        let values = [10.0, 1.0, 20.0, bias, 1.0, 0.0, 0.0, 0.0];
+        assert_eq!(placement(3, &values), "(522, 1, -492) (1, 0, 0, 0)");
+        assert_eq!(placement(2, &values), "(522, 1, -492) (1, 0, 0, 0)");
+        // The neutral bias (2048 in both parts) moves nothing.
+        let neutral = ((2048 << 12) | 2048) as f32;
+        let values = [10.0, 1.0, 20.0, neutral, 1.0, 0.0, 0.0, 0.0];
+        assert_eq!(placement(2, &values), "(10, 1, 20) (1, 0, 0, 0)");
+    }
+
+    #[test]
+    fn version_1_placements_have_seven_floats() {
+        let values = [10.0, 1.0, 20.0, 1.0, 0.0, 0.0, 0.0];
+        assert_eq!(placement(1, &values), "(10, 1, 20) (1, 0, 0, 0)");
     }
 }

@@ -16,31 +16,6 @@ pub fn thousands(value: i64) -> String {
     out
 }
 
-/// How long ago something happened, roughly: `just now`, `5 minutes ago`, `2 days ago`,
-/// `3 years ago`. (Relative times need no time zone, and read better than dates in lists.)
-pub fn ago(when: std::time::SystemTime) -> String {
-    let seconds = std::time::SystemTime::now()
-        .duration_since(when)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    let units: [(u64, &str); 6] = [
-        (365 * 86_400, "year"),
-        (30 * 86_400, "month"),
-        (7 * 86_400, "week"),
-        (86_400, "day"),
-        (3_600, "hour"),
-        (60, "minute"),
-    ];
-    for (size, unit) in units {
-        let count = seconds / size;
-        if count > 0 {
-            let plural = if count == 1 { "" } else { "s" };
-            return format!("{count} {unit}{plural} ago");
-        }
-    }
-    "just now".to_string()
-}
-
 /// `1_000_000` → `"1M"`: the short form people can also type into an amount field.
 pub fn compact(value: i64) -> String {
     let units: [(i64, &str); 3] = [(1_000_000_000, "B"), (1_000_000, "M"), (1_000, "k")];

@@ -64,8 +64,12 @@ def make_readers(version):
     vec = lambda n: (lambda r: "(" + ", ".join(fmt_f(x) for x in r.u("f" * n)) + ")")
 
     def vec8(r):
+        # Version 1 stores 7 floats; version 2+ adds a hidden bias (4th float) for x and z.
+        if version == 1:
+            v = list(r.u("7f"))
+            return "(" + ", ".join(fmt_f(x) for x in v[:3]) + ") (" + ", ".join(fmt_f(x) for x in v[3:]) + ")"
         v = list(r.u("8f"))
-        if version >= 3:
+        if version >= 2:
             bias = int(v[3])
             v[0] += ((bias & 0xFFF) - 2048) << 9
             v[2] += (((bias >> 12) & 0xFFF) - 2048) << 9

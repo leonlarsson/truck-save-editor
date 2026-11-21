@@ -6,11 +6,12 @@
 
 use std::collections::HashSet;
 
-use gpui_kit::Context;
+use gpui_kit::{App, Context, SharedString};
 use save::{Career, Game, LoadedSlot, Profile, Slot, Truck};
 
 use crate::format::thousands;
-use crate::labels::{ADR_CLASSES, SKILLS};
+use crate::i18n::t;
+use crate::labels::{adr_summary, skill_name};
 
 pub struct Session {
     game: Game,
@@ -29,9 +30,9 @@ pub struct Session {
 
 /// One change, for the list shown before saving.
 pub struct Change {
-    pub what: String,
-    pub before: String,
-    pub after: String,
+    pub what: SharedString,
+    pub before: SharedString,
+    pub after: SharedString,
 }
 
 impl Session {
@@ -110,14 +111,15 @@ impl Session {
     }
 
     /// Every change, described for people.
-    pub fn changes(&self) -> Vec<Change> {
+    pub fn changes(&self, cx: &App) -> Vec<Change> {
         let (before, after) = (&self.saved_career, &self.career);
         let currency = self.game.currency_symbol();
+        let money = |amount: i64| format!("{currency} {}", thousands(amount));
         let mut changes = Vec::new();
-        let mut add = |what: &str, before: String, after: String| {
+        let mut add = |what: SharedString, before: SharedString, after: SharedString| {
             if before != after {
                 changes.push(Change {
-                    what: what.to_string(),
+                    what,
                     before,
                     after,
                 });
@@ -125,37 +127,45 @@ impl Session {
         };
 
         add(
-            "Money",
-            format!("{currency} {}", thousands(before.money)),
-            format!("{currency} {}", thousands(after.money)),
+            t!(cx, "money"),
+            money(before.money).into(),
+            money(after.money).into(),
         );
         add(
-            "Experience",
-            format!("{} XP", thousands(before.experience)),
-            format!("{} XP", thousands(after.experience)),
+            t!(cx, "experience"),
+            t!(
+                cx,
+                "experience-amount",
+                amount = thousands(before.experience)
+            ),
+            t!(
+                cx,
+                "experience-amount",
+                amount = thousands(after.experience)
+            ),
         );
-        for (index, label) in SKILLS.iter().enumerate() {
+        for index in 0..before.skills.levels().len() {
             add(
-                label.name,
-                format!("Level {}", before.skills.levels()[index].1),
-                format!("Level {}", after.skills.levels()[index].1),
+                skill_name(cx, index),
+                t!(cx, "skill-level", level = before.skills.levels()[index].1),
+                t!(cx, "skill-level", level = after.skills.levels()[index].1),
             );
         }
         add(
-            "ADR",
-            adr_summary(before.skills.adr),
-            adr_summary(after.skills.adr),
+            t!(cx, "adr"),
+            adr_summary(cx, before.skills.adr),
+            adr_summary(cx, after.skills.adr),
         );
         add(
-            "HQ",
-            save::city_display_name(&before.hq_city),
-            save::city_display_name(&after.hq_city),
+            t!(cx, "hq"),
+            save::city_display_name(&before.hq_city).into(),
+            save::city_display_name(&after.hq_city).into(),
         );
         if !self.repaired.is_empty() {
             add(
-                "Repairs",
-                "Worn".to_string(),
-                format!("{} trucks repaired", self.repaired.len()),
+                t!(cx, "repairs"),
+                t!(cx, "repairs-before"),
+                t!(cx, "repairs-after", count = self.repaired.len()),
             );
         }
         changes
@@ -197,17 +207,5 @@ impl Session {
             .file_name()
             .map(|name| name.to_string_lossy().into_owned())
             .unwrap_or_else(|| "profile".to_string())
-    }
-}
-
-/// `3 of 6 classes`, `All classes`, `None`.
-fn adr_summary(bits: u8) -> String {
-    let count = (0..ADR_CLASSES.len())
-        .filter(|bit| bits & (1 << bit) != 0)
-        .count();
-    match count {
-        0 => "None".to_string(),
-        n if n == ADR_CLASSES.len() => "All classes".to_string(),
-        n => format!("{n} of {} classes", ADR_CLASSES.len()),
     }
 }
