@@ -5,6 +5,7 @@
 //! it would be saved, and the workspace hands that to `save::save` in the background.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::sync::Arc;
 
 use gpui_kit::{App, Context, SharedString};
 use save::{Career, Driver, Game, Garage, LoadedSlot, Place, Profile, Slot, Vehicle, VehicleKind};
@@ -34,6 +35,11 @@ pub struct Session {
     /// What Undo went back from, latest last: Redo goes forward again. A new change clears it.
     redo: Vec<Pending>,
     is_saving: bool,
+    /// The save as it would be written (the loaded save with every change), built when first
+    /// asked for after a change. Every page reads from it, so they all agree: a repair shows in
+    /// All data, an All data edit shows in Fleet. A `RefCell` because building it is a cache
+    /// fill, not a change, and reading the session only gives `&self`.
+    preview: std::cell::RefCell<Option<Arc<sii::Document>>>,
 }
 
 /// Everything changed since the save was loaded (or last saved). Undo and Redo swap whole copies
@@ -132,6 +138,7 @@ impl Session {
             slot,
             loaded,
             is_saving: false,
+            preview: std::cell::RefCell::new(None),
         })
     }
 
@@ -170,12 +177,33 @@ impl Session {
             return;
         }
         self.pending = pending;
+        self.forget_preview();
         self.undo.push(before);
         if self.undo.len() > UNDO_LIMIT {
             self.undo.remove(0);
         }
         self.redo.clear();
         cx.notify();
+    }
+
+    /// The save as it would be written, every change in it (see `preview`).
+    pub fn preview(&self) -> Arc<sii::Document> {
+        if let Some(preview) = self.preview.borrow().as_ref() {
+            return preview.clone();
+        }
+        // If a change can't be applied (it can't, short of a bug), show the save as loaded
+        // rather than nothing; saving reports the error.
+        let document = self
+            .prepared()
+            .map(|slot| slot.game)
+            .unwrap_or_else(|_| self.loaded.game.clone());
+        let preview = Arc::new(document);
+        *self.preview.borrow_mut() = Some(preview.clone());
+        preview
+    }
+
+    fn forget_preview(&mut self) {
+        *self.preview.get_mut() = None;
     }
 
     pub fn can_undo(&self) -> bool {
@@ -190,6 +218,7 @@ impl Session {
     pub fn undo(&mut self, cx: &mut Context<Self>) {
         if let Some(previous) = self.undo.pop() {
             let current = std::mem::replace(&mut self.pending, previous);
+            self.forget_preview();
             self.redo.push(current);
             cx.notify();
         }
@@ -198,6 +227,7 @@ impl Session {
     pub fn redo(&mut self, cx: &mut Context<Self>) {
         if let Some(next) = self.redo.pop() {
             let current = std::mem::replace(&mut self.pending, next);
+            self.forget_preview();
             self.undo.push(current);
             cx.notify();
         }
@@ -208,21 +238,9 @@ impl Session {
         self.change(cx, |pending, _| edit(&mut pending.career));
     }
 
-    /// The vehicles as they'll be after saving (repaired ones without wear).
+    /// The vehicles as they'll be after saving.
     pub fn vehicles(&self) -> Vec<Vehicle> {
-        self.saved_vehicles
-            .iter()
-            .map(|truck| {
-                let mut truck = truck.clone();
-                if self.pending.repaired.contains(&truck.id) {
-                    truck.wear = save::Wear::default();
-                }
-                if self.pending.refueled.contains(&truck.id) && truck.fuel.is_some() {
-                    truck.fuel = Some(1.0);
-                }
-                truck
-            })
-            .collect()
+        save::vehicles(&self.preview())
     }
 
     /// Applies a quick-start plan: everything in it is one change.
@@ -314,24 +332,12 @@ impl Session {
 
     /// Every city with how often it was visited, as it'll be after saving.
     pub fn cities(&self) -> Vec<save::City> {
-        save::cities(&self.loaded.game)
-            .into_iter()
-            .map(|mut city| {
-                if self.pending.visit_all_cities && city.visits == 0 {
-                    city.visits = 1;
-                }
-                city
-            })
-            .collect()
+        save::cities(&self.preview())
     }
 
     /// The cities whose dealer (or agency) is unlocked, as it'll be after saving.
     pub fn unlocked(&self, place: Place) -> BTreeSet<String> {
-        let mut unlocked: BTreeSet<String> = save::unlocked(&self.loaded.game, place)
-            .into_iter()
-            .collect();
-        unlocked.extend(self.pending.unlocks(place).iter().cloned());
-        unlocked
+        save::unlocked(&self.preview(), place).into_iter().collect()
     }
 
     /// Unlocks the dealers (or agencies) in every city of `cities` (which the game's data knows).
@@ -348,27 +354,35 @@ impl Session {
         self.change(cx, |pending, _| pending.visit_all_cities = true);
     }
 
-    /// The save as loaded (or last saved), for All data. Edits aren't in it; see `raw_value`.
-    pub fn document(&self) -> &sii::Document {
-        &self.loaded.game
-    }
-
-    /// A value as it'll be saved: the All data edit if there is one, else what's in the save.
+    /// A value as it'll be saved (every change in it), in its text form.
     pub fn raw_value(&self, path: &FieldPath) -> Option<String> {
-        if let Some(edited) = self.pending.raw_edits.get(path) {
-            return Some(edited.clone());
-        }
-        self.saved_raw_value(path)
+        path.read(&self.preview())
     }
 
+    /// Whether a value will be saved different from what's on disk (by an All data edit or any
+    /// other change).
     pub fn is_edited(&self, path: &FieldPath) -> bool {
         self.pending.raw_edits.contains_key(path)
+            || path.read(&self.preview()) != self.saved_value(path)
     }
 
-    /// Changes one value (in its text form, as All data shows it). Setting it back to what's in
-    /// the save removes the change.
+    /// Changes one value (in its text form, as All data shows it). A value the career pages own
+    /// (money, experience, skills …) becomes a career change, so those pages show it and it's
+    /// undone like one; anything else is kept as an All data edit. Setting a value back to
+    /// what's on disk removes the edit.
     pub fn set_raw_value(&mut self, path: FieldPath, text: String, cx: &mut Context<Self>) {
-        let original = self.saved_raw_value(&path);
+        let mut edited = (*self.preview()).clone();
+        path.apply(&mut edited, &text);
+        if let Ok(career) = Career::read(&edited)
+            && career != self.pending.career
+        {
+            self.change(cx, |pending, _| {
+                pending.career = career;
+                pending.raw_edits.remove(&path);
+            });
+            return;
+        }
+        let original = self.saved_value(&path);
         self.change(cx, |pending, _| {
             if original.as_deref() == Some(text.as_str()) {
                 pending.raw_edits.remove(&path);
@@ -378,27 +392,14 @@ impl Session {
         });
     }
 
-    /// A value as it is in the save on disk, without All data edits.
-    fn saved_raw_value(&self, path: &FieldPath) -> Option<String> {
-        let value = self.loaded.game.unit(&path.unit)?.get(&path.field)?;
-        match path.index {
-            None => value.as_single().map(str::to_string),
-            Some(index) => value.items().get(index).cloned(),
-        }
+    /// A value as it is in the save on disk.
+    pub fn saved_value(&self, path: &FieldPath) -> Option<String> {
+        path.read(&self.loaded.game)
     }
 
     /// The hired drivers as they'll be after saving.
     pub fn drivers(&self) -> Vec<Driver> {
-        self.saved_drivers
-            .iter()
-            .map(|driver| {
-                let mut driver = driver.clone();
-                if self.pending.maxed_drivers.contains(&driver.id) {
-                    driver.skills = save::Skills::maxed();
-                }
-                driver
-            })
-            .collect()
+        save::drivers(&self.preview())
     }
 
     /// Gives every hired driver every skill at its highest level and all ADR classes.
@@ -414,17 +415,7 @@ impl Session {
 
     /// The garages as they'll be after saving.
     pub fn garages(&self) -> Vec<Garage> {
-        self.saved_garages
-            .iter()
-            .map(|garage| {
-                let mut garage = garage.clone();
-                if self.pending.upgraded_garages.contains(&garage.id) {
-                    garage.is_owned = true;
-                    garage.slots = garage.slots.max(save::LARGE_GARAGE_SLOTS);
-                }
-                garage
-            })
-            .collect()
+        save::garages(&self.preview())
     }
 
     /// Makes every owned garage large; with `buy_all`, buys every garage too.
@@ -667,6 +658,7 @@ impl Session {
         self.saved_garages = save::garages(&written.game);
         self.saved_drivers = save::drivers(&written.game);
         self.loaded = written;
+        self.forget_preview();
         self.saved_career = self.pending.career.clone();
         self.pending = Pending::none(self.saved_career.clone());
         // What's on disk changed under the history; undoing past a save would describe changes
@@ -729,6 +721,15 @@ impl FieldPath {
         match self.index {
             Some(index) => format!("{}[{index}]", self.field),
             None => self.field.clone(),
+        }
+    }
+
+    /// The value at this path in a document, in its text form.
+    pub fn read(&self, document: &sii::Document) -> Option<String> {
+        let value = document.unit(&self.unit)?.get(&self.field)?;
+        match self.index {
+            None => value.as_single().map(str::to_string),
+            Some(index) => value.items().get(index).cloned(),
         }
     }
 
@@ -893,5 +894,47 @@ mod tests {
             assert_eq!(session.change_count(), 0);
             assert!(!session.can_undo());
         });
+    }
+
+    #[gpui_kit::test]
+    fn all_data_edits_to_career_fields_are_career_changes(cx: &mut TestAppContext) {
+        let session = session(cx);
+        let money = FieldPath {
+            unit: "_nameless.2".into(),
+            field: "money_account".into(),
+            index: None,
+        };
+        session.update(cx, |session, cx| {
+            session.set_raw_value(money.clone(), "4321".into(), cx)
+        });
+        assert_eq!(money_of(&session, cx), 4321);
+        cx.update(|cx| {
+            let session = session.read(cx);
+            assert_eq!(session.change_count(), 1);
+            assert_eq!(session.raw_value(&money).as_deref(), Some("4321"));
+            assert!(session.is_edited(&money));
+        });
+        session.update(cx, |session, cx| session.undo(cx));
+        assert_eq!(money_of(&session, cx), 1000);
+    }
+
+    #[gpui_kit::test]
+    fn typed_changes_show_in_all_data(cx: &mut TestAppContext) {
+        let session = session(cx);
+        set_money(&session, 2000, cx);
+        let money = FieldPath {
+            unit: "_nameless.2".into(),
+            field: "money_account".into(),
+            index: None,
+        };
+        cx.update(|cx| {
+            let session = session.read(cx);
+            assert_eq!(session.raw_value(&money).as_deref(), Some("2000"));
+            assert!(session.is_edited(&money));
+        });
+    }
+
+    fn money_of(session: &Entity<Session>, cx: &mut TestAppContext) -> i64 {
+        cx.update(|cx| session.read(cx).career().money)
     }
 }

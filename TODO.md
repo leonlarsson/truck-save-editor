@@ -40,7 +40,7 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [x] Trailers (owned, with wear and repair, doubles included), odometers, plates, fuel.
 - [ ] Jobs.
 - [x] All data: every unit and field, editable (shape-checked).
-- [ ] All data: show All data edits on the typed pages too (an edited money_account in Overview), and search values across units.
+- [x] All data: edits show on the typed pages (and typed changes in All data), and search across every value.
 - [x] Reading the game's archives (HashFS v1/v2) and its data: levels, ranks, skill limits, text and city names (`hashfs`, `gamedata`).
 - [x] The game's own icons for skills and ADR classes: GDeflate and texture decoding in `hashfs`, the icon materials in `gamedata`, drawn at exact pixel size by `GameIconView`. Nothing of SCS's is bundled; without the game, the rows show no icon.
 - [x] Brand logos and the game's model names in Fleet.

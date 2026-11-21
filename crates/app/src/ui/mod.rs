@@ -11,7 +11,7 @@ mod step_buttons;
 mod text_table;
 
 pub use amount_field::{AmountChanged, AmountField};
-pub use filter_bar::{FilterBar, FilterChanged};
+pub use filter_bar::{FilterBar, FilterChanged, fold};
 pub use game_icon::GameIconView;
 pub use level_picker::LevelPicker;
 pub use page::{PageHeader, page_body};

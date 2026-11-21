@@ -1,11 +1,13 @@
 //! All data: every unit in the save and every value in it, editable. For anything the other pages
-//! don't cover. Pick a kind of unit, then a unit, then a value; edit it below the table.
+//! don't cover. Pick a kind of unit, then a unit, then a value; edit it below the table. Or search
+//! every value at once and pick from what matches.
 //!
 //! Edits are checked against the value's shape: a number stays a number, text stays quoted text,
 //! so a typo can't turn into something the game can't read.
 
+use gpui_kit::assets::IconName;
 use gpui_kit::component::{
-    ActiveTheme as _, Disableable as _, Sizable as _, StyledExt as _,
+    ActiveTheme as _, Disableable as _, Icon, Sizable as _, StyledExt as _,
     button::{Button, ButtonVariants as _},
     h_flex,
     input::{Input, InputEvent, InputState},
@@ -21,11 +23,20 @@ use sii::inventory::{Shape, shape_of};
 use crate::format::thousands;
 use crate::i18n::t;
 use crate::session::{FieldPath, Session};
-use crate::ui::{RowLook, TextColumn, TextRow, TextTable};
+use crate::ui::{RowLook, TextColumn, TextRow, TextTable, fold};
 
 pub struct AllDataPage {
     session: Entity<Session>,
     filter: Entity<InputState>,
+    /// Search across every value; while it holds text, its results replace the three panes.
+    search: Entity<InputState>,
+    results: Entity<TableState<TextTable>>,
+    /// The values the results table shows, in its order.
+    result_paths: Vec<FieldPath>,
+    /// Whether there were more matches than shown.
+    has_more_results: bool,
+    /// Counts searches, so a slow, stale one doesn't overwrite a newer one's results.
+    search_generation: usize,
     kinds: Entity<TableState<TextTable>>,
     units: Entity<TableState<TextTable>>,
     fields: Entity<TableState<TextTable>>,
@@ -49,7 +60,7 @@ pub struct AllDataPage {
 impl AllDataPage {
     pub fn new(session: Entity<Session>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let mut counts = std::collections::BTreeMap::<String, usize>::new();
-        for unit in session.read(cx).document().units() {
+        for unit in session.read(cx).preview().units() {
             *counts.entry(unit.kind.clone()).or_default() += 1;
         }
         let all_kinds: Vec<(String, usize)> = counts.into_iter().collect();
@@ -100,6 +111,34 @@ impl AllDataPage {
         );
         let filter =
             cx.new(|cx| InputState::new(window, cx).placeholder(t!(cx, "all-data-filter")));
+        let search =
+            cx.new(|cx| InputState::new(window, cx).placeholder(t!(cx, "all-data-search")));
+        let results = table(
+            vec![
+                TextColumn {
+                    key: "kind",
+                    title: t!(cx, "all-data-kind"),
+                    width: 170.,
+                },
+                TextColumn {
+                    key: "unit",
+                    title: t!(cx, "all-data-unit"),
+                    width: 230.,
+                },
+                TextColumn {
+                    key: "field",
+                    title: t!(cx, "all-data-field"),
+                    width: 200.,
+                },
+                TextColumn {
+                    key: "value",
+                    title: t!(cx, "all-data-value"),
+                    width: 420.,
+                },
+            ],
+            window,
+            cx,
+        );
         let editor = cx.new(|cx| InputState::new(window, cx));
 
         let _subscriptions = vec![
@@ -108,6 +147,22 @@ impl AllDataPage {
                     this.show_kinds(cx);
                 }
             }),
+            cx.subscribe_in(&search, window, |this, _, event: &InputEvent, _, cx| {
+                if let InputEvent::Change = event {
+                    this.run_search(cx);
+                }
+            }),
+            cx.subscribe_in(
+                &results,
+                window,
+                |this, _, event: &TableEvent, window, cx| {
+                    if let TableEvent::SelectRow(row) = event
+                        && let Some(path) = this.result_paths.get(*row).cloned()
+                    {
+                        this.select_path(path, window, cx);
+                    }
+                },
+            ),
             cx.subscribe_in(&kinds, window, |this, _, event: &TableEvent, _, cx| {
                 if let TableEvent::SelectRow(row) = event
                     && let Some(kind) = this.shown_kinds.get(*row).cloned()
@@ -136,13 +191,24 @@ impl AllDataPage {
                     this.apply(cx);
                 }
             }),
-            // Edits (here or on other pages, Discard, saving) show in the values table.
-            cx.observe(&session, |this, _, cx| this.refresh_fields(cx)),
+            // Edits (here or on other pages, Discard, saving) show in the values table and the
+            // search results.
+            cx.observe(&session, |this, _, cx| {
+                this.refresh_fields(cx);
+                if this.is_searching(cx) {
+                    this.run_search(cx);
+                }
+            }),
         ];
 
         let mut page = Self {
             session,
             filter,
+            search,
+            results,
+            result_paths: Vec::new(),
+            has_more_results: false,
+            search_generation: 0,
             kinds,
             units,
             fields,
@@ -158,6 +224,69 @@ impl AllDataPage {
         };
         page.show_kinds(cx);
         page
+    }
+
+    fn is_searching(&self, cx: &gpui_kit::App) -> bool {
+        self.search.read(cx).value().trim().chars().count() >= 2
+    }
+
+    /// Searches every unit id, field name and value for the search text, in the background (a
+    /// big save holds a million values), and shows the first matches.
+    fn run_search(&mut self, cx: &mut Context<Self>) {
+        self.search_generation += 1;
+        let generation = self.search_generation;
+        if !self.is_searching(cx) {
+            self.result_paths.clear();
+            set_rows(&self.results, Vec::new(), cx);
+            cx.notify();
+            return;
+        }
+        let query = fold(self.search.read(cx).value().trim());
+        let document = self.session.read(cx).preview();
+        cx.spawn(async move |this, cx| {
+            let (matches, has_more) = cx
+                .background_spawn(async move { search(&document, &query) })
+                .await;
+            let _ = this.update(cx, |this, cx| {
+                if generation != this.search_generation {
+                    return;
+                }
+                let rows = matches
+                    .iter()
+                    .map(|found| TextRow {
+                        cells: vec![
+                            found.kind.clone().into(),
+                            found.path.unit.clone().into(),
+                            found.path.field_name().into(),
+                            found.value.clone().into(),
+                        ],
+                        look: RowLook::Normal,
+                    })
+                    .collect();
+                this.result_paths = matches.into_iter().map(|found| found.path).collect();
+                this.has_more_results = has_more;
+                set_rows(&this.results, rows, cx);
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    /// Chooses a value from the search results for the editor.
+    fn select_path(&mut self, path: FieldPath, window: &mut Window, cx: &mut Context<Self>) {
+        self.problem = None;
+        self.unit_kind = self
+            .session
+            .read(cx)
+            .preview()
+            .unit(&path.unit)
+            .map(|unit| unit.kind.clone())
+            .unwrap_or_default();
+        let text = self.session.read(cx).raw_value(&path).unwrap_or_default();
+        self.selected = Some(path);
+        self.editor
+            .update(cx, |editor, cx| editor.set_value(text, window, cx));
+        cx.notify();
     }
 
     fn show_kinds(&mut self, cx: &mut Context<Self>) {
@@ -182,7 +311,7 @@ impl AllDataPage {
         self.unit_ids = self
             .session
             .read(cx)
-            .document()
+            .preview()
             .units_of_kind(kind)
             .map(|unit| unit.id.clone())
             .collect();
@@ -205,7 +334,7 @@ impl AllDataPage {
         self.field_rows.clear();
         self.selected = None;
         self.problem = None;
-        if let Some(unit) = self.session.read(cx).document().unit(id) {
+        if let Some(unit) = self.session.read(cx).preview().unit(id) {
             self.unit_kind = unit.kind.clone();
             for field in &unit.fields {
                 let path = |index| FieldPath {
@@ -315,19 +444,57 @@ impl AllDataPage {
             .update(cx, |session, cx| session.set_raw_value(path, original, cx));
     }
 
+    /// The value as it is in the save on disk: what Revert goes back to, and the shape an edit
+    /// must keep.
     fn original_value(&self, path: &FieldPath, cx: &Context<Self>) -> String {
-        let value = self
-            .session
-            .read(cx)
-            .document()
-            .unit(&path.unit)
-            .and_then(|unit| unit.get(&path.field).cloned());
-        match (value, path.index) {
-            (Some(sii::Value::Single(text)), None) => text,
-            (Some(value), Some(index)) => value.items().get(index).cloned().unwrap_or_default(),
-            _ => String::new(),
+        self.session.read(cx).saved_value(path).unwrap_or_default()
+    }
+}
+
+/// How many search results show at most (the rest are counted as "more").
+const MAX_RESULTS: usize = 1_000;
+
+struct Found {
+    kind: String,
+    path: FieldPath,
+    value: String,
+}
+
+/// Every value whose unit id, field name or text contains `query` (already folded), up to
+/// `MAX_RESULTS`; and whether there were more.
+fn search(document: &sii::Document, query: &str) -> (Vec<Found>, bool) {
+    let mut found = Vec::new();
+    for unit in document.units() {
+        let unit_matches = fold(&unit.id).contains(query);
+        for field in &unit.fields {
+            let field_matches = unit_matches || fold(&field.name).contains(query);
+            let values: Vec<(Option<usize>, &String)> = match &field.value {
+                sii::Value::Single(text) => vec![(None, text)],
+                sii::Value::Array(items) => items
+                    .iter()
+                    .enumerate()
+                    .map(|(i, t)| (Some(i), t))
+                    .collect(),
+            };
+            for (index, text) in values {
+                if field_matches || fold(text).contains(query) {
+                    if found.len() == MAX_RESULTS {
+                        return (found, true);
+                    }
+                    found.push(Found {
+                        kind: unit.kind.clone(),
+                        path: FieldPath {
+                            unit: unit.id.clone(),
+                            field: field.name.clone(),
+                            index,
+                        },
+                        value: text.clone(),
+                    });
+                }
+            }
         }
     }
+    (found, false)
 }
 
 /// A row of the values table: a value, or the heading of an array (its name and item count).
@@ -374,6 +541,7 @@ fn shape_name(cx: &gpui_kit::App, shape: Shape) -> SharedString {
 impl Render for AllDataPage {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let has_selection = self.selected.is_some();
+        let is_searching = self.is_searching(cx);
         let pane = |title: SharedString, body: gpui_kit::AnyElement, width: Option<f32>| {
             v_flex()
                 .gap_2()
@@ -391,48 +559,86 @@ impl Render for AllDataPage {
             .px_8()
             .py_6()
             .child(
-                div()
-                    .text_sm()
-                    .text_color(cx.theme().muted_foreground)
-                    .child(t!(cx, "all-data-intro")),
-            )
-            .child(
                 h_flex()
-                    .flex_1()
-                    .min_h_0()
                     .gap_4()
-                    .child(pane(
-                        t!(cx, "all-data-kinds"),
-                        v_flex()
-                            .size_full()
-                            .gap_2()
-                            .child(Input::new(&self.filter).small())
-                            .child(
-                                div()
-                                    .flex_1()
-                                    .min_h_0()
-                                    .child(DataTable::new(&self.kinds).stripe(true).bordered(true)),
-                            )
-                            .into_any_element(),
-                        Some(16.),
-                    ))
-                    .child(pane(
-                        t!(cx, "all-data-units"),
-                        DataTable::new(&self.units)
-                            .stripe(true)
-                            .bordered(true)
-                            .into_any_element(),
-                        Some(16.),
-                    ))
-                    .child(pane(
-                        t!(cx, "all-data-values"),
-                        DataTable::new(&self.fields)
-                            .stripe(true)
-                            .bordered(true)
-                            .into_any_element(),
-                        None,
-                    )),
+                    .items_center()
+                    .child(
+                        div().w(rems(22.)).flex_shrink_0().child(
+                            Input::new(&self.search)
+                                .small()
+                                .cleanable(true)
+                                .prefix(Icon::new(IconName::Search).small()),
+                        ),
+                    )
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(cx.theme().muted_foreground)
+                            .child(if is_searching {
+                                let count = thousands(self.result_paths.len() as i64);
+                                if self.has_more_results {
+                                    t!(cx, "all-data-search-more", count = count)
+                                } else {
+                                    t!(
+                                        cx,
+                                        "all-data-search-count",
+                                        count = self.result_paths.len(),
+                                        amount = count
+                                    )
+                                }
+                            } else {
+                                t!(cx, "all-data-intro")
+                            }),
+                    ),
             )
+            .when(is_searching, |this| {
+                this.child(
+                    div().flex_1().min_h_0().child(
+                        DataTable::new(&self.results)
+                            .stripe(true)
+                            .bordered(true)
+                            .accessibility_label(t!(cx, "all-data-results")),
+                    ),
+                )
+            })
+            .when(!is_searching, |this| {
+                this.child(
+                    h_flex()
+                        .flex_1()
+                        .min_h_0()
+                        .gap_4()
+                        .child(pane(
+                            t!(cx, "all-data-kinds"),
+                            v_flex()
+                                .size_full()
+                                .gap_2()
+                                .child(Input::new(&self.filter).small())
+                                .child(
+                                    div().flex_1().min_h_0().child(
+                                        DataTable::new(&self.kinds).stripe(true).bordered(true),
+                                    ),
+                                )
+                                .into_any_element(),
+                            Some(16.),
+                        ))
+                        .child(pane(
+                            t!(cx, "all-data-units"),
+                            DataTable::new(&self.units)
+                                .stripe(true)
+                                .bordered(true)
+                                .into_any_element(),
+                            Some(16.),
+                        ))
+                        .child(pane(
+                            t!(cx, "all-data-values"),
+                            DataTable::new(&self.fields)
+                                .stripe(true)
+                                .bordered(true)
+                                .into_any_element(),
+                            None,
+                        )),
+                )
+            })
             .child(
                 v_flex()
                     .gap_1()

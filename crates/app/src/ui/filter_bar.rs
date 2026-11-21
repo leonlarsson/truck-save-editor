@@ -166,7 +166,7 @@ impl Render for FilterBar {
 }
 
 /// Lowercase without accents, for matching what people type (`Örebro` → `orebro`).
-fn fold(text: &str) -> String {
+pub fn fold(text: &str) -> String {
     text.chars()
         .flat_map(char::to_lowercase)
         .map(|c| match c {

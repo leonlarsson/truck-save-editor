@@ -116,3 +116,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** the city definitions are a stable, documented-by-use format, so reading them keeps dealers right as maps change. Agencies exist only in the binary map sectors, whose format is versioned and was decoded by searching for known tokens: too fragile to run on players' machines. A list that's missing a new city leaves that agency locked, which is harmless; a guess that adds tokens for cities without one might not be.
 
 **Considered:** unlocking every city (other editors do; unknown what the game does with a dealer token for a city without a dealer); scanning the map at startup (slow, and breaks when the map format changes).
+
+## 2026-11-21: Every page reads one preview of the save
+
+**Decided:** the session builds the save as it would be written (the loaded save with every pending change applied, the same `prepared()` saving uses) when a page first asks after a change, and keeps it until the next change. Fleet, Garages, Drivers, Map and All data read from it. An All data edit that changes the career (money, experience, skills, HQ) becomes a career change instead of a raw edit, found by applying it to a copy and reading the career back.
+
+**Why:** pages used to overlay their own pending changes on the save as loaded, so a repair didn't show in All data and an All data edit of money didn't show on the Overview: two pictures of one save. One preview makes them agree by construction, and every new kind of change shows everywhere without page code. Building it costs one document copy (about 30 ms on a big save, release build), at most once per change.
+
+**Considered:** overlays per page (the old way; every page must know every change); applying changes to the loaded save directly (loses the "as on disk" side that Undo, Discard and the changes list need).

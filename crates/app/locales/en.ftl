@@ -260,6 +260,14 @@ hq = HQ
 ## All data
 
 all-data-intro = Every unit in the save, and every value in it. Pick a kind, then a unit, then a value to change.
+all-data-search = Search every value, field and unit
+all-data-search-count = { $count ->
+    [0] Nothing matches
+    [one] 1 match
+   *[other] { $amount } matches
+}
+all-data-search-more = The first { $count } matches
+all-data-results = Search results
 all-data-kinds = Kinds
 all-data-units = Units
 all-data-values = Values
