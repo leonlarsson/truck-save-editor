@@ -108,3 +108,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** the pending changes are small (a career and a few lists of ids), so copies cost nothing, and a copy can't get out of step with what it undoes the way hand-written inverse operations can. Undoing a Discard turns an easy misclick into nothing.
 
 **Considered:** a log of operations with inverses (more code, and every new kind of change needs its inverse written and tested); undo across saves (the history would describe changes against a file that's no longer on disk).
+
+## 2026-11-21: Where dealers and recruitment agencies come from
+
+**Decided:** dealer cities are read at runtime from the installed game's city definitions (`vehicle_brands[]`), across the base game and every map DLC archive. Recruitment-agency cities ship as a list read off the 1.62 map, filtered at runtime to the cities the install defines. Unlocking only adds tokens of cities the game says have one.
+
+**Why:** the city definitions are a stable, documented-by-use format, so reading them keeps dealers right as maps change. Agencies exist only in the binary map sectors, whose format is versioned and was decoded by searching for known tokens: too fragile to run on players' machines. A list that's missing a new city leaves that agency locked, which is harmless; a guess that adds tokens for cities without one might not be.
+
+**Considered:** unlocking every city (other editors do; unknown what the game does with a dealer token for a city without a dealer); scanning the map at startup (slow, and breaks when the map format changes).

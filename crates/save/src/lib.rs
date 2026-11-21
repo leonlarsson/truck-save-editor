@@ -29,7 +29,7 @@ pub use game::Game;
 pub use garages::{Garage, LARGE_GARAGE_SLOTS, garages, upgrade_garage};
 pub use info::{SlotInfo, read_info, set_name, update_info};
 pub use levels::{FALLBACK_STEPS, Level, LevelTable};
-pub use map::{City, cities, visit_all_cities};
+pub use map::{City, Place, cities, unlock, unlocked, visit_all_cities};
 pub use preview::{Picture, decode_tga};
 #[cfg(feature = "native")]
 pub use profiles::{

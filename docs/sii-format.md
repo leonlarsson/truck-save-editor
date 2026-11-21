@@ -147,3 +147,12 @@ The units to edit first (each points to others by id):
 | `mechanical` | Ecodriving |
 
 Check these labels and the ADR bit order against the game before shipping them.
+
+## Dealers and recruitment agencies
+
+The save lists the cities where the player has found a truck dealer (`economy.unlocked_dealers[]`) and a recruitment agency (`economy.unlocked_recruitments[]`), by city token. Which cities have them isn't in the save, and the game has no plain table of either:
+
+- **Dealers:** a city has one when its definition lists brands: `vehicle_brands[]` in `city_data : city.<token>`, in `def/city/<token>.sui`. `def/city.sii` (in `def.scs`) includes the base game's cities, and each map DLC adds a `def/city.<dlc>.sii` in its own archive. In 1.62 that's 146 cities, and it matches the dealer prefabs placed on the map (two cities list brands without a dealer on the map: `edirne`, `veli_tarnovo`).
+- **Recruitment agencies:** only the map knows. Prefab models (`def/world/prefab*.sii`) point to `.ppd` descriptors whose spawn points have types; type 16 is a recruitment agency (type 7 a truck dealer). Finding where those prefabs sit in the map sectors (`map/europe/sec*.base`) and which city area each falls in gives 138 cities in 1.62. The map format changes between versions, so the editor ships that list (`crates/gamedata/src/recruitment.rs`) and keeps only the cities the installed game defines; it needs reading again when a map DLC adds cities.
+
+Saves can hold tokens for cities that no longer have one (a leftover from an older map); the editor keeps them and doesn't count them.

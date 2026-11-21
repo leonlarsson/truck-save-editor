@@ -1,16 +1,21 @@
-//! Map: every city, and how often the player has been there. Visit them all in one go.
+//! Map: every city, how often the player has been there, and its truck dealer and recruitment
+//! agency (if it has them) and whether they're unlocked. Visit every city or unlock every dealer
+//! and agency in one go.
+
+use std::collections::BTreeSet;
 
 use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Sizable as _,
-    button::{Button, ButtonVariants as _},
+    button::Button,
     h_flex,
     table::{DataTable, TableState},
     v_flex,
 };
 use gpui_kit::{
-    AppContext as _, Context, Entity, IntoElement, ParentElement as _, Render, Styled as _,
-    Subscription, Window, div,
+    App, AppContext as _, Context, Entity, IntoElement, ParentElement as _, Render, SharedString,
+    Styled as _, Subscription, Window, div,
 };
+use save::Place;
 
 use crate::game_data;
 use crate::i18n::t;
@@ -22,7 +27,22 @@ pub struct MapPage {
     table: Entity<TableState<TextTable>>,
     visited: usize,
     count: usize,
+    dealers: PlaceCount,
+    recruitments: PlaceCount,
     _subscriptions: Vec<Subscription>,
+}
+
+/// How many of a kind of place are unlocked, of how many there are (`None` without the game).
+#[derive(Clone, Copy, Default)]
+struct PlaceCount {
+    unlocked: usize,
+    total: Option<usize>,
+}
+
+impl PlaceCount {
+    fn is_complete(self) -> bool {
+        self.total.is_some_and(|total| self.unlocked >= total)
+    }
 }
 
 impl MapPage {
@@ -31,21 +51,36 @@ impl MapPage {
             TextColumn {
                 key: "city",
                 title: t!(cx, "column-city"),
-                width: 240.,
+                width: 220.,
             },
             TextColumn {
                 key: "visits",
                 title: t!(cx, "column-visits"),
-                width: 140.,
+                width: 130.,
+            },
+            TextColumn {
+                key: "dealer",
+                title: t!(cx, "column-dealer"),
+                width: 160.,
+            },
+            TextColumn {
+                key: "recruitment",
+                title: t!(cx, "column-recruitment"),
+                width: 180.,
             },
         ];
         let table = cx.new(|cx| TableState::new(TextTable::new(columns), window, cx));
-        let _subscriptions = vec![cx.observe(&session, |this, _, cx| this.reload(cx))];
+        let _subscriptions = vec![
+            cx.observe(&session, |this, _, cx| this.reload(cx)),
+            game_data::observe(cx, |this, cx| this.reload(cx)),
+        ];
         let mut page = Self {
             session,
             table,
             visited: 0,
             count: 0,
+            dealers: PlaceCount::default(),
+            recruitments: PlaceCount::default(),
             _subscriptions,
         };
         page.reload(cx);
@@ -53,20 +88,45 @@ impl MapPage {
     }
 
     fn reload(&mut self, cx: &mut Context<Self>) {
-        let mut cities: Vec<(String, u32)> = self
-            .session
-            .read(cx)
+        let session = self.session.read(cx);
+        let unlocked_dealers = session.unlocked(Place::Dealer);
+        let unlocked_recruitments = session.unlocked(Place::Recruitment);
+        let dealer_cities = game_data::place_cities(cx, Place::Dealer);
+        let recruitment_cities = game_data::place_cities(cx, Place::Recruitment);
+        self.dealers = count(&unlocked_dealers, dealer_cities.as_ref());
+        self.recruitments = count(&unlocked_recruitments, recruitment_cities.as_ref());
+
+        let mut cities: Vec<(String, u32, SharedString, SharedString)> = session
             .cities()
             .into_iter()
-            .map(|city| (game_data::city_name(cx, &city.token), city.visits))
+            .map(|city| {
+                let dealer = place_cell(&city.token, &unlocked_dealers, dealer_cities.as_ref(), cx);
+                let recruitment = place_cell(
+                    &city.token,
+                    &unlocked_recruitments,
+                    recruitment_cities.as_ref(),
+                    cx,
+                );
+                (
+                    game_data::city_name(cx, &city.token),
+                    city.visits,
+                    dealer,
+                    recruitment,
+                )
+            })
             .collect();
         cities.sort_by(|a, b| a.0.cmp(&b.0));
         self.count = cities.len();
-        self.visited = cities.iter().filter(|(_, visits)| *visits > 0).count();
+        self.visited = cities.iter().filter(|city| city.1 > 0).count();
         let rows = cities
             .into_iter()
-            .map(|(name, visits)| TextRow {
-                cells: vec![name.into(), t!(cx, "map-visits", count = visits)],
+            .map(|(name, visits, dealer, recruitment)| TextRow {
+                cells: vec![
+                    name.into(),
+                    t!(cx, "map-visits", count = visits),
+                    dealer,
+                    recruitment,
+                ],
                 look: if visits == 0 {
                     RowLook::Muted
                 } else {
@@ -81,10 +141,79 @@ impl MapPage {
         });
         cx.notify();
     }
+
+    fn unlock(&mut self, place: Place, cx: &mut Context<Self>) {
+        let Some(cities) = game_data::place_cities(cx, place) else {
+            return;
+        };
+        self.session
+            .update(cx, |session, cx| session.unlock_all(place, &cities, cx));
+    }
+}
+
+/// Unlocked ones count only where the game says there's one (the save can hold leftovers from
+/// older maps).
+fn count(unlocked: &BTreeSet<String>, cities: Option<&BTreeSet<String>>) -> PlaceCount {
+    match cities {
+        Some(cities) => PlaceCount {
+            unlocked: unlocked.intersection(cities).count(),
+            total: Some(cities.len()),
+        },
+        None => PlaceCount {
+            unlocked: unlocked.len(),
+            total: None,
+        },
+    }
+}
+
+/// A city's dealer or agency: unlocked, not found yet, or nothing (the city has none, or without
+/// the game, nobody knows).
+fn place_cell(
+    token: &str,
+    unlocked: &BTreeSet<String>,
+    cities: Option<&BTreeSet<String>>,
+    cx: &App,
+) -> SharedString {
+    if unlocked.contains(token) {
+        t!(cx, "map-place-unlocked")
+    } else if cities.is_some_and(|cities| cities.contains(token)) {
+        t!(cx, "map-place-locked")
+    } else {
+        SharedString::default()
+    }
 }
 
 impl Render for MapPage {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let has_game_data = self.dealers.total.is_some() && self.recruitments.total.is_some();
+        let mut summary = vec![t!(
+            cx,
+            "map-summary",
+            visited = self.visited,
+            count = self.count
+        )];
+        // Literal keys, so the check that every key has English text sees them.
+        if let Some(total) = self.dealers.total {
+            summary.push(t!(
+                cx,
+                "map-dealers-summary",
+                unlocked = self.dealers.unlocked,
+                count = total
+            ));
+        }
+        if let Some(total) = self.recruitments.total {
+            summary.push(t!(
+                cx,
+                "map-recruitments-summary",
+                unlocked = self.recruitments.unlocked,
+                count = total
+            ));
+        }
+        // Each fact stays on one line; the line breaks only between them.
+        let summary = summary
+            .into_iter()
+            .map(|part| div().whitespace_nowrap().child(part));
+
         v_flex()
             .size_full()
             .gap_4()
@@ -95,30 +224,66 @@ impl Render for MapPage {
                     .justify_between()
                     .items_center()
                     .gap_4()
+                    // The summary wraps; the buttons keep their size.
                     .child(
-                        div()
+                        h_flex()
+                            .flex_1()
+                            .min_w_0()
+                            .flex_wrap()
+                            .gap_x_4()
                             .text_sm()
                             .text_color(cx.theme().muted_foreground)
-                            .child(t!(
-                                cx,
-                                "map-summary",
-                                visited = self.visited,
-                                count = self.count
-                            )),
+                            .children(summary),
                     )
                     .child(
-                        Button::new("visit-all")
-                            .small()
-                            .primary()
-                            .label(t!(cx, "map-visit-all"))
-                            .tooltip(t!(cx, "map-visit-all-tooltip"))
-                            .disabled(self.visited == self.count)
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.session
-                                    .update(cx, |session, cx| session.visit_all_cities(cx));
-                            })),
+                        h_flex()
+                            .flex_shrink_0()
+                            .gap_2()
+                            .child(
+                                Button::new("visit-all")
+                                    .small()
+                                    .outline()
+                                    .label(t!(cx, "map-visit-all"))
+                                    .tooltip(t!(cx, "map-visit-all-tooltip"))
+                                    .disabled(self.visited == self.count)
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        this.session
+                                            .update(cx, |session, cx| session.visit_all_cities(cx));
+                                    })),
+                            )
+                            .child(
+                                Button::new("unlock-dealers")
+                                    .small()
+                                    .outline()
+                                    .label(t!(cx, "map-unlock-dealers"))
+                                    .tooltip(t!(cx, "map-unlock-dealers-tooltip"))
+                                    .disabled(!has_game_data || self.dealers.is_complete())
+                                    .on_click(
+                                        cx.listener(|this, _, _, cx| {
+                                            this.unlock(Place::Dealer, cx)
+                                        }),
+                                    ),
+                            )
+                            .child(
+                                Button::new("unlock-recruitments")
+                                    .small()
+                                    .outline()
+                                    .label(t!(cx, "map-unlock-recruitments"))
+                                    .tooltip(t!(cx, "map-unlock-recruitments-tooltip"))
+                                    .disabled(!has_game_data || self.recruitments.is_complete())
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        this.unlock(Place::Recruitment, cx)
+                                    })),
+                            ),
                     ),
             )
+            // Not hidden, and not just a disabled button: say why, and what makes it work.
+            .children((!has_game_data).then(|| {
+                div()
+                    .text_sm()
+                    .text_color(cx.theme().muted_foreground)
+                    .child(t!(cx, "map-needs-game"))
+            }))
             .child(
                 div().flex_1().min_h_0().child(
                     DataTable::new(&self.table)

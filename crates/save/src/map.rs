@@ -1,4 +1,9 @@
-//! What the player has discovered of the map: the cities they've visited (and how often).
+//! What the player has discovered of the map: the cities they've visited (and how often), and the
+//! truck dealers and recruitment agencies they've found.
+//!
+//! `economy.unlocked_dealers[]` and `economy.unlocked_recruitments[]` list city tokens: a dealer or
+//! agency is unlocked by driving past it. Which cities have one isn't in the save; the game's data
+//! knows (see the `gamedata` crate).
 //!
 //! `economy.visited_cities[]` lists city tokens and `economy.visited_cities_count[]` how many times
 //! each was visited, item by item. Every city has a garage unit (owned or not), so the garages
@@ -81,11 +86,62 @@ pub fn visit_all_cities(document: &mut Document) -> usize {
     missing.len()
 }
 
+/// Something on the map the player unlocks by finding it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Place {
+    Dealer,
+    Recruitment,
+}
+
+impl Place {
+    fn field(self) -> &'static str {
+        match self {
+            Place::Dealer => "unlocked_dealers",
+            Place::Recruitment => "unlocked_recruitments",
+        }
+    }
+}
+
+/// The cities where the player has unlocked a dealer or an agency, as the save lists them.
+pub fn unlocked(document: &Document, place: Place) -> Vec<String> {
+    document
+        .first_of_kind("economy")
+        .map(|economy| economy.items(place.field()).to_vec())
+        .unwrap_or_default()
+}
+
+/// Unlocks the dealers or agencies in `cities`, keeping those already unlocked in their order.
+/// Returns how many were added.
+pub fn unlock(document: &mut Document, place: Place, cities: &[String]) -> usize {
+    let mut list = unlocked(document, place);
+    let before = list.len();
+    for city in cities {
+        if !list.contains(city) {
+            list.push(city.clone());
+        }
+    }
+    let added = list.len() - before;
+    if added == 0 {
+        return 0;
+    }
+    let Some(id) = document
+        .first_of_kind("economy")
+        .map(|unit| unit.id.clone())
+    else {
+        return 0;
+    };
+    let Some(mut economy) = document.unit_mut(&id) else {
+        return 0;
+    };
+    economy.set(place.field(), Value::Array(list));
+    added
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    const SAVE: &str = "SiiNunit\r\n{\r\neconomy : e {\r\n visited_cities: 1\r\n visited_cities[0]: berlin\r\n visited_cities_count: 1\r\n visited_cities_count[0]: 4\r\n}\r\n\r\ngarage : garage.berlin {\r\n status: 0\r\n}\r\n\r\ngarage : garage.lyon {\r\n status: 0\r\n}\r\n\r\n}\r\n";
+    const SAVE: &str = "SiiNunit\r\n{\r\neconomy : e {\r\n unlocked_dealers: 1\r\n unlocked_dealers[0]: lyon\r\n unlocked_recruitments: 0\r\n visited_cities: 1\r\n visited_cities[0]: berlin\r\n visited_cities_count: 1\r\n visited_cities_count[0]: 4\r\n}\r\n\r\ngarage : garage.berlin {\r\n status: 0\r\n}\r\n\r\ngarage : garage.lyon {\r\n status: 0\r\n}\r\n\r\n}\r\n";
 
     #[test]
     fn lists_cities_and_visits() {
@@ -111,5 +167,17 @@ mod tests {
         assert_eq!(economy.items("visited_cities"), ["berlin", "lyon"]);
         assert_eq!(economy.items("visited_cities_count"), ["4", "1"]);
         assert_eq!(visit_all_cities(&mut document), 0);
+    }
+
+    #[test]
+    fn unlocks_dealers_and_agencies_once() {
+        let mut document = sii::parse_text(SAVE).expect("parses");
+        let cities = vec!["berlin".to_string(), "lyon".to_string()];
+        assert_eq!(unlock(&mut document, Place::Dealer, &cities), 1);
+        assert_eq!(unlocked(&document, Place::Dealer), ["lyon", "berlin"]);
+        assert_eq!(unlock(&mut document, Place::Dealer, &cities), 0);
+
+        assert_eq!(unlock(&mut document, Place::Recruitment, &cities), 2);
+        assert_eq!(unlocked(&document, Place::Recruitment), ["berlin", "lyon"]);
     }
 }

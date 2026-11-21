@@ -22,6 +22,7 @@ use gpui_kit::{
 use save::{Profile, Slot};
 
 use crate::APP_NAME;
+use crate::game_data;
 use crate::i18n::t;
 use crate::labels;
 use crate::pages::{
@@ -207,6 +208,23 @@ impl Workspace {
             }
             PaletteCommand::MaxAllDrivers => {
                 session.update(cx, |session, cx| session.max_all_drivers(cx));
+            }
+            PaletteCommand::UnlockDealers | PaletteCommand::UnlockRecruitments => {
+                let place = if command == PaletteCommand::UnlockDealers {
+                    save::Place::Dealer
+                } else {
+                    save::Place::Recruitment
+                };
+                // Without the game nobody knows where they are; the Map page says so.
+                match game_data::place_cities(cx, place) {
+                    Some(cities) => {
+                        session.update(cx, |session, cx| session.unlock_all(place, &cities, cx))
+                    }
+                    None => {
+                        self.page = Page::Map;
+                        cx.notify();
+                    }
+                }
             }
             PaletteCommand::VisitEveryCity => {
                 session.update(cx, |session, cx| session.visit_all_cities(cx));

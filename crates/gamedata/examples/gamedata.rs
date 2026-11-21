@@ -29,6 +29,11 @@ fn main() {
             for city in ["malmo", "krakow", "zurich", "berlin"] {
                 println!("{city}: {:?}", data.city_name(city));
             }
+            println!(
+                "{} cities with a dealer, {} with a recruitment agency",
+                data.dealer_cities().len(),
+                data.recruitment_cities().len()
+            );
         }
         Err(error) => println!("couldn't read it: {error}"),
     }

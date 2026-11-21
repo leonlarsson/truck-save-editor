@@ -262,6 +262,27 @@ map-visits = { $count ->
 }
 column-visits = Visited
 map-table = Cities
+map-dealers = Truck dealers
+map-recruitments = Recruitment agencies
+map-dealers-summary = { $unlocked } of { $count ->
+    [one] 1 truck dealer
+   *[other] { $count } truck dealers
+}
+map-recruitments-summary = { $unlocked } of { $count ->
+    [one] 1 recruitment agency
+   *[other] { $count } recruitment agencies
+}
+map-unlocked-count = { $count } unlocked
+map-unlocked-of = { $unlocked } of { $count } unlocked
+map-unlock-dealers = Unlock every dealer
+map-unlock-dealers-tooltip = Unlock the truck dealer in every city that has one, as if you'd driven past each.
+map-unlock-recruitments = Unlock every agency
+map-unlock-recruitments-tooltip = Unlock the recruitment agency in every city that has one, as if you'd driven past each.
+map-needs-game = Unlocking dealers and agencies needs the game installed on this PC: its data says which cities have them.
+column-dealer = Truck dealer
+column-recruitment = Recruitment agency
+map-place-unlocked = Unlocked
+map-place-locked = Not found yet
 
 ## Garages
 

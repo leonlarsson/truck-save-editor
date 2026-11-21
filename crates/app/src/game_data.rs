@@ -1,10 +1,11 @@
 //! The installed game's own data (level tables, rank names, city names, icons), loaded in the background
 //! at startup. Until it arrives, or if the game isn't found, the app uses built-in fallbacks.
 
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use gamedata::{GameData, GameIcon};
-use gpui_kit::{App, AppContext as _, Global};
+use gpui_kit::{App, AppContext as _, Context, Global, Subscription};
 use save::{Game, LevelTable};
 
 #[derive(Default)]
@@ -73,4 +74,24 @@ pub fn adr_icon(cx: &App, bit: usize) -> Option<Arc<GameIcon>> {
 /// The game's own text for a key, if the game was found and has it.
 pub fn text(cx: &App, key: &str) -> Option<String> {
     data(cx)?.text(key).filter(|text| !text.is_empty())
+}
+
+/// The cities with a truck dealer, or with a recruitment agency, in the installed game. `None`
+/// when the game (or its city definitions) wasn't found: then nobody knows where they are.
+pub fn place_cities(cx: &App, place: save::Place) -> Option<BTreeSet<String>> {
+    let data = data(cx)?;
+    let cities = match place {
+        save::Place::Dealer => data.dealer_cities(),
+        save::Place::Recruitment => data.recruitment_cities(),
+    };
+    (!cities.is_empty()).then(|| cities.clone())
+}
+
+/// Calls `on_loaded` when the game's data arrives, for views that keep text made from it (city
+/// names, which cities have dealers) and must remake it then.
+pub fn observe<V: 'static>(
+    cx: &mut Context<V>,
+    on_loaded: impl Fn(&mut V, &mut Context<V>) + 'static,
+) -> Subscription {
+    cx.observe_global::<Loaded>(on_loaded)
 }

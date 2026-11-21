@@ -34,7 +34,10 @@ impl FleetPage {
             sort: None,
         };
         let table = cx.new(|cx| TableState::new(delegate, window, cx).sortable(true));
-        let _subscriptions = vec![cx.observe(&session, |this, _, cx| this.reload(cx))];
+        let _subscriptions = vec![
+            cx.observe(&session, |this, _, cx| this.reload(cx)),
+            game_data::observe(cx, |this, cx| this.reload(cx)),
+        ];
         Self {
             session,
             kind,

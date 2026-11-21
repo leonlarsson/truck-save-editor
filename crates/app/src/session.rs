@@ -4,10 +4,10 @@
 //! the header counts its changes. Nothing is written to disk here: `prepared` builds the slot as
 //! it would be saved, and the workspace hands that to `save::save` in the background.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use gpui_kit::{App, Context, SharedString};
-use save::{Career, Driver, Game, Garage, LoadedSlot, Profile, Slot, Vehicle, VehicleKind};
+use save::{Career, Driver, Game, Garage, LoadedSlot, Place, Profile, Slot, Vehicle, VehicleKind};
 
 use crate::format::thousands;
 use crate::game_data;
@@ -52,6 +52,10 @@ struct Pending {
     visit_all_cities: bool,
     /// Values changed in All data, by where they are; applied before the other changes.
     raw_edits: BTreeMap<FieldPath, String>,
+    /// Cities whose truck dealer to unlock when saving.
+    unlock_dealers: BTreeSet<String>,
+    /// Cities whose recruitment agency to unlock when saving.
+    unlock_recruitments: BTreeSet<String>,
 }
 
 impl Pending {
@@ -64,6 +68,22 @@ impl Pending {
             maxed_drivers: HashSet::new(),
             visit_all_cities: false,
             raw_edits: BTreeMap::new(),
+            unlock_dealers: BTreeSet::new(),
+            unlock_recruitments: BTreeSet::new(),
+        }
+    }
+
+    fn unlocks(&self, place: Place) -> &BTreeSet<String> {
+        match place {
+            Place::Dealer => &self.unlock_dealers,
+            Place::Recruitment => &self.unlock_recruitments,
+        }
+    }
+
+    fn unlocks_mut(&mut self, place: Place) -> &mut BTreeSet<String> {
+        match place {
+            Place::Dealer => &mut self.unlock_dealers,
+            Place::Recruitment => &mut self.unlock_recruitments,
         }
     }
 }
@@ -202,6 +222,8 @@ impl Session {
             + usize::from(!self.pending.maxed_drivers.is_empty())
             + self.pending.raw_edits.len()
             + usize::from(self.pending.visit_all_cities)
+            + usize::from(!self.pending.unlock_dealers.is_empty())
+            + usize::from(!self.pending.unlock_recruitments.is_empty())
     }
 
     /// Every city with how often it was visited, as it'll be after saving.
@@ -215,6 +237,25 @@ impl Session {
                 city
             })
             .collect()
+    }
+
+    /// The cities whose dealer (or agency) is unlocked, as it'll be after saving.
+    pub fn unlocked(&self, place: Place) -> BTreeSet<String> {
+        let mut unlocked: BTreeSet<String> = save::unlocked(&self.loaded.game, place)
+            .into_iter()
+            .collect();
+        unlocked.extend(self.pending.unlocks(place).iter().cloned());
+        unlocked
+    }
+
+    /// Unlocks the dealers (or agencies) in every city of `cities` (which the game's data knows).
+    pub fn unlock_all(&mut self, place: Place, cities: &BTreeSet<String>, cx: &mut Context<Self>) {
+        let saved: BTreeSet<String> = save::unlocked(&self.loaded.game, place)
+            .into_iter()
+            .collect();
+        self.change(cx, |pending, _| {
+            *pending.unlocks_mut(place) = cities.difference(&saved).cloned().collect();
+        });
     }
 
     pub fn visit_all_cities(&mut self, cx: &mut Context<Self>) {
@@ -412,6 +453,41 @@ impl Session {
                 t!(cx, "map-visited-all", count = unvisited),
             );
         }
+        for (place, what) in [
+            (Place::Dealer, t!(cx, "map-dealers")),
+            (Place::Recruitment, t!(cx, "map-recruitments")),
+        ] {
+            if self.pending.unlocks(place).is_empty() {
+                continue;
+            }
+            let saved: BTreeSet<String> = save::unlocked(&self.loaded.game, place)
+                .into_iter()
+                .collect();
+            let after = self.unlocked(place);
+            // Counted as the Map page counts them: only where the game has one, of how many.
+            match game_data::place_cities(cx, place) {
+                Some(cities) => add(
+                    what,
+                    t!(
+                        cx,
+                        "map-unlocked-of",
+                        unlocked = saved.intersection(&cities).count(),
+                        count = cities.len()
+                    ),
+                    t!(
+                        cx,
+                        "map-unlocked-of",
+                        unlocked = after.intersection(&cities).count(),
+                        count = cities.len()
+                    ),
+                ),
+                None => add(
+                    what,
+                    t!(cx, "map-unlocked-count", count = saved.len()),
+                    t!(cx, "map-unlocked-count", count = after.len()),
+                ),
+            }
+        }
         if !self.pending.maxed_drivers.is_empty() {
             add(
                 t!(cx, "page-drivers"),
@@ -478,6 +554,10 @@ impl Session {
         }
         if self.pending.visit_all_cities {
             save::visit_all_cities(&mut slot.game);
+        }
+        for place in [Place::Dealer, Place::Recruitment] {
+            let cities: Vec<String> = self.pending.unlocks(place).iter().cloned().collect();
+            save::unlock(&mut slot.game, place, &cities);
         }
         if let Some(info) = &mut slot.info {
             save::update_info(info, &self.pending.career);
@@ -673,6 +753,25 @@ mod tests {
             assert_eq!(session.change_count(), 0);
             assert!(!session.can_undo());
             assert_eq!(session.career().money, 2000);
+        });
+    }
+
+    #[gpui_kit::test]
+    fn unlocks_only_whats_not_unlocked_yet(cx: &mut TestAppContext) {
+        let session = session(cx);
+        let cities: BTreeSet<String> = ["lyon", "berlin"].map(String::from).into();
+        session.update(cx, |session, cx| {
+            session.unlock_all(Place::Dealer, &cities, cx)
+        });
+        cx.update(|cx| {
+            let session = session.read(cx);
+            assert_eq!(session.unlocked(Place::Dealer), cities);
+            assert_eq!(session.change_count(), 1);
+            let prepared = session.prepared().expect("prepares");
+            assert_eq!(
+                save::unlocked(&prepared.game, Place::Dealer),
+                ["berlin", "lyon"]
+            );
         });
     }
 }

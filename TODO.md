@@ -25,7 +25,7 @@ Agreed work, in order. Each step should end with something the owner can see or 
 ## 5. Overview
 
 - [ ] Money, level and XP, skills, ADR, HQ city: shown, then editable, with "max" buttons.
-- [ ] Changes list, undo and redo.
+- [x] Changes list, undo and redo.
 
 ## 6. Saving
 
@@ -35,7 +35,8 @@ Agreed work, in order. Each step should end with something the owner can see or 
 
 - [x] Fleet (trucks and coaches, repair), Garages (buy all, upgrade to large, HQ), Drivers (skills, max all).
 - [x] Map: visit every city.
-- [ ] Map: unlock every dealer and recruitment agency (city tokens in `economy.unlocked_dealers[]` / `unlocked_recruitments[]`; the full lists must come from the game's data).
+- [x] Map: unlock every dealer and recruitment agency (dealers from the city definitions; agencies from a list read off the 1.62 map, see `docs/sii-format.md`).
+- [ ] Re-read the recruitment-agency list from the map when a map DLC adds cities (part of the game-update checklist).
 - [ ] Trailers, odometers, plates; jobs.
 - [x] All data: every unit and field, editable (shape-checked).
 - [ ] All data: show All data edits on the typed pages too (an edited money_account in Overview), and search values across units.
@@ -45,7 +46,7 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [ ] Use the game's language for its names when the app gets more languages (gamedata already takes a language code).
 - [ ] Coach garages: coaches show "No garage"; find where the save keeps them.
 - [x] HQ city: pick from the cities the company has garages in (Garages page).
-- [ ] City names from the game's city definitions (`city_name_localized`), not only by token: a few tokens (`vasteraas`) differ from their text keys.
+- [x] City names from the game's city definitions (`city_name_localized`), not only by token: a few tokens (`vasteraas`) differ from their text keys.
 - [ ] Driver names (not found in `def/` yet; maybe generated or in another archive).
 
 ## Keeping up with the game

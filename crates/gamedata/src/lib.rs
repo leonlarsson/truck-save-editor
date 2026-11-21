@@ -5,11 +5,13 @@
 //!
 //! Everything here is read-only. When the game isn't found, the app falls back to built-in values.
 
+mod cities;
 mod icon;
 mod install;
+mod recruitment;
 mod texture;
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -50,6 +52,12 @@ pub struct GameData {
     adr_icons: Vec<Arc<GameIcon>>,
     /// The game's text: key → text, in the loaded language.
     strings: HashMap<String, String>,
+    /// Every city in the installed game and its maps: token → key of its name in the text.
+    city_names: std::collections::BTreeMap<String, String>,
+    /// Cities with a truck dealer.
+    dealer_cities: BTreeSet<String>,
+    /// Cities with a recruitment agency (of those the installed game has).
+    recruitment_cities: BTreeSet<String>,
 }
 
 impl GameData {
@@ -92,6 +100,15 @@ impl GameData {
                 .collect();
         }
 
+        let cities = cities::read_cities(install_dir);
+        data.recruitment_cities = recruitment::RECRUITMENT_CITIES
+            .iter()
+            .filter(|token| cities.names.contains_key(**token))
+            .map(|token| token.to_string())
+            .collect();
+        data.dealer_cities = cities.dealers;
+        data.city_names = cities.names;
+
         if let Ok(mut locale) = hashfs::Archive::open(install_dir.join("locale.scs")) {
             data.strings = read_strings(&mut locale, language)
                 .or_else(|_| read_strings(&mut locale, "en_us"))
@@ -117,9 +134,21 @@ impl GameData {
         Some(text)
     }
 
-    /// A city's name as the game shows it (`malmo` → `Malmö`).
+    /// A city's name as the game shows it (`malmo` → `Malmö`): its `city_name_localized` text.
     pub fn city_name(&self, token: &str) -> Option<String> {
-        self.text(token).filter(|name| !name.is_empty())
+        let key = self.city_names.get(token).map_or(token, String::as_str);
+        self.text(key).filter(|name| !name.is_empty())
+    }
+
+    /// Cities with a truck dealer, in the installed game and its map DLCs. Empty if the game's
+    /// city definitions couldn't be read.
+    pub fn dealer_cities(&self) -> &BTreeSet<String> {
+        &self.dealer_cities
+    }
+
+    /// Cities with a recruitment agency, in the installed game and its map DLCs.
+    pub fn recruitment_cities(&self) -> &BTreeSet<String> {
+        &self.recruitment_cities
     }
 
     /// The rank name for a truck driver level (`Newbie` … ), if the game has one.
