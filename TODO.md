@@ -73,7 +73,7 @@ Agreed work, in order. Each step should end with something the owner can see or 
 
 ## Later
 
-- [ ] Web version (GPUI's web target, or a page around the core compiled to wasm).
 - [ ] American Truck Simulator: test on real ATS saves (the code is written for both from the start).
 - [x] App icon (`scripts/make-icon.py`, embedded in the .exe) and a release workflow (version tag → draft release).
 - [ ] A final product name (Truck Save Editor for now, in `APP_NAME`; never a game name, those are SCS trademarks), signed Windows builds, the first release (the owner's call).
+- [ ] Web version, on hold (the owner's call, 2026-11-21): the desktop app comes first. The core crates stay free of UI and disk access so it stays possible (GPUI's web target, or a page around the core compiled to wasm), but no work on it until it's picked up again.
