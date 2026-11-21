@@ -1,6 +1,7 @@
-//! The vehicle models in the installed game (its own and every truck or coach DLC's): each
+//! The vehicle models in the installed game (its own and every truck, coach or trailer DLC's): each
 //! model's brand and series, as text keys (`brand_volvo`, `series_volvo_fh16_2012`), from
-//! `def/vehicle/{truck,bus}/<brand.model>/data.sii`.
+//! `def/vehicle/{truck,bus,trailer_owned}/<brand.model>/data.sii`. Trailers have no brand text
+//! (an empty key), only a series.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -14,7 +15,7 @@ pub(crate) fn read_models(archives: &[PathBuf]) -> HashMap<String, (String, Stri
         let Ok(mut archive) = hashfs::Archive::open(path) else {
             continue;
         };
-        for kind in ["truck", "bus"] {
+        for kind in ["truck", "bus", "trailer_owned"] {
             let folder = format!("/def/vehicle/{kind}");
             let Ok(Some(listing)) = archive.list(&folder) else {
                 continue;
@@ -35,6 +36,7 @@ pub(crate) fn read_models(archives: &[PathBuf]) -> HashMap<String, (String, Stri
                 let info = document
                     .first_of_kind("accessory_truck_data")
                     .or_else(|| document.first_of_kind("accessory_bus_data"))
+                    .or_else(|| document.first_of_kind("accessory_trailer_data"))
                     .map(|unit| unit.items("info").to_vec())
                     .unwrap_or_default();
                 let key = |index: usize| {

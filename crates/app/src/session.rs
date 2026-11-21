@@ -44,6 +44,8 @@ struct Pending {
     career: Career,
     /// Vehicles to repair when saving, by id.
     repaired: HashSet<String>,
+    /// Trucks and coaches to fill up when saving, by id.
+    refueled: HashSet<String>,
     /// Garages to buy or upgrade to large when saving, by id.
     upgraded_garages: HashSet<String>,
     /// Drivers to max out when saving, by id.
@@ -64,6 +66,7 @@ impl Pending {
         Self {
             career,
             repaired: HashSet::new(),
+            refueled: HashSet::new(),
             upgraded_garages: HashSet::new(),
             maxed_drivers: HashSet::new(),
             visit_all_cities: false,
@@ -214,6 +217,9 @@ impl Session {
                 if self.pending.repaired.contains(&truck.id) {
                     truck.wear = save::Wear::default();
                 }
+                if self.pending.refueled.contains(&truck.id) && truck.fuel.is_some() {
+                    truck.fuel = Some(1.0);
+                }
                 truck
             })
             .collect()
@@ -265,6 +271,17 @@ impl Session {
         });
     }
 
+    /// Fills the tank of every truck or coach of a kind that isn't full.
+    pub fn refuel_all(&mut self, kind: VehicleKind, cx: &mut Context<Self>) {
+        self.change(cx, |pending, this| {
+            for vehicle in this.saved_vehicles.iter().filter(|v| v.kind == kind) {
+                if vehicle.fuel.is_some_and(|fuel| fuel < 1.0) {
+                    pending.refueled.insert(vehicle.id.clone());
+                }
+            }
+        });
+    }
+
     /// Marks one vehicle for repair.
     pub fn repair(&mut self, id: &str, cx: &mut Context<Self>) {
         self.change(cx, |pending, _| {
@@ -286,6 +303,7 @@ impl Session {
     pub fn change_count(&self) -> usize {
         self.pending.career.changes_from(&self.saved_career)
             + usize::from(!self.pending.repaired.is_empty())
+            + usize::from(!self.pending.refueled.is_empty())
             + usize::from(!self.pending.upgraded_garages.is_empty())
             + usize::from(!self.pending.maxed_drivers.is_empty())
             + self.pending.raw_edits.len()
@@ -584,6 +602,13 @@ impl Session {
                 ),
             );
         }
+        if !self.pending.refueled.is_empty() {
+            add(
+                t!(cx, "fuel"),
+                t!(cx, "fuel-before"),
+                t!(cx, "fuel-after", count = self.pending.refueled.len()),
+            );
+        }
         if !self.pending.repaired.is_empty() {
             add(
                 t!(cx, "repairs"),
@@ -613,6 +638,9 @@ impl Session {
             .write_changes(&self.saved_career, &mut slot.game)?;
         for id in &self.pending.repaired {
             save::repair(&mut slot.game, id, false);
+        }
+        for id in &self.pending.refueled {
+            save::refuel(&mut slot.game, id);
         }
         for id in &self.pending.upgraded_garages {
             save::upgrade_garage(&mut slot.game, id);

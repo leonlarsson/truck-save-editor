@@ -24,7 +24,9 @@ mod time;
 pub use career::{ADR_ALL, Career, CoachSkills, MAX_COACH_SKILL_LEVEL, MAX_SKILL_LEVEL, Skills};
 pub use drivers::{Driver, drivers, max_driver};
 pub use error::{Error, Result};
-pub use fleet::{Vehicle, VehicleKind, Wear, model_display_name, repair, vehicles, wear_is_known};
+pub use fleet::{
+    Vehicle, VehicleKind, Wear, model_display_name, refuel, repair, vehicles, wear_is_known,
+};
 pub use game::Game;
 pub use garages::{Garage, LARGE_GARAGE_SLOTS, garages, upgrade_garage};
 pub use info::{SlotInfo, read_info, set_name, update_info};

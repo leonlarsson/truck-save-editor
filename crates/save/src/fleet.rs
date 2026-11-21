@@ -1,5 +1,6 @@
-//! The player's vehicles (trucks, and coaches from the Coaches DLC): what they are, where they're
-//! kept, how worn they are, and repairing them.
+//! The player's vehicles (trucks, coaches from the Coaches DLC, and owned trailers): what they
+//! are, where they're kept, how worn and how full of fuel they are, and repairing and refuelling
+//! them.
 
 use std::collections::HashMap;
 
@@ -11,6 +12,8 @@ pub enum VehicleKind {
     Truck,
     /// A coach (Coaches DLC).
     Coach,
+    /// An owned trailer (`player.trailers[]`).
+    Trailer,
 }
 
 /// One vehicle the player owns.
@@ -30,6 +33,10 @@ pub struct Vehicle {
     pub garage_city: Option<String>,
     /// The driver's id (`driver.12`), if one drives it.
     pub driver: Option<String>,
+    /// How full the tank is, from 0 to 1 (`None` for trailers).
+    pub fuel: Option<f32>,
+    /// A trailer's body type (`refrigerated`, `curtainside`), from its `trailer_def`.
+    pub body_type: Option<String>,
 }
 
 impl Vehicle {
@@ -46,11 +53,25 @@ pub struct Wear {
     pub transmission: f32,
     pub cabin: f32,
     pub chassis: f32,
+    /// A trailer's body.
+    pub body: f32,
     /// The most worn wheel.
     pub wheels: f32,
 }
 
 impl Wear {
+    /// Part by part, the more worn of two.
+    fn worst_of(self, other: Wear) -> Wear {
+        Wear {
+            engine: self.engine.max(other.engine),
+            transmission: self.transmission.max(other.transmission),
+            cabin: self.cabin.max(other.cabin),
+            chassis: self.chassis.max(other.chassis),
+            body: self.body.max(other.body),
+            wheels: self.wheels.max(other.wheels),
+        }
+    }
+
     /// The most worn part: what decides whether the truck needs the garage.
     pub fn worst(&self) -> f32 {
         [
@@ -58,6 +79,7 @@ impl Wear {
             self.transmission,
             self.cabin,
             self.chassis,
+            self.body,
             self.wheels,
         ]
         .into_iter()
@@ -65,12 +87,41 @@ impl Wear {
     }
 }
 
-const WEAR_FIELDS: [&str; 4] = [
+const WEAR_FIELDS: [&str; 5] = [
     "engine_wear",
     "transmission_wear",
     "cabin_wear",
     "chassis_wear",
+    "trailer_body_wear",
 ];
+
+/// Whether a vehicle keeps its wear on itself (the current format; trailers always do), not on
+/// each part's accessory (the older trucks' format).
+fn has_own_wear(vehicle: &sii::Unit) -> bool {
+    vehicle.get("engine_wear").is_some() || vehicle.get("trailer_body_wear").is_some()
+}
+
+/// A trailer and the trailers it pulls (`slave_trailer`, for doubles and B-doubles), in order.
+fn trailer_chain(document: &Document, first: &str) -> Vec<String> {
+    let mut chain = vec![first.to_string()];
+    let mut current = first.to_string();
+    // A chain is a few trailers long; the limit stops a damaged save from looping.
+    for _ in 0..8 {
+        let Some(next) = document
+            .unit(&current)
+            .and_then(|unit| unit.single("slave_trailer"))
+            .filter(|id| *id != "null" && document.unit(id).is_some())
+        else {
+            break;
+        };
+        if chain.iter().any(|id| id == next) {
+            break;
+        }
+        chain.push(next.to_string());
+        current = next.to_string();
+    }
+    chain
+}
 
 /// Every vehicle the player owns: trucks, then coaches, each in the order the save lists them.
 pub fn vehicles(document: &Document) -> Vec<Vehicle> {
@@ -82,7 +133,11 @@ pub fn vehicles(document: &Document) -> Vec<Vehicle> {
     let mut garage_of: HashMap<&str, String> = HashMap::new();
     for garage in document.units_of_kind("garage") {
         let city = garage.id.strip_prefix("garage.").unwrap_or(&garage.id);
-        for vehicle in garage.items("vehicles") {
+        for vehicle in garage
+            .items("vehicles")
+            .iter()
+            .chain(garage.items("trailers"))
+        {
             garage_of.insert(vehicle.as_str(), city.to_string());
         }
     }
@@ -103,8 +158,13 @@ pub fn vehicles(document: &Document) -> Vec<Vehicle> {
         .items("buses")
         .iter()
         .map(|id| (VehicleKind::Coach, id));
+    let trailers = player
+        .items("trailers")
+        .iter()
+        .map(|id| (VehicleKind::Trailer, id));
     trucks
         .chain(coaches)
+        .chain(trailers)
         .filter_map(|(kind, id)| Some((kind, document.unit(id)?)))
         .map(|(kind, vehicle)| {
             let (plate, plate_country) = split_plate(vehicle.single("license_plate").unwrap_or(""));
@@ -118,9 +178,26 @@ pub fn vehicles(document: &Document) -> Vec<Vehicle> {
                     .single("odometer")
                     .and_then(value::parse_i64)
                     .unwrap_or(0),
-                wear: read_wear(document, vehicle),
+                wear: if kind == VehicleKind::Trailer {
+                    // The worst of the whole chain: a double is as worn as its most worn trailer.
+                    trailer_chain(document, &vehicle.id)
+                        .iter()
+                        .filter_map(|id| document.unit(id))
+                        .map(|unit| read_wear(document, unit))
+                        .fold(Wear::default(), Wear::worst_of)
+                } else {
+                    read_wear(document, vehicle)
+                },
                 garage_city: garage_of.get(vehicle.id.as_str()).cloned(),
                 driver: driver_of.get(vehicle.id.as_str()).cloned(),
+                fuel: (kind != VehicleKind::Trailer)
+                    .then(|| vehicle.single("fuel_relative").and_then(value::parse_f32))
+                    .flatten(),
+                body_type: vehicle
+                    .single("trailer_definition")
+                    .and_then(|id| document.unit(id))
+                    .and_then(|definition| definition.single("body_type"))
+                    .map(|body| value::parse_string(body).to_string()),
             }
         })
         .collect()
@@ -128,11 +205,27 @@ pub fn vehicles(document: &Document) -> Vec<Vehicle> {
 
 /// Repairs a truck: all wear the game's garage can fix goes to zero. With `including_permanent`,
 /// the wear a garage can't fix goes too, making it like new.
-pub fn repair(document: &mut Document, truck_id: &str, including_permanent: bool) -> bool {
+///
+/// A trailer is repaired with the trailers it pulls.
+pub fn repair(document: &mut Document, vehicle_id: &str, including_permanent: bool) -> bool {
+    let is_trailer = document
+        .unit(vehicle_id)
+        .is_some_and(|unit| unit.kind == "trailer");
+    if is_trailer {
+        let mut repaired = false;
+        for id in trailer_chain(document, vehicle_id) {
+            repaired |= repair_one(document, &id, including_permanent);
+        }
+        return repaired;
+    }
+    repair_one(document, vehicle_id, including_permanent)
+}
+
+fn repair_one(document: &mut Document, truck_id: &str, including_permanent: bool) -> bool {
     let Some(vehicle) = document.unit(truck_id) else {
         return false;
     };
-    if vehicle.get("engine_wear").is_none() {
+    if !has_own_wear(vehicle) {
         // The older format: each part (accessory) holds its own `wear`.
         let parts: Vec<String> = vehicle.items("accessories").to_vec();
         let mut repaired = false;
@@ -164,11 +257,28 @@ pub fn repair(document: &mut Document, truck_id: &str, including_permanent: bool
         wheel_fields.push("wheels_wear_unfixable".to_string());
     }
     for field in wheel_fields {
-        let count = vehicle.get(&field).map(|v| v.items().len()).unwrap_or(0);
-        if count > 0 {
-            vehicle.set(&field, Value::Array(vec!["0".to_string(); count]));
+        // An array (one per axle) or, on some trailers, a single value.
+        match vehicle.get(&field) {
+            Some(Value::Array(items)) if !items.is_empty() => {
+                let count = items.len();
+                vehicle.set(&field, Value::Array(vec!["0".to_string(); count]));
+            }
+            Some(Value::Single(_)) => vehicle.set(&field, Value::single("0")),
+            _ => {}
         }
     }
+    true
+}
+
+/// Fills a truck's or coach's tank. Returns whether it has one.
+pub fn refuel(document: &mut Document, vehicle_id: &str) -> bool {
+    let Some(mut vehicle) = document.unit_mut(vehicle_id) else {
+        return false;
+    };
+    if vehicle.get("fuel_relative").is_none() {
+        return false;
+    }
+    vehicle.set("fuel_relative", Value::single("1"));
     true
 }
 
@@ -181,17 +291,21 @@ fn read_wear(document: &Document, vehicle: &sii::Unit) -> Wear {
     let float = |unit: &sii::Unit, field: &str| {
         unit.single(field).and_then(value::parse_f32).unwrap_or(0.0)
     };
-    if vehicle.get("engine_wear").is_some() {
+    if has_own_wear(vehicle) {
         return Wear {
             engine: float(vehicle, "engine_wear"),
             transmission: float(vehicle, "transmission_wear"),
             cabin: float(vehicle, "cabin_wear"),
             chassis: float(vehicle, "chassis_wear"),
-            wheels: vehicle
-                .items("wheels_wear")
-                .iter()
-                .filter_map(|text| value::parse_f32(text))
-                .fold(0.0, f32::max),
+            body: float(vehicle, "trailer_body_wear"),
+            wheels: match vehicle.get("wheels_wear") {
+                Some(Value::Single(_)) => float(vehicle, "wheels_wear"),
+                _ => vehicle
+                    .items("wheels_wear")
+                    .iter()
+                    .filter_map(|text| value::parse_f32(text))
+                    .fold(0.0, f32::max),
+            },
         };
     }
 
@@ -231,7 +345,7 @@ pub fn wear_is_known(document: &Document, truck_id: &str) -> bool {
     let Some(vehicle) = document.unit(truck_id) else {
         return false;
     };
-    vehicle.get("engine_wear").is_some()
+    has_own_wear(vehicle)
         || vehicle
             .items("accessories")
             .iter()
@@ -245,14 +359,16 @@ fn player(document: &Document) -> Option<&sii::Unit> {
 }
 
 /// The model from the vehicle's accessories: the one whose definition is
-/// `/def/vehicle/truck/<model>/data.sii` (or `/def/vehicle/bus/…` for coaches).
+/// `/def/vehicle/truck/<model>/data.sii` (`/def/vehicle/bus/…` for coaches,
+/// `/def/vehicle/trailer_owned/…` for owned trailers).
 fn model_id(document: &Document, vehicle: &sii::Unit) -> Option<String> {
     vehicle.items("accessories").iter().find_map(|id| {
         let path = document.unit(id)?.single("data_path")?;
         let path = value::parse_string(path);
         let rest = path
             .strip_prefix("/def/vehicle/truck/")
-            .or_else(|| path.strip_prefix("/def/vehicle/bus/"))?;
+            .or_else(|| path.strip_prefix("/def/vehicle/bus/"))
+            .or_else(|| path.strip_prefix("/def/vehicle/trailer_owned/"))?;
         let (model, file) = rest.split_once('/')?;
         (file == "data.sii").then(|| model.to_string())
     })
@@ -382,5 +498,38 @@ mod tests {
             split_plate("\"<offset hshift=-2>AB 123|france\"").0,
             "AB 123"
         );
+    }
+
+    const TRAILERS: &str = "SiiNunit\r\n{\r\neconomy : e {\r\n player: p\r\n}\r\n\r\nplayer : p {\r\n trucks: 1\r\n trucks[0]: v1\r\n trailers: 1\r\n trailers[0]: t1\r\n}\r\n\r\nvehicle : v1 {\r\n engine_wear: 0\r\n transmission_wear: 0\r\n cabin_wear: 0\r\n chassis_wear: 0\r\n fuel_relative: &3f000000\r\n wheels_wear: 0\r\n odometer: 10\r\n license_plate: \"AB 123|france\"\r\n}\r\n\r\ntrailer : t1 {\r\n slave_trailer: t2\r\n trailer_body_wear: &3e800000\r\n chassis_wear: 0\r\n wheels_wear: 0\r\n odometer: 20\r\n license_plate: \"TR 1|france\"\r\n}\r\n\r\ntrailer : t2 {\r\n slave_trailer: null\r\n trailer_body_wear: 0\r\n chassis_wear: &3f000000\r\n wheels_wear: 0\r\n odometer: 20\r\n}\r\n\r\ngarage : garage.lyon {\r\n vehicles: 1\r\n vehicles[0]: v1\r\n trailers: 1\r\n trailers[0]: t1\r\n}\r\n\r\n}\r\n";
+
+    #[test]
+    fn lists_trailers_with_the_wear_of_their_whole_chain() {
+        let document = sii::parse_text(TRAILERS).expect("parses");
+        let vehicles = vehicles(&document);
+        assert_eq!(vehicles.len(), 2);
+        let trailer = &vehicles[1];
+        assert_eq!(trailer.kind, VehicleKind::Trailer);
+        assert_eq!(trailer.garage_city.as_deref(), Some("lyon"));
+        assert_eq!(trailer.fuel, None);
+        assert_eq!(trailer.wear.body, 0.25);
+        // The pulled trailer's chassis is the most worn part of the double.
+        assert_eq!(trailer.wear.worst(), 0.5);
+        assert_eq!(vehicles[0].fuel, Some(0.5));
+    }
+
+    #[test]
+    fn repairs_a_trailer_with_the_trailers_it_pulls() {
+        let mut document = sii::parse_text(TRAILERS).expect("parses");
+        assert!(repair(&mut document, "t1", false));
+        let trailer = &vehicles(&document)[1];
+        assert_eq!(trailer.wear.worst(), 0.0);
+    }
+
+    #[test]
+    fn refuels_trucks_not_trailers() {
+        let mut document = sii::parse_text(TRAILERS).expect("parses");
+        assert!(refuel(&mut document, "v1"));
+        assert!(!refuel(&mut document, "t1"));
+        assert_eq!(vehicles(&document)[0].fuel, Some(1.0));
     }
 }

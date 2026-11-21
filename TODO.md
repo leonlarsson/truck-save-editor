@@ -37,7 +37,8 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [x] Map: visit every city.
 - [x] Map: unlock every dealer and recruitment agency (dealers from the city definitions; agencies from a list read off the 1.62 map, see `docs/sii-format.md`).
 - [ ] Re-read the recruitment-agency list from the map when a map DLC adds cities (part of the game-update checklist).
-- [ ] Trailers, odometers, plates; jobs.
+- [x] Trailers (owned, with wear and repair, doubles included), odometers, plates, fuel.
+- [ ] Jobs.
 - [x] All data: every unit and field, editable (shape-checked).
 - [ ] All data: show All data edits on the typed pages too (an edited money_account in Overview), and search values across units.
 - [x] Reading the game's archives (HashFS v1/v2) and its data: levels, ranks, skill limits, text and city names (`hashfs`, `gamedata`).

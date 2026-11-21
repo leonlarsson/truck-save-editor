@@ -99,6 +99,14 @@ pub fn observe<V: 'static>(
 /// A vehicle's model name: the game's own (`Volvo FH4`), else made from its id.
 pub fn model_name(cx: &App, vehicle: &save::Vehicle) -> Option<String> {
     let model_id = vehicle.model_id.as_deref()?;
+    // SCS's own trailers are known by their body (`Refrigerated`); their series names (`STD`)
+    // say little. Branded trailers (Krone, Schmitz …) keep their model name.
+    if vehicle.kind == save::VehicleKind::Trailer
+        && model_id.starts_with("scs.")
+        && let Some(body) = vehicle.body_type.as_deref()
+    {
+        return Some(text(cx, body).unwrap_or_else(|| save::model_display_name(body)));
+    }
     data(cx)
         .and_then(|d| d.model_name(model_id))
         .or_else(|| vehicle.display_name())

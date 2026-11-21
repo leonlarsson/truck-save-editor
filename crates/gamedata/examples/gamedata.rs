@@ -29,7 +29,12 @@ fn main() {
             for city in ["malmo", "krakow", "zurich", "berlin"] {
                 println!("{city}: {:?}", data.city_name(city));
             }
-            for model in ["volvo.fh16_2012", "scania.s_2016", "man.lions_24"] {
+            for model in [
+                "volvo.fh16_2012",
+                "scania.s_2016",
+                "man.lions_24",
+                "scs.box",
+            ] {
                 println!("{model}: {:?}", data.model_name(model));
             }
             println!(

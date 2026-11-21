@@ -167,6 +167,8 @@ palette-max-coach-skills = Max all coach skills
 palette-all-adr = All ADR classes
 palette-repair-trucks = Repair all trucks
 palette-repair-coaches = Repair all coaches
+palette-repair-trailers = Repair all trailers
+palette-refuel-all = Fill every tank
 palette-save = Save…
 palette-buy-all-garages = Buy every garage, all large
 palette-upgrade-owned-garages = Upgrade owned garages to large
@@ -411,6 +413,20 @@ column-garage = Garage
 column-odometer = Odometer
 column-wear = Wear
 repair = Repair
+refuel-all = Fill every tank
+refuel-all-tooltip = Fill the fuel tank of every truck or coach in this list.
+column-fuel = Fuel
+fuel = Fuel
+fuel-before = As it was
+fuel-after = { $count ->
+    [one] 1 tank filled
+   *[other] { $count } tanks filled
+}
+fleet-trailers = { $count ->
+    [one] 1 trailer
+   *[other] { $amount } trailers
+}
+fleet-tab-trailers = Trailers · { $count }
 no-garage = No garage
 distance-km = { $amount } km
 percent = { $amount }%

@@ -156,3 +156,9 @@ The save lists the cities where the player has found a truck dealer (`economy.un
 - **Recruitment agencies:** only the map knows. Prefab models (`def/world/prefab*.sii`) point to `.ppd` descriptors whose spawn points have types; type 16 is a recruitment agency (type 7 a truck dealer). Finding where those prefabs sit in the map sectors (`map/europe/sec*.base`) and which city area each falls in gives 138 cities in 1.62. The map format changes between versions, so the editor ships that list (`crates/gamedata/src/recruitment.rs`) and keeps only the cities the installed game defines; it needs reading again when a map DLC adds cities.
 
 Saves can hold tokens for cities that no longer have one (a leftover from an older map); the editor keeps them and doesn't count them.
+
+## Trailers and fuel
+
+- Owned trailers are `player.trailers[]`, each a `trailer` unit: `trailer_definition` (a `trailer_def` with `body_type`, `axles`, `chain_type`), `license_plate`, `odometer`, and wear in `trailer_body_wear`, `chassis_wear` and `wheels_wear` (each with an `_unfixable` part the garage can't repair). A double or B-double links its next trailer through `slave_trailer` (`null` at the end); `player.trailers[]` lists only the first. A garage lists the trailers kept there in `trailers[]`.
+- The trailer's model is the accessory whose `data_path` is `/def/vehicle/trailer_owned/<brand.model>/data.sii`. SCS's own trailers have no brand text and a terse series (`STD`), so the editor names them by body type (the text key is the `body_type` token: `refrigerated` → "Refrigerated").
+- A truck's or coach's fuel is `fuel_relative`, from 0 to 1 of its tank, whatever the tank's size.

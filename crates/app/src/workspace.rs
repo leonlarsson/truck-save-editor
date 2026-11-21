@@ -41,6 +41,7 @@ use crate::quick_start;
 use crate::session::Session;
 use crate::theme;
 use crate::ui::PageHeader;
+use save::VehicleKind;
 
 gpui_kit::actions!(workspace, [Undo, Redo]);
 
@@ -200,6 +201,10 @@ impl Workspace {
             PaletteCommand::AllAdr => {
                 edit(cx, Box::new(|career| career.skills.adr = save::ADR_ALL))
             }
+            PaletteCommand::RefuelAll => session.update(cx, |session, cx| {
+                session.refuel_all(VehicleKind::Truck, cx);
+                session.refuel_all(VehicleKind::Coach, cx);
+            }),
             PaletteCommand::Repair(kind) => {
                 session.update(cx, |session, cx| session.repair_all(kind, cx));
             }

@@ -170,9 +170,12 @@ impl GameData {
     /// A vehicle model's name as the game shows it (`Volvo FH16 Classic`), by model id.
     pub fn model_name(&self, model_id: &str) -> Option<String> {
         let (brand, series) = self.models.get(model_id)?;
-        let brand = self.text(brand).filter(|text| !text.is_empty())?;
         let series = self.text(series).filter(|text| !text.is_empty())?;
-        Some(format!("{brand} {series}"))
+        match self.text(brand).filter(|text| !text.is_empty()) {
+            Some(brand) => Some(format!("{brand} {series}")),
+            // Trailers: the series alone (`Box`).
+            None => Some(series),
+        }
     }
 
     /// A brand's logo (`volvo`), from the truck or coach set.

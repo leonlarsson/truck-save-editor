@@ -132,6 +132,7 @@ impl Render for FleetPage {
         let vehicles = match self.kind {
             VehicleKind::Truck => t!(cx, "fleet-trucks", count = truck_count, amount = count),
             VehicleKind::Coach => t!(cx, "fleet-coaches", count = truck_count, amount = count),
+            VehicleKind::Trailer => t!(cx, "fleet-trailers", count = truck_count, amount = count),
         };
         let worn = t!(
             cx,
@@ -141,32 +142,43 @@ impl Render for FleetPage {
         );
         let summary = t!(cx, "fleet-summary", vehicles = vehicles, worn = worn);
 
-        // Trucks and coaches each get their own list; the switch only shows when there are coaches.
+        // Trucks, coaches and trailers each get their own list; the switch shows the kinds the
+        // save has (trucks always).
         let all = self.session.read(cx).vehicles();
-        let coach_count = all.iter().filter(|v| v.kind == VehicleKind::Coach).count();
-        let all_truck_count = all.len() - coach_count;
-        let switch = (coach_count > 0).then(|| {
+        let count_of = |kind: VehicleKind| all.iter().filter(|v| v.kind == kind).count();
+        let kinds: Vec<VehicleKind> =
+            [VehicleKind::Truck, VehicleKind::Coach, VehicleKind::Trailer]
+                .into_iter()
+                .filter(|kind| *kind == VehicleKind::Truck || count_of(*kind) > 0)
+                .collect();
+        let switch = (kinds.len() > 1).then(|| {
+            let buttons = kinds.iter().map(|kind| {
+                let count = count_of(*kind);
+                let label = match kind {
+                    VehicleKind::Truck => t!(cx, "fleet-tab-trucks", count = count),
+                    VehicleKind::Coach => t!(cx, "fleet-tab-coaches", count = count),
+                    VehicleKind::Trailer => t!(cx, "fleet-tab-trailers", count = count),
+                };
+                Button::new(("vehicle-kind", *kind as usize))
+                    .label(label)
+                    .selected(self.kind == *kind)
+            });
+            let kinds = kinds.clone();
             ButtonGroup::new("vehicle-kind")
                 .outline()
                 .small()
-                .child(
-                    Button::new("trucks")
-                        .label(t!(cx, "fleet-tab-trucks", count = all_truck_count))
-                        .selected(self.kind == VehicleKind::Truck),
-                )
-                .child(
-                    Button::new("coaches")
-                        .label(t!(cx, "fleet-tab-coaches", count = coach_count))
-                        .selected(self.kind == VehicleKind::Coach),
-                )
-                .on_click(
-                    cx.listener(|this, clicked: &Vec<usize>, _, cx| match clicked.first() {
-                        Some(0) => this.show(VehicleKind::Truck, cx),
-                        Some(1) => this.show(VehicleKind::Coach, cx),
-                        _ => {}
-                    }),
-                )
+                .children(buttons)
+                .on_click(cx.listener(move |this, clicked: &Vec<usize>, _, cx| {
+                    if let Some(kind) = clicked.first().and_then(|index| kinds.get(*index)) {
+                        this.show(*kind, cx);
+                    }
+                }))
         });
+        let has_fuel = self.kind != VehicleKind::Trailer;
+        let empty_tanks = trucks
+            .iter()
+            .filter(|truck| truck.fuel.is_some_and(|fuel| fuel < 1.0))
+            .count();
 
         v_flex()
             .size_full()
@@ -187,16 +199,33 @@ impl Render for FleetPage {
                         ),
                     )
                     .child(
-                        Button::new("repair-all")
-                            .small()
-                            .outline()
-                            .label(t!(cx, "repair-all"))
-                            .disabled(worn_count == 0)
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                let kind = this.kind;
-                                this.session
-                                    .update(cx, |session, cx| session.repair_all(kind, cx));
-                            })),
+                        h_flex()
+                            .gap_2()
+                            .children(has_fuel.then(|| {
+                                Button::new("refuel-all")
+                                    .small()
+                                    .outline()
+                                    .label(t!(cx, "refuel-all"))
+                                    .tooltip(t!(cx, "refuel-all-tooltip"))
+                                    .disabled(empty_tanks == 0)
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        let kind = this.kind;
+                                        this.session
+                                            .update(cx, |session, cx| session.refuel_all(kind, cx));
+                                    }))
+                            }))
+                            .child(
+                                Button::new("repair-all")
+                                    .small()
+                                    .outline()
+                                    .label(t!(cx, "repair-all"))
+                                    .disabled(worn_count == 0)
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        let kind = this.kind;
+                                        this.session
+                                            .update(cx, |session, cx| session.repair_all(kind, cx));
+                                    })),
+                            ),
                     ),
             )
             .child(self.filter.clone())
@@ -234,15 +263,17 @@ enum TruckColumn {
     Plate,
     Garage,
     Odometer,
+    Fuel,
     Wear,
 }
 
 impl TruckColumn {
-    const ALL: [TruckColumn; 5] = [
+    const ALL: [TruckColumn; 6] = [
         TruckColumn::Truck,
         TruckColumn::Plate,
         TruckColumn::Garage,
         TruckColumn::Odometer,
+        TruckColumn::Fuel,
         TruckColumn::Wear,
     ];
 }
@@ -268,6 +299,7 @@ impl TruckTable {
                 TruckColumn::Plate => a.plate.cmp(&b.plate),
                 TruckColumn::Garage => a.garage_city.cmp(&b.garage_city),
                 TruckColumn::Odometer => a.odometer_km.cmp(&b.odometer_km),
+                TruckColumn::Fuel => a.fuel.unwrap_or(0.0).total_cmp(&b.fuel.unwrap_or(0.0)),
                 TruckColumn::Wear => a.wear.worst().total_cmp(&b.wear.worst()),
             };
             if sort == ColumnSort::Descending {
@@ -296,6 +328,11 @@ impl TruckTable {
                 .map(|city| SharedString::from(game_data::city_name(cx, city)))
                 .unwrap_or_else(|| t!(cx, "no-garage")),
             TruckColumn::Odometer => t!(cx, "distance-km", amount = thousands(truck.odometer_km)),
+            // Rounded down, so only a full tank says 100%. Trailers have none.
+            TruckColumn::Fuel => truck
+                .fuel
+                .map(|fuel| t!(cx, "percent", amount = (fuel * 100.0).floor() as i64))
+                .unwrap_or_default(),
             // Rounded up, so any wear at all shows (and matches the "need repairs" count).
             TruckColumn::Wear => t!(
                 cx,
@@ -318,20 +355,24 @@ impl TableDelegate for TruckTable {
     fn column(&self, col_ix: usize, cx: &App) -> Column {
         match TruckColumn::ALL.get(col_ix) {
             Some(TruckColumn::Truck) => Column::new("truck", t!(cx, "column-truck"))
-                .width(260.)
+                .width(230.)
                 .sortable(),
             Some(TruckColumn::Plate) => Column::new("plate", t!(cx, "column-plate"))
-                .width(110.)
+                .width(100.)
                 .sortable(),
             Some(TruckColumn::Garage) => Column::new("garage", t!(cx, "column-garage"))
-                .width(150.)
+                .width(140.)
                 .sortable(),
             Some(TruckColumn::Odometer) => Column::new("odometer", t!(cx, "column-odometer"))
-                .width(130.)
+                .width(120.)
+                .text_right()
+                .sortable(),
+            Some(TruckColumn::Fuel) => Column::new("fuel", t!(cx, "column-fuel"))
+                .width(70.)
                 .text_right()
                 .sortable(),
             Some(TruckColumn::Wear) | None => Column::new("wear", t!(cx, "column-wear"))
-                .width(170.)
+                .width(150.)
                 .text_right()
                 .sortable(),
         }
@@ -409,6 +450,8 @@ impl TableDelegate for TruckTable {
                 });
                 cell.justify_end().children(repair).child(text)
             }
+            // Numbers line up on the right, like their headings.
+            TruckColumn::Odometer | TruckColumn::Fuel => cell.justify_end().child(text),
             _ => cell.child(text),
         }
         .into_any_element()

@@ -30,6 +30,7 @@ pub enum PaletteCommand {
     UpgradeOwnedGarages,
     MaxAllDrivers,
     VisitEveryCity,
+    RefuelAll,
     UnlockDealers,
     UnlockRecruitments,
     Save,
@@ -53,6 +54,8 @@ fn groups(has_coaches: bool) -> Vec<Vec<PaletteCommand>> {
         PaletteCommand::MaxTruckSkills,
         PaletteCommand::AllAdr,
         PaletteCommand::Repair(VehicleKind::Truck),
+        PaletteCommand::Repair(VehicleKind::Trailer),
+        PaletteCommand::RefuelAll,
         PaletteCommand::BuyAllGarages,
         PaletteCommand::UpgradeOwnedGarages,
         PaletteCommand::MaxAllDrivers,
@@ -112,6 +115,16 @@ fn item(command: PaletteCommand, cx: &App) -> CommandItem {
             t!(cx, "palette-repair-coaches"),
             IconName::Wrench,
             &["wear", "fix", "bus"],
+        ),
+        PaletteCommand::Repair(VehicleKind::Trailer) => (
+            t!(cx, "palette-repair-trailers"),
+            IconName::Wrench,
+            &["wear", "fix", "trailer"],
+        ),
+        PaletteCommand::RefuelAll => (
+            t!(cx, "palette-refuel-all"),
+            IconName::Truck,
+            &["fuel", "tank", "fill", "diesel"],
         ),
         PaletteCommand::BuyAllGarages => (
             t!(cx, "palette-buy-all-garages"),
