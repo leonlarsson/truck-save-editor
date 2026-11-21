@@ -69,8 +69,6 @@ headquarters-pick = Pick a city
 page-drivers = Drivers
 page-map = Map
 page-all-data = All data
-page-not-built = { $page } isn't built yet
-page-not-built-body = It's on the way.
 switch-save = Switch save
 theme-light = Light mode
 theme-dark = Dark mode
@@ -201,6 +199,23 @@ shape-text = text in quotes
 shape-id = an id or name
 shape-vector = numbers in brackets
 shape-value = a value
+
+## Map
+
+map-summary = { $visited } of { $count } cities visited
+map-visit-all = Visit every city
+map-visit-all-tooltip = Mark every city as visited, as if you'd driven through each.
+map-visited-all = { $count ->
+    [one] 1 more city visited
+   *[other] { $count } more cities visited
+}
+map-visits = { $count ->
+    [0] Not visited
+    [one] Once
+   *[other] { $count } times
+}
+column-visits = Visited
+map-table = Cities
 
 ## Garages
 

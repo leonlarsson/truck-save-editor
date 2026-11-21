@@ -65,6 +65,15 @@ fn real_saves_have_a_career_and_a_fleet() {
                 .all(|(_, l)| *l <= save::MAX_SKILL_LEVEL)
         }));
 
+        // Every visited city is one the garages know.
+        let cities = save::cities(&slot.game);
+        let visited = slot
+            .game
+            .first_of_kind("economy")
+            .map(|e| e.items("visited_cities").len())
+            .unwrap_or(0);
+        assert!(cities.iter().filter(|c| c.visits > 0).count() <= visited);
+
         // Writing the unchanged career back leaves the save exactly as it was.
         let before = sii::to_text(&slot.game);
         career.write(&mut slot.game).expect("writes");

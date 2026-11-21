@@ -4,6 +4,7 @@ pub mod all_data;
 pub mod drivers;
 pub mod fleet;
 pub mod garages;
+pub mod map;
 pub mod open_save;
 pub mod overview;
 
@@ -69,14 +70,5 @@ impl Page {
             Page::Map => IconName::Map,
             Page::AllData => IconName::Database,
         }
-    }
-
-    /// Whether the page exists yet. Pages that don't are listed but disabled, so people can see
-    /// what's coming instead of wondering where it is.
-    pub fn is_built(self) -> bool {
-        matches!(
-            self,
-            Page::Overview | Page::Fleet | Page::Garages | Page::Drivers | Page::AllData
-        )
     }
 }

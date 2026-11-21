@@ -34,6 +34,8 @@ pub struct Session {
     saved_drivers: Vec<Driver>,
     /// Drivers to max out when saving, by id.
     maxed_drivers: HashSet<String>,
+    /// Whether to mark every city as visited when saving.
+    visit_all_cities: bool,
     /// Values changed in All data, by where they are; applied before the other changes.
     raw_edits: BTreeMap<FieldPath, String>,
     is_saving: bool,
@@ -56,6 +58,7 @@ impl Session {
             saved_drivers: save::drivers(&loaded.game),
             maxed_drivers: HashSet::new(),
             raw_edits: BTreeMap::new(),
+            visit_all_cities: false,
             saved_career: career.clone(),
             career,
             profile,
@@ -128,6 +131,25 @@ impl Session {
             + usize::from(!self.upgraded_garages.is_empty())
             + usize::from(!self.maxed_drivers.is_empty())
             + self.raw_edits.len()
+            + usize::from(self.visit_all_cities)
+    }
+
+    /// Every city with how often it was visited, as it'll be after saving.
+    pub fn cities(&self) -> Vec<save::City> {
+        save::cities(&self.loaded.game)
+            .into_iter()
+            .map(|mut city| {
+                if self.visit_all_cities && city.visits == 0 {
+                    city.visits = 1;
+                }
+                city
+            })
+            .collect()
+    }
+
+    pub fn visit_all_cities(&mut self, cx: &mut Context<Self>) {
+        self.visit_all_cities = true;
+        cx.notify();
     }
 
     /// The save as loaded (or last saved), for All data. Edits aren't in it; see `raw_value`.
@@ -309,6 +331,17 @@ impl Session {
                 text.clone().into(),
             );
         }
+        if self.visit_all_cities {
+            let unvisited = save::cities(&self.loaded.game)
+                .iter()
+                .filter(|city| city.visits == 0)
+                .count();
+            add(
+                t!(cx, "page-map"),
+                t!(cx, "garages-before"),
+                t!(cx, "map-visited-all", count = unvisited),
+            );
+        }
         if !self.maxed_drivers.is_empty() {
             add(
                 t!(cx, "page-drivers"),
@@ -349,6 +382,7 @@ impl Session {
         self.upgraded_garages.clear();
         self.maxed_drivers.clear();
         self.raw_edits.clear();
+        self.visit_all_cities = false;
         cx.notify();
     }
 
@@ -370,6 +404,9 @@ impl Session {
         for id in &self.maxed_drivers {
             save::max_driver(&mut slot.game, id);
         }
+        if self.visit_all_cities {
+            save::visit_all_cities(&mut slot.game);
+        }
         if let Some(info) = &mut slot.info {
             save::update_info(info, &self.career);
         }
@@ -384,6 +421,7 @@ impl Session {
         self.saved_drivers = save::drivers(&written.game);
         self.maxed_drivers.clear();
         self.raw_edits.clear();
+        self.visit_all_cities = false;
         self.loaded = written;
         self.saved_career = self.career.clone();
         self.repaired.clear();

@@ -12,6 +12,7 @@ mod game;
 mod garages;
 mod info;
 mod levels;
+mod map;
 #[cfg(feature = "native")]
 mod profiles;
 #[cfg(feature = "native")]
@@ -27,6 +28,7 @@ pub use game::Game;
 pub use garages::{Garage, LARGE_GARAGE_SLOTS, garages, upgrade_garage};
 pub use info::{SlotInfo, read_info, set_name, update_info};
 pub use levels::{FALLBACK_STEPS, Level, LevelTable};
+pub use map::{City, cities, visit_all_cities};
 #[cfg(feature = "native")]
 pub use profiles::{
     Location, PROFILE_DIRS_VARIABLE, Profile, Slot, SlotKind, decode_profile_folder, find_profiles,

@@ -7,7 +7,6 @@ use gpui_kit::assets::IconName;
 use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Icon, Sizable as _, StyledExt as _, WindowExt as _,
     button::{Button, ButtonVariants as _},
-    empty::{Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle},
     h_flex,
     notification::{Notification, NotificationType},
     sidebar::{Sidebar, SidebarGroup, SidebarMenu, SidebarMenuItem},
@@ -30,6 +29,7 @@ use crate::pages::{
     drivers::DriversPage,
     fleet::FleetPage,
     garages::GaragesPage,
+    map::MapPage,
     open_save::{OpenSavePage, OpenSlot},
     overview::OverviewPage,
 };
@@ -54,6 +54,7 @@ struct Opened {
     garages: Entity<GaragesPage>,
     drivers: Entity<DriversPage>,
     all_data: Entity<AllDataPage>,
+    map: Entity<MapPage>,
     _observe: Subscription,
 }
 
@@ -118,6 +119,7 @@ impl Workspace {
         let garages = cx.new(|cx| GaragesPage::new(session.clone(), window, cx));
         let drivers = cx.new(|cx| DriversPage::new(session.clone(), window, cx));
         let all_data = cx.new(|cx| AllDataPage::new(session.clone(), window, cx));
+        let map = cx.new(|cx| MapPage::new(session.clone(), window, cx));
         let _observe = cx.observe(&session, |_, _, cx| cx.notify());
         self.opened = Some(Opened {
             session,
@@ -126,6 +128,7 @@ impl Workspace {
             garages,
             drivers,
             all_data,
+            map,
             _observe,
         });
     }
@@ -356,7 +359,6 @@ impl Workspace {
             SidebarMenuItem::new(page.title(cx))
                 .icon(Icon::new(page.icon()))
                 .active(page == self.page)
-                .disable(!page.is_built())
                 .on_click(cx.listener(move |this, _, _, cx| {
                     this.page = page;
                     cx.notify();
@@ -416,7 +418,7 @@ impl Workspace {
             )
     }
 
-    fn render_page(&self, opened: &Opened, cx: &App) -> impl IntoElement {
+    fn render_page(&self, opened: &Opened) -> impl IntoElement {
         match self.page {
             Page::Overview => div()
                 .id("overview-scroll")
@@ -436,29 +438,13 @@ impl Workspace {
                 .size_full()
                 .child(opened.drivers.clone())
                 .into_any_element(),
+            Page::Map => div()
+                .size_full()
+                .child(opened.map.clone())
+                .into_any_element(),
             Page::AllData => div()
                 .size_full()
                 .child(opened.all_data.clone())
-                .into_any_element(),
-            other => div()
-                .size_full()
-                .flex()
-                .items_center()
-                .justify_center()
-                .child(
-                    Empty::new().header(
-                        EmptyHeader::new()
-                            .media(EmptyMedia::new().child(Icon::new(other.icon())))
-                            .title(EmptyTitle::new().child(t!(
-                                cx,
-                                "page-not-built",
-                                page = other.title(cx)
-                            )))
-                            .description(
-                                EmptyDescription::new().child(t!(cx, "page-not-built-body")),
-                            ),
-                    ),
-                )
                 .into_any_element(),
         }
     }
@@ -481,7 +467,7 @@ impl Render for Workspace {
                     .min_w_0()
                     .h_full()
                     .child(self.render_header(&session, cx))
-                    .child(div().flex_1().min_h_0().child(self.render_page(opened, cx))),
+                    .child(div().flex_1().min_h_0().child(self.render_page(opened))),
             )
             .into_any_element()
     }

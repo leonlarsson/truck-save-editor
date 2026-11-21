@@ -34,7 +34,8 @@ Agreed work, in order. Each step should end with something the owner can see or 
 ## 7. Sections
 
 - [x] Fleet (trucks and coaches, repair), Garages (buy all, upgrade to large, HQ), Drivers (skills, max all).
-- [ ] Map: visit every city (`economy.visited_cities[]` + `visited_cities_count[]`; every city has a garage unit), unlock every dealer and recruitment agency (city tokens in `unlocked_dealers[]` / `unlocked_recruitments[]`; the full lists must come from the game's data).
+- [x] Map: visit every city.
+- [ ] Map: unlock every dealer and recruitment agency (city tokens in `economy.unlocked_dealers[]` / `unlocked_recruitments[]`; the full lists must come from the game's data).
 - [ ] Trailers, odometers, plates; jobs.
 - [x] All data: every unit and field, editable (shape-checked).
 - [ ] All data: show All data edits on the typed pages too (an edited money_account in Overview), and search values across units.
