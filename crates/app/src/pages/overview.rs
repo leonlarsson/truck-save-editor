@@ -1,64 +1,61 @@
 //! Overview: the big levers first. Money, experience, skills and ADR, each one click from maxed.
 
 use gpui_kit::component::{
-    ActiveTheme as _, Sizable as _, StyledExt as _,
-    button::Button,
-    checkbox::Checkbox,
-    h_flex,
-    input::{Input, InputEvent, InputState, MaskPattern},
-    progress::Progress,
-    v_flex,
+    ActiveTheme as _, Sizable as _, StyledExt as _, button::Button, checkbox::Checkbox, h_flex,
+    progress::Progress, v_flex,
 };
 use gpui_kit::{
     AppContext as _, Context, Entity, IntoElement, ParentElement as _, Render, Styled as _,
     Subscription, Window, div, rems,
 };
 
-use crate::format::{parse_whole_number, thousands};
+use crate::format::compact;
 use crate::sample::{self, ADR_ALL, ADR_CLASSES, Career, MAX_SKILL_LEVEL, SKILLS};
-use crate::ui::{LevelPicker, Section, page_body};
+use crate::ui::{AmountChanged, AmountField, LevelPicker, Section, StepButtons, page_body};
+
+/// What typing in an amount field can do, said once under each field.
+const AMOUNT_HINT: &str = "Try 2.5m, 10k, +1m or -500k.";
 
 pub struct OverviewPage {
     /// The career as loaded; edits are compared against it to count changes.
     original: Career,
     career: Career,
-    money_input: Entity<InputState>,
-    experience_input: Entity<InputState>,
+    money: Entity<AmountField>,
+    experience: Entity<AmountField>,
     _subscriptions: Vec<Subscription>,
 }
 
 impl OverviewPage {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let career = Career::sample();
-        let money_input = number_input(career.money, window, cx);
-        let experience_input = number_input(career.experience, window, cx);
+        let money = cx.new(|cx| {
+            AmountField::new(career.money, "Bank balance in euros", window, cx)
+                .prefix("€")
+                .hint(AMOUNT_HINT)
+        });
+        let experience = cx.new(|cx| {
+            AmountField::new(career.experience, "Experience points", window, cx)
+                .min(0)
+                .suffix("XP")
+                .hint(AMOUNT_HINT)
+        });
 
-        // Typing in a field updates the career as you type; a value that isn't a number is ignored
-        // until it becomes one.
         let _subscriptions = vec![
-            cx.subscribe_in(&money_input, window, |this, state, event, _, cx| {
-                if let InputEvent::Change = event
-                    && let Some(value) = parse_whole_number(&state.read(cx).value())
-                {
-                    this.career.money = value;
-                    cx.notify();
-                }
+            cx.subscribe(&money, |this, _, AmountChanged(value), cx| {
+                this.career.money = *value;
+                cx.notify();
             }),
-            cx.subscribe_in(&experience_input, window, |this, state, event, _, cx| {
-                if let InputEvent::Change = event
-                    && let Some(value) = parse_whole_number(&state.read(cx).value())
-                {
-                    this.career.experience = value.max(0);
-                    cx.notify();
-                }
+            cx.subscribe(&experience, |this, _, AmountChanged(value), cx| {
+                this.career.experience = *value;
+                cx.notify();
             }),
         ];
 
         Self {
             original: career.clone(),
             career,
-            money_input,
-            experience_input,
+            money,
+            experience,
             _subscriptions,
         }
     }
@@ -70,59 +67,50 @@ impl OverviewPage {
 
     pub fn discard_changes(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.career = self.original.clone();
-        self.sync_inputs(window, cx);
+        self.sync_fields(window, cx);
         cx.notify();
     }
 
     fn set_money(&mut self, value: i64, window: &mut Window, cx: &mut Context<Self>) {
         self.career.money = value;
-        self.sync_inputs(window, cx);
+        self.sync_fields(window, cx);
         cx.notify();
     }
 
     fn set_experience(&mut self, value: i64, window: &mut Window, cx: &mut Context<Self>) {
         self.career.experience = value.max(0);
-        self.sync_inputs(window, cx);
+        self.sync_fields(window, cx);
         cx.notify();
     }
 
-    /// Puts the career's values back into the text fields after a change made elsewhere.
-    fn sync_inputs(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let money = thousands(self.career.money);
-        let experience = thousands(self.career.experience);
-        self.money_input
-            .update(cx, |state, cx| state.set_value(money, window, cx));
-        self.experience_input
-            .update(cx, |state, cx| state.set_value(experience, window, cx));
+    /// Puts the career's values into the fields after a change made elsewhere (a button, Discard).
+    fn sync_fields(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let (money, experience) = (self.career.money, self.career.experience);
+        self.money
+            .update(cx, |field, cx| field.set_value(money, window, cx));
+        self.experience
+            .update(cx, |field, cx| field.set_value(experience, window, cx));
     }
 
     fn render_money(&self, cx: &mut Context<Self>) -> Section {
-        let amounts: [i64; 3] = [100_000, 1_000_000, 10_000_000];
+        let steps: [i64; 3] = [100_000, 1_000_000, 10_000_000];
         Section::new("Money")
             .description("Your company's bank balance.")
-            .child(
-                Input::new(&self.money_input)
-                    .large()
-                    .prefix(div().text_color(cx.theme().muted_foreground).child("€"))
-                    .aria_label("Bank balance in euros"),
-            )
-            .child(h_flex().gap_2().flex_wrap().children(amounts.map(|amount| {
-                Button::new(("add-money", amount as usize))
-                    .small()
-                    .outline()
-                    .label(format!("+ {}", thousands(amount)))
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.set_money(this.career.money.saturating_add(amount), window, cx);
-                    }))
+            .child(self.money.clone())
+            .child(h_flex().gap_2().flex_wrap().children(steps.map(|step| {
+                StepButtons::new(("money-step", step as usize), compact(step)).on_step(cx.listener(
+                    move |this, direction: &i64, window, cx| {
+                        let value = this.career.money.saturating_add(direction * step);
+                        this.set_money(value, window, cx);
+                    },
+                ))
             })))
     }
 
     fn render_experience(&self, cx: &mut Context<Self>) -> Section {
         let (level, progress) = sample::level_for(self.career.experience);
-        let next_level_xp = move |levels_up: i64| {
-            let target = level + levels_up;
-            target * target * 400
-        };
+        // The experience at which a level starts. PLACEHOLDER curve, like `sample::level_for`.
+        let level_start = |level: i64| level.max(0) * level.max(0) * 400;
         Section::new("Experience")
             .description("Experience points decide your level.")
             .child(
@@ -155,33 +143,19 @@ impl OverviewPage {
                             .accessibility_label("Progress to the next level"),
                     ),
             )
-            .child(
-                Input::new(&self.experience_input)
-                    .large()
-                    .suffix(div().text_color(cx.theme().muted_foreground).child("XP"))
-                    .aria_label("Experience points"),
-            )
+            .child(self.experience.clone())
             .child(
                 h_flex()
                     .gap_2()
-                    .child(
-                        Button::new("level-up")
-                            .small()
-                            .outline()
-                            .label("+1 level")
-                            .on_click(cx.listener(move |this, _, window, cx| {
-                                this.set_experience(next_level_xp(1), window, cx);
-                            })),
-                    )
-                    .child(
-                        Button::new("level-up-ten")
-                            .small()
-                            .outline()
-                            .label("+10 levels")
-                            .on_click(cx.listener(move |this, _, window, cx| {
-                                this.set_experience(next_level_xp(10), window, cx);
-                            })),
-                    ),
+                    .flex_wrap()
+                    .children([(1, "1 level"), (10, "10 levels")].map(|(levels, label)| {
+                        StepButtons::new(("level-step", levels as usize), label).on_step(
+                            cx.listener(move |this, direction: &i64, window, cx| {
+                                let target = level + direction * levels;
+                                this.set_experience(level_start(target), window, cx);
+                            }),
+                        )
+                    })),
             )
     }
 
@@ -292,20 +266,4 @@ impl Render for OverviewPage {
                 .child(self.render_adr(cx)),
         )
     }
-}
-
-/// A whole-number field that groups thousands as you type.
-fn number_input(
-    value: i64,
-    window: &mut Window,
-    cx: &mut Context<OverviewPage>,
-) -> Entity<InputState> {
-    cx.new(|cx| {
-        InputState::new(window, cx)
-            .mask_pattern(MaskPattern::Number {
-                separator: Some(','),
-                fraction: None,
-            })
-            .default_value(thousands(value))
-    })
 }

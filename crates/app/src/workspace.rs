@@ -7,7 +7,7 @@ use gpui_kit::component::{
     button::{Button, ButtonVariants as _},
     empty::{Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle},
     h_flex,
-    sidebar::{Sidebar, SidebarFooter, SidebarGroup, SidebarHeader, SidebarMenu, SidebarMenuItem},
+    sidebar::{Sidebar, SidebarGroup, SidebarMenu, SidebarMenuItem},
     v_flex,
 };
 use gpui_kit::{
@@ -49,39 +49,40 @@ impl Workspace {
         Sidebar::new("sidebar")
             .w(px(232.))
             .header(
-                SidebarHeader::new().child(
-                    h_flex()
-                        .gap_2()
-                        .child(
-                            div()
-                                .flex()
-                                .items_center()
-                                .justify_center()
-                                .size_8()
-                                .flex_shrink_0()
-                                .rounded(cx.theme().radius)
-                                .bg(cx.theme().sidebar_primary)
-                                .text_color(cx.theme().sidebar_primary_foreground)
-                                .child(Icon::new(IconName::Truck)),
-                        )
-                        .child(
-                            v_flex()
-                                .min_w_0()
-                                .child(div().text_sm().font_semibold().child(APP_NAME))
-                                .child(
-                                    div()
-                                        .text_xs()
-                                        .text_color(cx.theme().muted_foreground)
-                                        .child("John · Autosave"),
-                                ),
-                        ),
-                ),
+                // Plain content, not `SidebarHeader`: that one is a menu trigger and lights up on hover.
+                h_flex()
+                    .p_2()
+                    .gap_2()
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .size_8()
+                            .flex_shrink_0()
+                            .rounded(cx.theme().radius)
+                            .bg(cx.theme().sidebar_primary)
+                            .text_color(cx.theme().sidebar_primary_foreground)
+                            .child(Icon::new(IconName::Truck)),
+                    )
+                    .child(
+                        v_flex()
+                            .min_w_0()
+                            .child(div().text_sm().font_semibold().child(APP_NAME))
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(cx.theme().muted_foreground)
+                                    .child("John · Autosave"),
+                            ),
+                    ),
             )
             .child(SidebarGroup::new("Career").child(self.menu(&Page::CAREER, cx)))
             .child(SidebarGroup::new("Company").child(self.menu(&Page::COMPANY, cx)))
             .child(SidebarGroup::new("Advanced").child(self.menu(&Page::ADVANCED, cx)))
             .footer(
-                SidebarFooter::new().child(
+                // Plain content, not `SidebarFooter` (a menu trigger that lights up on hover).
+                h_flex().p_2().child(
                     Button::new("toggle-theme")
                         .ghost()
                         .small()

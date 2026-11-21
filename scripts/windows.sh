@@ -18,7 +18,9 @@ mkdir -p "$dest"
 rsync -a --delete --exclude /target --exclude /fixtures --exclude /.git "$repo/" "$dest/"
 
 cd "$dest"
-cmd.exe /c "cargo build --release -p app" 2>&1
+# WSL keeps the Windows PATH it saw when it started, which misses a Rust installed since, so put
+# rustup's folder first. On the first build, rustup downloads the Rust version in rust-toolchain.toml.
+cmd.exe /c "set PATH=%USERPROFILE%\\.cargo\\bin;%PATH% && cargo build --release -p app" 2>&1
 
 exe="$dest/target/release/truck-save-editor.exe"
 echo "Built: $(wslpath -w "$exe")"
