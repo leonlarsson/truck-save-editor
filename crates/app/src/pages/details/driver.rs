@@ -10,6 +10,7 @@ use gpui_kit::{
 };
 use save::{Driver, MAX_SKILL_LEVEL, Skills};
 
+use super::garage_picker::GaragePicker;
 use super::{SHEET_WIDTH, fact, group};
 use crate::game_data;
 use crate::i18n::t;
@@ -21,6 +22,8 @@ pub struct DriverDetail {
     session: Entity<Session>,
     id: String,
     experience: Entity<AmountField>,
+    /// The garage, as a picker that moves the driver (and their truck).
+    garage: Entity<GaragePicker>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -55,10 +58,15 @@ impl DriverDetail {
                 cx.notify();
             }),
         ];
+        let garage = {
+            let (session, id) = (session.clone(), id.clone());
+            cx.new(|cx| GaragePicker::new(session, id, false, window, cx))
+        };
         Self {
             session,
             id,
             experience,
+            garage,
             _subscriptions,
         }
     }
@@ -163,11 +171,14 @@ impl Render for DriverDetail {
             )
             .child(group(
                 t!(cx, "detail-about"),
-                v_flex().gap_1().child(fact(
-                    t!(cx, "column-experience"),
-                    div().w(rems(11.)).child(self.experience.clone()),
-                    cx,
-                )),
+                v_flex()
+                    .gap_1()
+                    .child(fact(t!(cx, "column-garage"), self.garage.clone(), cx))
+                    .child(fact(
+                        t!(cx, "column-experience"),
+                        div().w(rems(11.)).child(self.experience.clone()),
+                        cx,
+                    )),
             ))
             .child(group(
                 t!(cx, "column-skills"),

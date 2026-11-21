@@ -13,7 +13,7 @@ use save::{Game, Location, Profile, Slot, SlotKind};
 use crate::workspace::Workspace;
 
 /// A made-up save: a career, two cities (one visited), one half-full truck, as plain text.
-const SAVE: &str = "SiiNunit\r\n{\r\neconomy : _nameless.1 {\r\n bank: _nameless.2\r\n player: _nameless.3\r\n experience_points: 5000\r\n adr: 0\r\n long_dist: 0\r\n heavy: 0\r\n fragile: 0\r\n urgent: 0\r\n mechanical: 0\r\n visited_cities: 1\r\n visited_cities[0]: lyon\r\n visited_cities_count: 1\r\n visited_cities_count[0]: 2\r\n}\r\n\r\nbank : _nameless.2 {\r\n money_account: 1000\r\n loans: 0\r\n}\r\n\r\nplayer : _nameless.3 {\r\n hq_city: lyon\r\n trucks: 1\r\n trucks[0]: _nameless.4\r\n}\r\n\r\nvehicle : _nameless.4 {\r\n engine_wear: 0\r\n transmission_wear: 0\r\n cabin_wear: 0\r\n chassis_wear: 0\r\n fuel_relative: &3f000000\r\n wheels_wear: 0\r\n odometer: 1000\r\n license_plate: \"AB 123|france\"\r\n}\r\n\r\ngarage : garage.lyon {\r\n status: 1\r\n}\r\n\r\ngarage : garage.berlin {\r\n status: 0\r\n}\r\n\r\n}\r\n";
+const SAVE: &str = "SiiNunit\r\n{\r\neconomy : _nameless.1 {\r\n bank: _nameless.2\r\n player: _nameless.3\r\n experience_points: 5000\r\n adr: 0\r\n long_dist: 0\r\n heavy: 0\r\n fragile: 0\r\n urgent: 0\r\n mechanical: 0\r\n visited_cities: 1\r\n visited_cities[0]: lyon\r\n visited_cities_count: 1\r\n visited_cities_count[0]: 2\r\n}\r\n\r\nbank : _nameless.2 {\r\n money_account: 1000\r\n loans: 0\r\n}\r\n\r\nplayer : _nameless.3 {\r\n hq_city: lyon\r\n trucks: 1\r\n trucks[0]: _nameless.4\r\n drivers: 1\r\n drivers[0]: driver.7\r\n current_job: _nameless.20\r\n assigned_trailer: _nameless.21\r\n assigned_trailer_connected: true\r\n}\r\n\r\nvehicle : _nameless.4 {\r\n engine_wear: 0\r\n transmission_wear: 0\r\n cabin_wear: 0\r\n chassis_wear: 0\r\n fuel_relative: &3f000000\r\n wheels_wear: 0\r\n odometer: 1000\r\n license_plate: \"AB 123|france\"\r\n}\r\n\r\ngarage : garage.lyon {\r\n vehicles: 1\r\n vehicles[0]: _nameless.4\r\n drivers: 1\r\n drivers[0]: driver.7\r\n status: 1\r\n}\r\n\r\ngarage : garage.paris {\r\n vehicles: 2\r\n vehicles[0]: null\r\n vehicles[1]: null\r\n drivers: 2\r\n drivers[0]: null\r\n drivers[1]: null\r\n status: 3\r\n}\r\n\r\ndriver_ai : driver.7 {\r\n adr: 0\r\n long_dist: 1\r\n heavy: 1\r\n fragile: 1\r\n urgent: 1\r\n mechanical: 1\r\n hometown: lyon\r\n current_city: lyon\r\n experience_points: 100\r\n assigned_truck: null\r\n adopted_truck: null\r\n}\r\n\r\nplayer_job : _nameless.20 {\r\n company_truck: null\r\n company_trailer: _nameless.21\r\n time_upper_limit: 2000\r\n online_job_id: 18446744073709551615\r\n cargo: cargo.bricks\r\n source_company: company.volatile.acme.lyon\r\n target_company: company.volatile.bolt.berlin\r\n planned_distance_km: 900\r\n urgency: 1\r\n special: null\r\n units_count: 10\r\n}\r\n\r\ntrailer : _nameless.21 {\r\n odometer: 1\r\n}\r\n\r\ngarage : garage.berlin {\r\n status: 0\r\n}\r\n\r\n}\r\n";
 
 /// A made-up profile file. The login fields hold placeholders, nothing real.
 const PROFILE: &str = "SiiNunit\r\n{\r\nuser_profile : _nameless.9 {\r\n company_name: \"Northwind Haulage\"\r\n cached_experience: 5000\r\n online_user_name: \"placeholder\"\r\n online_password: \"placeholder\"\r\n}\r\n\r\n}\r\n";
@@ -349,4 +349,81 @@ fn ctrl_s_opens_the_save_dialog_only_when_there_is_something_to_save(cx: &mut Te
     act(cx, handle, |window, cx| window.press("escape", cx));
     assert!(!has_dialog(cx, handle));
     assert_eq!(change_count(&workspace, cx), 1);
+}
+
+/// The session of the open save.
+fn session(
+    workspace: &Entity<Workspace>,
+    cx: &mut TestAppContext,
+) -> Entity<crate::session::Session> {
+    cx.update(|cx| workspace.read(cx).session().expect("a save is open"))
+}
+
+#[gpui_kit::test]
+fn the_current_job_can_be_cancelled_and_brought_back(cx: &mut TestAppContext) {
+    let slot = TempSlot::new("cancel-job");
+    let (handle, workspace) = open(cx, &slot);
+    act(cx, handle, |window, cx| window.press("ctrl-6", cx));
+    let session = session(&workspace, cx);
+    let has_job =
+        |cx: &mut TestAppContext| cx.update(|cx| session.read(cx).current_job().is_some());
+    assert!(has_job(cx));
+
+    act(cx, handle, |window, cx| window.click("cancel-job", cx));
+    assert!(!has_job(cx), "cancelled");
+    assert_eq!(change_count(&workspace, cx), 1);
+    let prepared = cx.update(|cx| session.read(cx).prepared().expect("prepares"));
+    let player = prepared.game.unit("_nameless.3").expect("player");
+    assert_eq!(player.single("current_job"), Some("null"));
+    assert_eq!(player.single("assigned_trailer"), Some("null"));
+
+    act(cx, handle, |window, cx| window.press("ctrl-z", cx));
+    assert!(has_job(cx), "Undo brought it back");
+    assert_eq!(change_count(&workspace, cx), 0);
+}
+
+#[gpui_kit::test]
+fn the_current_job_can_lose_its_deadline(cx: &mut TestAppContext) {
+    let slot = TempSlot::new("job-deadline");
+    let (handle, workspace) = open(cx, &slot);
+    act(cx, handle, |window, cx| window.press("ctrl-6", cx));
+    let session = session(&workspace, cx);
+    let deadline = |cx: &mut TestAppContext| {
+        cx.update(|cx| session.read(cx).current_job().and_then(|job| job.deadline))
+    };
+    assert_eq!(deadline(cx), Some(2000));
+    act(cx, handle, |window, cx| window.click("remove-deadline", cx));
+    assert_eq!(deadline(cx), None);
+    assert_eq!(change_count(&workspace, cx), 1);
+}
+
+#[gpui_kit::test]
+fn a_truck_moves_to_another_garage_with_its_driver(cx: &mut TestAppContext) {
+    let slot = TempSlot::new("move-truck");
+    let (_handle, workspace) = open(cx, &slot);
+    let session = session(&workspace, cx);
+    let options = cx.update(|cx| {
+        session
+            .read(cx)
+            .move_options("_nameless.4")
+            .expect("movable")
+    });
+    assert_eq!(options.from, "garage.lyon");
+    assert_eq!(options.partner.as_deref(), Some("driver.7"));
+    assert_eq!(options.targets, ["garage.paris"]);
+
+    cx.update(|cx| {
+        session.update(cx, |session, cx| {
+            session.move_to_garage("_nameless.4", "garage.paris", cx)
+        })
+    });
+    cx.run_until_parked();
+    assert_eq!(change_count(&workspace, cx), 1);
+    let prepared = cx.update(|cx| session.read(cx).prepared().expect("prepares"));
+    let paris = prepared.game.unit("garage.paris").expect("paris");
+    assert_eq!(paris.items("vehicles"), ["_nameless.4", "null"]);
+    assert_eq!(paris.items("drivers"), ["driver.7", "null"]);
+    // The driver's page agrees: they're in Paris now, with their truck.
+    let options = cx.update(|cx| session.read(cx).move_options("driver.7").expect("movable"));
+    assert_eq!(options.from, "garage.paris");
 }

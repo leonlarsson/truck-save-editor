@@ -71,6 +71,13 @@ struct Pending {
     unlock_dealers: BTreeSet<String>,
     /// Cities whose recruitment agency to unlock when saving.
     unlock_recruitments: BTreeSet<String>,
+    /// Trucks and drivers to move to another garage (id, garage id), in the order asked; each
+    /// takes its whole slot along (see `save::move_to_garage`).
+    garage_moves: Vec<(String, String)>,
+    /// Whether to cancel the job in progress when saving.
+    cancel_job: bool,
+    /// Whether to remove the job in progress's deadline when saving.
+    remove_job_deadline: bool,
 }
 
 impl Pending {
@@ -88,6 +95,9 @@ impl Pending {
             company_name: None,
             unlock_dealers: BTreeSet::new(),
             unlock_recruitments: BTreeSet::new(),
+            garage_moves: Vec::new(),
+            cancel_job: false,
+            remove_job_deadline: false,
         }
     }
 
@@ -314,6 +324,26 @@ impl Session {
     }
 
     /// The job offers as they'll be after saving, and the game's clock (minutes).
+    /// The job in progress, as it'll be after saving (none once cancelled).
+    pub fn current_job(&self) -> Option<save::CurrentJob> {
+        save::current_job(&self.preview())
+    }
+
+    /// The job in progress as the save on disk has it, and whether it's to be cancelled.
+    pub fn saved_job(&self) -> Option<(save::CurrentJob, bool)> {
+        save::current_job(&self.loaded.game).map(|job| (job, self.pending.cancel_job))
+    }
+
+    /// Cancels the job in progress (the kinds `save::cancel_job` handles).
+    pub fn cancel_job(&mut self, cx: &mut Context<Self>) {
+        self.change(cx, |pending, _| pending.cancel_job = true);
+    }
+
+    /// Takes the deadline off the job in progress.
+    pub fn remove_job_deadline(&mut self, cx: &mut Context<Self>) {
+        self.change(cx, |pending, _| pending.remove_job_deadline = true);
+    }
+
     pub fn jobs(&self) -> (Vec<save::Job>, i64) {
         let preview = self.preview();
         (save::jobs(&preview), save::game_time(&preview).unwrap_or(0))
@@ -426,6 +456,9 @@ impl Session {
             + usize::from(self.pending.company_name.is_some())
             + usize::from(!self.pending.unlock_dealers.is_empty())
             + usize::from(!self.pending.unlock_recruitments.is_empty())
+            + usize::from(!self.pending.garage_moves.is_empty())
+            + usize::from(self.pending.cancel_job)
+            + usize::from(self.pending.remove_job_deadline)
     }
 
     /// Every city with how often it was visited, as it'll be after saving.
@@ -514,6 +547,20 @@ impl Session {
     /// The garages as they'll be after saving.
     pub fn garages(&self) -> Vec<Garage> {
         save::garages(&self.preview())
+    }
+
+    /// Where a truck or driver could move, as the save will be after the changes so far.
+    pub fn move_options(&self, id: &str) -> Result<save::MoveOptions, save::MoveProblem> {
+        save::move_options(&self.preview(), id)
+    }
+
+    /// Moves a truck or driver, with the rest of its slot, to another garage.
+    pub fn move_to_garage(&mut self, id: &str, garage: &str, cx: &mut Context<Self>) {
+        self.change(cx, |pending, _| {
+            pending
+                .garage_moves
+                .push((id.to_string(), garage.to_string()));
+        });
     }
 
     /// Makes every owned garage large; with `buy_all`, buys every garage too.
@@ -691,6 +738,40 @@ impl Session {
                 ),
             );
         }
+        if !self.pending.garage_moves.is_empty() {
+            add(
+                t!(cx, "moves-what"),
+                t!(cx, "garages-before"),
+                t!(cx, "moves-after", count = self.pending.garage_moves.len()),
+            );
+        }
+        if self.pending.cancel_job || self.pending.remove_job_deadline {
+            let saved = save::current_job(&self.loaded.game);
+            let before = saved
+                .map(|job| {
+                    t!(
+                        cx,
+                        "current-job-summary",
+                        cargo = crate::game_data::cargo_name(cx, &job.cargo),
+                        city = crate::game_data::city_name(cx, &job.to_city)
+                    )
+                })
+                .unwrap_or_default();
+            if self.pending.remove_job_deadline {
+                add(
+                    t!(cx, "current-job"),
+                    before.clone(),
+                    t!(cx, "current-job-no-deadline"),
+                );
+            }
+            if self.pending.cancel_job {
+                add(
+                    t!(cx, "current-job"),
+                    before,
+                    t!(cx, "current-job-cancelled"),
+                );
+            }
+        }
         if let Some(name) = &self.pending.company_name {
             let before = self
                 .profile_file
@@ -751,6 +832,17 @@ impl Session {
         }
         for id in &self.pending.maxed_drivers {
             save::max_driver(&mut slot.game, id);
+        }
+        for (id, garage) in &self.pending.garage_moves {
+            // A move that no longer fits (an earlier one took the slot) is skipped; the page
+            // only offers moves that fit the preview, which this builds.
+            let _ = save::move_to_garage(&mut slot.game, id, garage);
+        }
+        if self.pending.remove_job_deadline {
+            save::remove_job_deadline(&mut slot.game);
+        }
+        if self.pending.cancel_job {
+            save::cancel_job(&mut slot.game);
         }
         if self.pending.visit_all_cities {
             save::visit_all_cities(&mut slot.game);

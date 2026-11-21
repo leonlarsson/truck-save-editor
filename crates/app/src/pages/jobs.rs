@@ -4,15 +4,15 @@
 use std::collections::HashSet;
 
 use gpui_kit::component::{
-    ActiveTheme as _, Disableable as _, Sizable as _,
-    button::Button,
+    ActiveTheme as _, Disableable as _, Sizable as _, StyledExt as _,
+    button::{Button, ButtonVariants as _},
     h_flex,
     table::{Column, ColumnSort, DataTable, TableDelegate, TableEvent, TableState},
     v_flex,
 };
 use gpui_kit::{
-    App, AppContext as _, Context, Entity, IntoElement, ParentElement as _, Pixels, Render,
-    SharedString, Styled as _, Subscription, Window, div,
+    AnyElement, App, AppContext as _, Context, Entity, IntoElement, ParentElement as _, Pixels,
+    Render, SharedString, Styled as _, Subscription, Window, div, prelude::FluentBuilder as _,
 };
 
 use crate::format::thousands;
@@ -20,7 +20,7 @@ use crate::game_data;
 use crate::i18n::t;
 use crate::session::{KEEP_OFFERS_MINUTES, Session};
 use crate::ui::{FillsWidth, fill_widths};
-use crate::ui::{FilterBar, FilterChanged, GameIconView};
+use crate::ui::{FilterBar, FilterChanged, GameIconView, Section};
 
 pub struct JobsPage {
     session: Entity<Session>,
@@ -181,6 +181,141 @@ impl JobsPage {
     }
 }
 
+impl JobsPage {
+    /// The job being driven, if any: where from and to, the cargo, the deadline, and Cancel and
+    /// Remove the deadline. A cancelled job stays shown (from the save on disk) until saving, so
+    /// it's clear what Undo would bring back.
+    fn render_current_job(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let session = self.session.read(cx);
+        let (saved, is_cancelled) = session.saved_job()?;
+        let job = session.current_job().unwrap_or(saved);
+        let now = session.jobs().1;
+
+        let place = |company: &str, city: &str, cx: &mut Context<Self>| {
+            let logo = game_data::company_logo(cx, company);
+            h_flex()
+                .gap_2()
+                .items_center()
+                .children(logo.map(|logo| GameIconView::new(logo).size(1.1)))
+                .child(game_data::city_name(cx, city))
+        };
+        let from = place(&job.from_company, &job.from_city, cx);
+        let to = place(&job.to_company, &job.to_city, cx);
+        let cargo_icon = game_data::cargo_icon(cx, &job.cargo);
+        let cargo = h_flex()
+            .gap_2()
+            .items_center()
+            .children(cargo_icon.map(|icon| GameIconView::new(icon).size(1.1)))
+            .child(game_data::cargo_name(cx, &job.cargo));
+        let deadline: SharedString = match job.deadline {
+            None => t!(cx, "current-job-no-deadline"),
+            Some(deadline) if deadline <= now => t!(cx, "current-job-late"),
+            Some(deadline) => expires_text(deadline - now, cx),
+        };
+        let urgency = match job.urgency {
+            0 => t!(cx, "job-urgency-standard"),
+            1 => t!(cx, "job-urgency-important"),
+            _ => t!(cx, "job-urgency-urgent"),
+        };
+        let facts = [
+            (
+                t!(cx, "column-distance"),
+                format!("{} km", thousands(job.planned_distance_km)).into(),
+            ),
+            (t!(cx, "current-job-deadline"), deadline),
+            (t!(cx, "column-urgency"), urgency),
+        ];
+        let is_urgent = job.urgency >= 2;
+        let fact = |label: SharedString, value: SharedString, cx: &Context<Self>| {
+            // Urgent in the danger colour, as in the table, with the word saying it too.
+            let is_danger = is_urgent && label == t!(cx, "column-urgency");
+            v_flex()
+                .gap_0p5()
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(cx.theme().muted_foreground)
+                        .child(label),
+                )
+                .child(
+                    div()
+                        .text_sm()
+                        .when(is_danger, |this| this.text_color(cx.theme().danger))
+                        .child(value),
+                )
+        };
+
+        let description = if is_cancelled {
+            t!(cx, "current-job-cancelled-note")
+        } else {
+            match job.kind {
+                save::JobKind::FreightMarket => t!(cx, "current-job-freight-market"),
+                save::JobKind::ExternalContract => t!(cx, "current-job-external"),
+                save::JobKind::QuickJob => t!(cx, "current-job-quick-job"),
+                save::JobKind::OwnTrailer => t!(cx, "current-job-own-trailer"),
+                save::JobKind::SpecialTransport => t!(cx, "current-job-special"),
+            }
+        };
+        let section = Section::new(t!(cx, "current-job"))
+            .description(description)
+            .when(!is_cancelled, |section| {
+                section.action(
+                    h_flex()
+                        .gap_2()
+                        .child(
+                            Button::new("remove-deadline")
+                                .small()
+                                .outline()
+                                .label(t!(cx, "current-job-remove-deadline"))
+                                .disabled(job.deadline.is_none())
+                                .on_click(cx.listener(|this, _, _, cx| {
+                                    this.session
+                                        .update(cx, |session, cx| session.remove_job_deadline(cx));
+                                })),
+                        )
+                        .child(
+                            Button::new("cancel-job")
+                                .small()
+                                .outline()
+                                .danger()
+                                .label(t!(cx, "current-job-cancel"))
+                                .disabled(!job.kind.can_cancel())
+                                .on_click(cx.listener(|this, _, _, cx| {
+                                    this.session
+                                        .update(cx, |session, cx| session.cancel_job(cx));
+                                })),
+                        ),
+                )
+            })
+            .child(
+                h_flex()
+                    .flex_wrap()
+                    .gap_x_8()
+                    .gap_y_3()
+                    .items_end()
+                    .child(
+                        v_flex().gap_1().child(cargo.text_sm().font_medium()).child(
+                            h_flex()
+                                .gap_2()
+                                .items_center()
+                                .text_sm()
+                                .child(from)
+                                .child(div().text_color(cx.theme().muted_foreground).child("→"))
+                                .child(to),
+                        ),
+                    )
+                    .children(
+                        facts
+                            .into_iter()
+                            .map(|(label, value)| fact(label, value, cx)),
+                    ),
+            )
+            // A cancelled job reads as set aside, not gone.
+            .when(is_cancelled, |section| section.opacity(0.6));
+        Some(section.into_any_element())
+    }
+}
+
 /// `in 40 minutes`, `in 5 hours`, `in 3 days`, or `Expired`.
 fn expires_text(minutes: i64, cx: &App) -> SharedString {
     if minutes <= 0 {
@@ -234,6 +369,7 @@ impl Render for JobsPage {
                             })),
                     ),
             )
+            .children(self.render_current_job(cx))
             .child(self.filter.clone())
             .child(
                 div().flex_1().min_h_0().child(crate::ui::table_or_empty(

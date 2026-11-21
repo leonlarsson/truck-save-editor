@@ -549,3 +549,30 @@ distance-km = { $amount } km
 percent = { $amount }%
 trucks-table = Vehicles
 unknown-truck = Unknown model
+
+# Moving trucks and drivers; the current job
+moves-what = Moves between garages
+moves-after = { $count ->
+    [one] One move
+   *[other] { $count } moves
+}
+move-garage-full = { $city } · full
+move-hint = Pick another garage to move it there.
+move-with-driver = Its driver moves with it.
+move-with-truck = Their truck moves with them.
+move-no-room = No other garage has a free slot. Buy or upgrade one under Garages.
+move-is-players = You drive this one: it goes where you take it.
+current-job = Current job
+current-job-summary = { $cargo } to { $city }
+current-job-no-deadline = No deadline
+current-job-cancelled = Cancelled
+current-job-deadline = Deadline
+current-job-late = Late
+current-job-remove-deadline = Remove the deadline
+current-job-cancel = Cancel job
+current-job-cancelled-note = Cancelled when you save, with no cancellation fee. Undo brings it back.
+current-job-freight-market = From the freight market, in your truck with the company's trailer. Cancelling here costs no fee.
+current-job-external = An external contract, in your truck with the company's trailer. Cancelling here costs no fee.
+current-job-quick-job = A quick job in the company's truck. The editor can't cancel those yet: cancel it in the game.
+current-job-own-trailer = A cargo market job in your own trailer. The editor can't cancel those yet: cancel it in the game.
+current-job-special = A special transport. The editor can't cancel those: cancel it in the game.

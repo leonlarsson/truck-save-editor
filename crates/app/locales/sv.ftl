@@ -549,3 +549,30 @@ distance-km = { $amount } km
 percent = { $amount } %
 trucks-table = Fordon
 unknown-truck = Okänd modell
+
+# Moving trucks and drivers; the current job
+moves-what = Flyttar mellan garage
+moves-after = { $count ->
+    [one] En flytt
+   *[other] { $count } flyttar
+}
+move-garage-full = { $city } · fullt
+move-hint = Välj ett annat garage för att flytta dit.
+move-with-driver = Föraren följer med.
+move-with-truck = Lastbilen följer med.
+move-no-room = Inget annat garage har en ledig plats. Köp eller bygg ut ett under Garage.
+move-is-players = Det här är din egen: den står där du kör den.
+current-job = Pågående uppdrag
+current-job-summary = { $cargo } till { $city }
+current-job-no-deadline = Ingen tidsgräns
+current-job-cancelled = Avbrutet
+current-job-deadline = Tidsgräns
+current-job-late = Försenad
+current-job-remove-deadline = Ta bort tidsgränsen
+current-job-cancel = Avbryt uppdraget
+current-job-cancelled-note = Avbryts när du sparar, utan avgift. Ångra tar tillbaka det.
+current-job-freight-market = Från fraktmarknaden, i din lastbil med företagets trailer. Att avbryta här kostar ingen avgift.
+current-job-external = Ett externt kontrakt, i din lastbil med företagets trailer. Att avbryta här kostar ingen avgift.
+current-job-quick-job = Ett snabbuppdrag i företagets lastbil. Redigeraren kan inte avbryta sådana än: avbryt det i spelet.
+current-job-own-trailer = Ett uppdrag från lastmarknaden i din egen trailer. Redigeraren kan inte avbryta sådana än: avbryt det i spelet.
+current-job-special = En specialtransport. Redigeraren kan inte avbryta sådana: avbryt den i spelet.

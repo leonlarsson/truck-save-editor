@@ -4,6 +4,7 @@
 
 mod driver;
 mod garage;
+mod garage_picker;
 mod vehicle;
 
 pub use driver::open as open_driver;

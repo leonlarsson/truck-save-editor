@@ -112,3 +112,94 @@ fn real_saves_read_back_the_way_they_were_written() {
         assert!(result.is_ok(), "slot {index}: {result:?}");
     }
 }
+
+/// A job in progress reads, and cancelling it (where the editor can) leaves nothing pointing at
+/// the job or its company trailer, as the game leaves a delivered job.
+#[test]
+fn real_jobs_read_and_cancel_cleanly() {
+    for (index, dir) in slot_dirs().into_iter().enumerate() {
+        let mut slot = save::load(&dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display()));
+        let Some(job) = save::current_job(&slot.game) else {
+            continue;
+        };
+        assert!(!job.cargo.is_empty(), "slot {index}: the job has cargo");
+        assert!(
+            !job.to_city.is_empty(),
+            "slot {index}: the job has a destination"
+        );
+        if !job.kind.can_cancel() {
+            continue;
+        }
+        let trailer = slot
+            .game
+            .unit(&job.id)
+            .and_then(|unit| unit.single("company_trailer"))
+            .unwrap_or("null")
+            .to_string();
+        assert!(save::cancel_job(&mut slot.game), "slot {index}: cancels");
+        assert!(save::current_job(&slot.game).is_none(), "slot {index}");
+        let text = sii::to_text(&slot.game);
+        let references = |id: &str| {
+            text.lines()
+                .filter(|line| line.ends_with(&format!(": {id}")))
+                .count()
+        };
+        assert_eq!(
+            references(&job.id),
+            0,
+            "slot {index}: nothing points at the job"
+        );
+        // Only the job itself (now unreferenced) still names its trailer.
+        assert_eq!(
+            references(&trailer),
+            1,
+            "slot {index}: nothing else points at the trailer"
+        );
+        // And it still reads back as written.
+        let again = sii::parse_text(&text).expect("reads back");
+        assert_eq!(sii::to_text(&again), text, "slot {index}");
+    }
+}
+
+/// A truck moves to another garage with its driver, and the company keeps every truck and driver.
+#[test]
+fn real_trucks_move_between_garages() {
+    for (index, dir) in slot_dirs().into_iter().enumerate() {
+        let mut slot = save::load(&dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display()));
+        let totals = |document: &sii::Document| {
+            save::garages(document)
+                .iter()
+                .fold((0, 0), |(trucks, drivers), garage| {
+                    (trucks + garage.trucks, drivers + garage.drivers)
+                })
+        };
+        let before = totals(&slot.game);
+        let garages = save::garages(&slot.game);
+        let trucks = save::vehicles(&slot.game);
+        // The first truck that can move somewhere, and where.
+        let found = trucks.iter().find_map(|truck| {
+            garages
+                .iter()
+                .find(|garage| save::can_move_to_garage(&slot.game, &truck.id, &garage.id).is_ok())
+                .map(|garage| (truck.id.clone(), garage.id.clone()))
+        });
+        let Some((truck, target)) = found else {
+            continue;
+        };
+        assert_eq!(
+            save::move_to_garage(&mut slot.game, &truck, &target),
+            Ok(()),
+            "slot {index}"
+        );
+        assert_eq!(
+            save::garage_of(&slot.game, &truck),
+            Some(target),
+            "slot {index}"
+        );
+        assert_eq!(
+            totals(&slot.game),
+            before,
+            "slot {index}: nothing lost or doubled"
+        );
+    }
+}

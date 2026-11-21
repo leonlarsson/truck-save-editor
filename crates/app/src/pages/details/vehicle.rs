@@ -14,6 +14,7 @@ use gpui_kit::{
 };
 use save::{Vehicle, VehicleKind};
 
+use super::garage_picker::GaragePicker;
 use super::{SHEET_WIDTH, fact, group};
 use crate::game_data;
 use crate::i18n::t;
@@ -35,6 +36,8 @@ pub struct VehicleDetail {
     id: String,
     odometer: Entity<AmountField>,
     plate: Entity<InputState>,
+    /// The garage, as a picker that moves the truck (trucks in a garage only).
+    garage: Option<Entity<GaragePicker>>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -59,6 +62,13 @@ impl VehicleDetail {
             .map(|v| v.plate.clone())
             .unwrap_or_default();
         let plate = cx.new(|cx| InputState::new(window, cx).default_value(plate_text));
+        let is_garaged_truck = vehicle
+            .as_ref()
+            .is_some_and(|v| v.kind == VehicleKind::Truck && v.garage_city.is_some());
+        let garage = is_garaged_truck.then(|| {
+            let (session, id) = (session.clone(), id.clone());
+            cx.new(|cx| GaragePicker::new(session, id, true, window, cx))
+        });
         let _subscriptions = vec![
             cx.subscribe(&odometer, |this, _, AmountChanged(km), cx| {
                 let id = this.id.clone();
@@ -82,6 +92,7 @@ impl VehicleDetail {
             id,
             odometer,
             plate,
+            garage,
             _subscriptions,
         }
     }
@@ -259,7 +270,12 @@ impl Render for VehicleDetail {
                         div().w(rems(11.)).child(Input::new(&self.plate).small()),
                         cx,
                     ))
-                    .child(fact(t!(cx, "column-garage"), where_kept, cx))
+                    .child(match &self.garage {
+                        Some(picker) => {
+                            fact(t!(cx, "column-garage"), picker.clone(), cx).into_any_element()
+                        }
+                        None => fact(t!(cx, "column-garage"), where_kept, cx).into_any_element(),
+                    })
                     .child(fact(
                         t!(cx, "column-odometer"),
                         div().w(rems(11.)).child(self.odometer.clone()),

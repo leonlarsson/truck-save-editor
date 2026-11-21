@@ -132,3 +132,19 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** "never lose a save" needs more than a backup: a write that didn't land (a full disk, an antivirus, a bug) should be caught before the game, or Steam Cloud, ever sees it.
 
 **Considered:** comparing bytes only (doesn't prove the file parses); comparing documents (fails on every real save because of the empty-array ambiguity, as the fixture test showed).
+
+## 2026-11-21: Moving to another garage moves the whole slot
+
+**Decided:** a garage's `vehicles[i]` and `drivers[i]` are one slot. Moving a truck or a driver to another of the company's garages moves its slot (truck and driver together) into the first slot there with neither, and leaves the old one empty. The slot holding the player (`driver_player`) doesn't move. Nothing else changes: the driver's `current_city` stays where they are, and the game sends them on from there.
+
+**Why:** in current saves every driver's `assigned_truck` and `adopted_truck` is `null`; the pairing is the slot index (checked on every filled slot of a real 1.62 save). The driver also caches values about the truck in their slot (`slot_truck_mass` and others), which stay right only if the pair stays together.
+
+**Considered:** moving a truck or driver alone into a half-filled slot (pairs them with someone new and leaves the cached values stale); asking which slot (the game itself doesn't number them).
+
+## 2026-11-21: Cancelling a job leaves its units in the file
+
+**Decided:** cancelling the current job sets `player.current_job: null` and unhitches the company trailer (`player.assigned_trailer` in older saves, the `player_vehicles` unit's `trailer` in newer ones). The `player_job` unit and the company trailer stay in the file with nothing pointing at them. Only jobs in the player's own truck with a company trailer (freight market, external contracts) can be cancelled, which is every job in the real saves looked at. Finishing a job isn't offered; removing its deadline is.
+
+**Why:** the editor never drops units (writing an unedited save gives the same file back, and edits change values only). When the game delivers a job, the job and trailer units disappear from its next save, so the game keeps only what's reachable; unreferenced units should go the same way. This is to be confirmed in game. Finishing would mean inventing the pay (it isn't stored; the game works it out on delivery), the delivery log entry, XP and statistics.
+
+**Considered:** removing the two units (the first edit that drops units, for no known gain); quick jobs, own-trailer jobs and special transports (no save to learn their shape from yet; shown with Cancel off and the reason).
