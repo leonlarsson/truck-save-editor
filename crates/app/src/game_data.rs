@@ -142,37 +142,39 @@ pub fn observe_in<V: 'static>(
     cx.observe_global_in::<Loaded>(window, on_loaded)
 }
 
-/// Drivers' faces, loaded one by one as they're first shown (there are hundreds, and a page shows
-/// a few dozen), each shrunk to a small copy so a big company doesn't cost much memory.
+/// Pictures from the game (drivers' faces, company logos, cargo icons), loaded one by one as
+/// they're first shown (there are hundreds of each, and a page shows a few dozen), each shrunk to
+/// a small copy so a big save doesn't cost much memory.
 #[derive(Default)]
-struct Faces {
+struct Pictures {
     /// `base.scs`, opened once on first use, shared with the background loads.
     archive: Arc<Mutex<Option<hashfs::Archive>>>,
-    /// By face number: the face, or `None` while loading or if the game has none.
-    loaded: HashMap<u32, Option<Arc<GameIcon>>>,
+    /// By material path: the picture, or `None` while loading or if the game has none.
+    loaded: HashMap<String, Option<Arc<GameIcon>>>,
 }
 
-impl Global for Faces {}
+impl Global for Pictures {}
 
-/// The pixel size faces are kept at: sharp at 2× for the table's 1.6rem.
-const FACE_PIXELS: u32 = 64;
+/// The size pictures are kept at, in pixels on their longer side: sharp at 2× for what the
+/// tables show.
+const PICTURE_PIXELS: u32 = 96;
 
-/// A hired driver's face (`driver.59` → the game's face 59). The first ask starts loading it in
-/// the background and returns `None`; the window redraws when it's there.
-pub fn driver_face(cx: &mut App, driver_id: &str) -> Option<Arc<GameIcon>> {
-    let number: u32 = driver_id.strip_prefix("driver.")?.parse().ok()?;
-    if !cx.has_global::<Faces>() {
-        cx.set_global(Faces::default());
+/// One of the game's pictures, by its material (`/material/ui/driver`, `59`). The first ask
+/// starts loading it in the background and returns `None`; the window redraws when it's there.
+fn picture(cx: &mut App, folder: &'static str, name: String) -> Option<Arc<GameIcon>> {
+    let key = format!("{folder}/{name}");
+    if !cx.has_global::<Pictures>() {
+        cx.set_global(Pictures::default());
     }
-    if let Some(face) = cx.global::<Faces>().loaded.get(&number) {
-        return face.clone();
+    if let Some(picture) = cx.global::<Pictures>().loaded.get(&key) {
+        return picture.clone();
     }
     let install_dir = data(cx)?.install_dir.clone();
-    let faces = cx.global_mut::<Faces>();
-    faces.loaded.insert(number, None);
-    let archive = faces.archive.clone();
+    let pictures = cx.global_mut::<Pictures>();
+    pictures.loaded.insert(key.clone(), None);
+    let archive = pictures.archive.clone();
     cx.spawn(async move |cx| {
-        let face = cx
+        let picture = cx
             .background_spawn(async move {
                 // A poisoned lock only means an earlier load panicked; the archive is still fine.
                 let mut archive = archive
@@ -182,18 +184,33 @@ pub fn driver_face(cx: &mut App, driver_id: &str) -> Option<Arc<GameIcon>> {
                     *archive = hashfs::Archive::open(install_dir.join("base.scs")).ok();
                 }
                 let archive = archive.as_mut()?;
-                let name = number.to_string();
-                GameIcon::load(archive, "/material/ui/driver", &name)
-                    .map(|face| Arc::new(face.shrunk(FACE_PIXELS)))
+                GameIcon::load(archive, folder, &name)
+                    .map(|picture| Arc::new(picture.shrunk(PICTURE_PIXELS)))
             })
             .await;
         cx.update(|cx| {
-            cx.global_mut::<Faces>().loaded.insert(number, face);
+            cx.global_mut::<Pictures>().loaded.insert(key, picture);
             cx.refresh_windows();
         });
     })
     .detach();
     None
+}
+
+/// A hired driver's face (`driver.59` → the game's face 59).
+pub fn driver_face(cx: &mut App, driver_id: &str) -> Option<Arc<GameIcon>> {
+    let number: u32 = driver_id.strip_prefix("driver.")?.parse().ok()?;
+    picture(cx, "/material/ui/driver", number.to_string())
+}
+
+/// A company's small logo (`renar`), as the game's job lists show it.
+pub fn company_logo(cx: &mut App, company: &str) -> Option<Arc<GameIcon>> {
+    picture(cx, "/material/ui/company/small", company.to_string())
+}
+
+/// A cargo's icon (`bricks`).
+pub fn cargo_icon(cx: &mut App, cargo: &str) -> Option<Arc<GameIcon>> {
+    picture(cx, "/material/ui/cargo_icons", cargo.to_string())
 }
 
 /// A company's name (`renar` → `Renar Logistik`), else made from its token.

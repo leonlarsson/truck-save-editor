@@ -19,7 +19,7 @@ use crate::format::thousands;
 use crate::game_data;
 use crate::i18n::t;
 use crate::session::{KEEP_OFFERS_MINUTES, Session};
-use crate::ui::{FilterBar, FilterChanged};
+use crate::ui::{FilterBar, FilterChanged, GameIconView};
 
 pub struct JobsPage {
     session: Entity<Session>,
@@ -42,6 +42,12 @@ struct Row {
     from: SharedString,
     to: SharedString,
     cargo: SharedString,
+    /// Tokens and city names, for the logos and icons drawn beside them.
+    from_company: String,
+    from_city: SharedString,
+    to_company: String,
+    to_city: SharedString,
+    cargo_token: String,
     distance: SharedString,
     expires: SharedString,
     urgency_text: SharedString,
@@ -122,6 +128,11 @@ impl JobsPage {
                     Row {
                         from: place(&job.from_company, &job.from_city),
                         to: place(&job.to_company, &job.to_city),
+                        from_company: job.from_company.clone(),
+                        from_city: game_data::city_name(cx, &job.from_city).into(),
+                        to_company: job.to_company.clone(),
+                        to_city: game_data::city_name(cx, &job.to_city).into(),
+                        cargo_token: job.cargo.clone(),
                         cargo: game_data::cargo_name(cx, &job.cargo).into(),
                         distance: if job.has_ferry {
                             t!(cx, "job-ferry", distance = distance)
@@ -347,7 +358,51 @@ impl TableDelegate for JobTable {
             .copied()
             .unwrap_or(JobColumn::From);
         let text = self.text(row_ix, column);
-        let cell = h_flex().w_full().items_center();
+        let cell = h_flex().w_full().items_center().gap_2();
+        // The company's logo, then the city (the logo says who); the full text while a logo
+        // loads or when the game has none.
+        let place =
+            |logo: Option<std::sync::Arc<gamedata::GameIcon>>, city: SharedString| match logo {
+                Some(logo) => h_flex()
+                    .w_full()
+                    .items_center()
+                    .gap_2()
+                    .child(GameIconView::new(logo).size(1.1))
+                    .child(city)
+                    .into_any_element(),
+                None => h_flex()
+                    .w_full()
+                    .items_center()
+                    .child(text.clone())
+                    .into_any_element(),
+            };
+        let Some(row) = self.rows.get(row_ix) else {
+            return cell.into_any_element();
+        };
+        match column {
+            JobColumn::From => {
+                let (company, city) = (row.from_company.clone(), row.from_city.clone());
+                return place(game_data::company_logo(cx, &company), city);
+            }
+            JobColumn::To => {
+                let (company, city) = (row.to_company.clone(), row.to_city.clone());
+                return place(game_data::company_logo(cx, &company), city);
+            }
+            JobColumn::Cargo => {
+                let cargo = row.cargo_token.clone();
+                let icon = game_data::cargo_icon(cx, &cargo);
+                return cell
+                    .child(
+                        div()
+                            .w(gpui_kit::rems(1.4))
+                            .flex_shrink_0()
+                            .children(icon.map(|icon| GameIconView::new(icon).size(1.1))),
+                    )
+                    .child(text)
+                    .into_any_element();
+            }
+            _ => {}
+        }
         match column {
             JobColumn::Distance => cell.justify_end().child(text),
             // Urgent offers stand out in the theme's danger colour (readable on both themes), with
@@ -357,6 +412,7 @@ impl TableDelegate for JobTable {
             }
             _ => cell.child(text),
         }
+        .into_any_element()
     }
 
     fn cell_label(&self, row_ix: usize, col_ix: usize, _: &App) -> Option<SharedString> {
