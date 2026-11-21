@@ -62,6 +62,14 @@ impl Language {
         }
     }
 
+    /// How the language writes numbers.
+    pub fn number_style(self) -> crate::format::NumberStyle {
+        match self {
+            Language::English => crate::format::NumberStyle::Comma,
+            Language::Swedish => crate::format::NumberStyle::Space,
+        }
+    }
+
     fn messages(self) -> &'static str {
         match self {
             Language::English => ENGLISH,
@@ -187,12 +195,14 @@ impl From<&SharedString> for Arg {
 /// Loads the language chosen in the settings.
 pub fn init(cx: &mut App) {
     let language = crate::settings::get(cx).language;
+    crate::format::set_style(language.number_style());
     cx.set_global(Strings::new(language));
 }
 
 /// Switches the app to another language: its own text, and the game's (city names and so on).
 pub fn set_language(language: Language, cx: &mut App) {
     crate::settings::update(cx, |settings| settings.language = language);
+    crate::format::set_style(language.number_style());
     cx.set_global(Strings::new(language));
     crate::game_data::reload(cx);
     cx.refresh_windows();

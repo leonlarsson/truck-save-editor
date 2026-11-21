@@ -295,7 +295,7 @@ restore-failed = Kunde inte återställa ”{ $name }”
 
 ## Overview
 
-amount-hint = Prova 2.5m, 10k, +1m eller -500k.
+amount-hint = Prova 2,5m, 10k, +1m eller -500k.
 company-name = Företagsnamn
 company-name-description = Ditt företags namn, för hela profilen: varje sparfil i den. Det ligger i profilfilen, som säkerhetskopieras innan den skrivs.
 money = Pengar

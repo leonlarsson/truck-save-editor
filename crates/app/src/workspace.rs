@@ -115,6 +115,9 @@ pub struct Workspace {
     opened: Option<Opened>,
     /// The save being opened, while it loads.
     opening: Option<SharedString>,
+    /// A save that's loaded, waiting for the game's data (names, levels) so its pages don't show
+    /// fallbacks first and then change.
+    waiting: Option<Session>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -154,6 +157,14 @@ impl Workspace {
                     this.build_pages(session, window, cx);
                 }
             });
+        let game_data_loaded = game_data::observe_in(window, cx, |this, window, cx| {
+            if !game_data::is_loading(cx)
+                && let Some(session) = this.waiting.take()
+            {
+                this.opening = None;
+                this.show(session, window, cx);
+            }
+        });
         let mut workspace = Self {
             page: dev_start_page().unwrap_or(Page::Overview),
             focus_handle,
@@ -161,7 +172,8 @@ impl Workspace {
             open_save,
             opened: None,
             opening: None,
-            _subscriptions: vec![subscription, language_changed],
+            waiting: None,
+            _subscriptions: vec![subscription, language_changed, game_data_loaded],
         };
         if let Some((profile, slot)) = dev_start_slot() {
             workspace.open(profile, slot, window, cx);
@@ -191,6 +203,11 @@ impl Workspace {
                 this.opening = None;
                 let session = loaded.and_then(|loaded| Session::open(profile, slot, loaded));
                 match session {
+                    // Still reading the game's data: keep showing "Opening…" until it's there.
+                    Ok(session) if game_data::is_loading(cx) => {
+                        this.opening = Some(name.clone());
+                        this.waiting = Some(session);
+                    }
                     Ok(session) => this.show(session, window, cx),
                     Err(error) => window.push_notification(
                         Notification::new()

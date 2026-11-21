@@ -9,7 +9,11 @@ use gpui_kit::{App, AppContext as _, Context, Global, Subscription, Window};
 use save::{Game, LevelTable};
 
 #[derive(Default)]
-struct Loaded(Option<Arc<GameData>>);
+struct Loaded {
+    data: Option<Arc<GameData>>,
+    /// A load is under way (at startup, or after the language or the game's folder changed).
+    is_loading: bool,
+}
 
 impl Global for Loaded {}
 
@@ -29,6 +33,10 @@ pub fn install_dir(cx: &App) -> Option<std::path::PathBuf> {
 /// Reads the game's data again (after the language or the game's folder changed). What's shown
 /// until it arrives is the data read before.
 pub fn reload(cx: &mut App) {
+    if !cx.has_global::<Loaded>() {
+        cx.set_global(Loaded::default());
+    }
+    cx.global_mut::<Loaded>().is_loading = true;
     let dir = install_dir(cx);
     let language = crate::settings::get(cx).language.game_code();
     cx.spawn(async move |cx| {
@@ -41,7 +49,10 @@ pub fn reload(cx: &mut App) {
             })
             .await;
         cx.update(|cx| {
-            cx.set_global(Loaded(data.map(Arc::new)));
+            cx.set_global(Loaded {
+                data: data.map(Arc::new),
+                is_loading: false,
+            });
             cx.refresh_windows();
         });
     })
@@ -50,7 +61,13 @@ pub fn reload(cx: &mut App) {
 
 fn data(cx: &App) -> Option<Arc<GameData>> {
     cx.try_global::<Loaded>()
-        .and_then(|loaded| loaded.0.clone())
+        .and_then(|loaded| loaded.data.clone())
+}
+
+/// Whether the game's data is being read right now.
+pub fn is_loading(cx: &App) -> bool {
+    cx.try_global::<Loaded>()
+        .is_some_and(|loaded| loaded.is_loading)
 }
 
 pub fn truck_levels(cx: &App) -> LevelTable {

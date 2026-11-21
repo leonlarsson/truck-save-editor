@@ -1,7 +1,48 @@
-//! How numbers are shown and read back. One place, so every screen writes them the same way.
+//! How numbers are shown and read back. One place, so every screen writes them the same way, in
+//! the way the app's language writes them (`2,480,350` in English, `2 480 350` in Swedish).
 
-/// `2480350` → `"2,480,350"`.
+use std::sync::atomic::{AtomicU8, Ordering};
+
+/// How a language writes numbers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NumberStyle {
+    /// `2,480,350` and `2.5`.
+    Comma,
+    /// `2 480 350` (a no-break space, so a number never wraps) and `2,5`.
+    Space,
+}
+
+impl NumberStyle {
+    fn grouping(self) -> char {
+        match self {
+            NumberStyle::Comma => ',',
+            NumberStyle::Space => '\u{a0}',
+        }
+    }
+}
+
+/// The style in use, for the whole app (set with the language; see `i18n::set_language`). An
+/// atomic rather than passing it everywhere: numbers are formatted in many places that have no
+/// app context at hand, and it changes only when the language does.
+static STYLE: AtomicU8 = AtomicU8::new(0);
+
+pub fn set_style(style: NumberStyle) {
+    STYLE.store(style as u8, Ordering::Relaxed);
+}
+
+fn style() -> NumberStyle {
+    match STYLE.load(Ordering::Relaxed) {
+        1 => NumberStyle::Space,
+        _ => NumberStyle::Comma,
+    }
+}
+
+/// `2480350` → `"2,480,350"` (or `"2 480 350"`, in the app's language).
 pub fn thousands(value: i64) -> String {
+    thousands_with(value, style())
+}
+
+fn thousands_with(value: i64, style: NumberStyle) -> String {
     let digits = value.unsigned_abs().to_string();
     let mut out = String::with_capacity(digits.len() + digits.len() / 3 + 1);
     if value < 0 {
@@ -9,7 +50,7 @@ pub fn thousands(value: i64) -> String {
     }
     for (index, digit) in digits.chars().enumerate() {
         if index > 0 && (digits.len() - index).is_multiple_of(3) {
-            out.push(',');
+            out.push(style.grouping());
         }
         out.push(digit);
     }
@@ -35,9 +76,23 @@ pub fn compact(value: i64) -> String {
 ///
 /// `None` when it isn't an amount, or doesn't fit.
 pub fn parse_amount(text: &str, current: i64) -> Option<i64> {
+    parse_amount_with(text, current, style())
+}
+
+/// `parse_amount` in a given style: in `Space` style a comma is the decimal mark (`2,5m`), and
+/// spaces group thousands; in `Comma` style commas group thousands. A point is a decimal mark in
+/// both, since that's what people type for `2.5m` whatever their language.
+fn parse_amount_with(text: &str, current: i64, style: NumberStyle) -> Option<i64> {
     let cleaned: String = text
         .chars()
-        .filter(|c| !matches!(c, ',' | ' ' | '_' | '€' | '$'))
+        .filter(|c| {
+            let grouping = match style {
+                NumberStyle::Comma => matches!(c, ','),
+                NumberStyle::Space => false,
+            };
+            !grouping && !c.is_whitespace() && !matches!(c, '_' | '€' | '$')
+        })
+        .map(|c| if c == ',' { '.' } else { c })
         .collect::<String>()
         .to_lowercase()
         .replace('−', "-");
@@ -74,6 +129,30 @@ pub fn parse_amount(text: &str, current: i64) -> Option<i64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn writes_and_reads_the_swedish_way() {
+        assert_eq!(
+            thousands_with(2_480_350, NumberStyle::Space),
+            "2\u{a0}480\u{a0}350"
+        );
+        assert_eq!(
+            parse_amount_with("2 480 350", 0, NumberStyle::Space),
+            Some(2_480_350)
+        );
+        assert_eq!(
+            parse_amount_with("2\u{a0}480", 0, NumberStyle::Space),
+            Some(2_480)
+        );
+        assert_eq!(
+            parse_amount_with("2,5m", 0, NumberStyle::Space),
+            Some(2_500_000)
+        );
+        assert_eq!(
+            parse_amount_with("2.5m", 0, NumberStyle::Space),
+            Some(2_500_000)
+        );
+    }
 
     #[test]
     fn groups_thousands() {
