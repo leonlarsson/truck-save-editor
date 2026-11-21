@@ -98,6 +98,8 @@ close-unsaved-body = { $count ->
    *[other] Dina { $count } ändringar går förlorade.
 }
 close-unsaved-confirm = Stäng utan att spara
+quit-unsaved-title = Avsluta utan att spara ”{ $name }”?
+quit-unsaved-confirm = Avsluta utan att spara
 save-confirm-title = Spara ändringarna i ”{ $name }”?
 cancel = Avbryt
 save-as-new-slot = Spara på ny plats

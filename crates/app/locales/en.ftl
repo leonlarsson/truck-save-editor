@@ -98,6 +98,8 @@ close-unsaved-body = { $count ->
    *[other] Your { $count } changes will be lost.
 }
 close-unsaved-confirm = Close without saving
+quit-unsaved-title = Quit without saving “{ $name }”?
+quit-unsaved-confirm = Quit without saving
 save-confirm-title = Save changes to “{ $name }”?
 cancel = Cancel
 save-as-new-slot = Save as new slot

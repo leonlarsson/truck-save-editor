@@ -109,6 +109,8 @@ fn step_history(cx: &mut App, is_undo: bool) {
 
 pub struct Workspace {
     page: Page,
+    /// The window title last set, so it's only set again when it changes.
+    window_title: String,
     focus_handle: FocusHandle,
     palette: Entity<CommandState>,
     open_save: Entity<OpenSavePage>,
@@ -165,7 +167,15 @@ impl Workspace {
                 this.show(session, window, cx);
             }
         });
+        // Closing the window with unsaved changes asks first, like closing the save does.
+        let guard = cx.entity().downgrade();
+        window.on_window_should_close(cx, move |window, cx| {
+            guard
+                .update(cx, |this, cx| this.may_close_window(window, cx))
+                .unwrap_or(true)
+        });
         let mut workspace = Self {
+            window_title: String::new(),
             page: dev_start_page().unwrap_or(Page::Overview),
             focus_handle,
             palette: cx.new(|cx| CommandState::new(window, cx)),
@@ -526,6 +536,53 @@ impl Workspace {
                     true
                 })
         });
+    }
+
+    /// Whether the window may close now. With unsaved changes it asks instead (and closes itself
+    /// if the player chooses to quit without saving).
+    fn may_close_window(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        let Some(opened) = &self.opened else {
+            return true;
+        };
+        let session = opened.session.read(cx);
+        let changes = session.change_count();
+        if changes == 0 || session.is_saving() {
+            // While saving, closing waits: the write is in flight.
+            return !session.is_saving();
+        }
+        let name = labels::slot_name(cx, session.slot());
+        window.open_alert_dialog(cx, move |alert, _, cx| {
+            alert
+                .title(t!(cx, "quit-unsaved-title", name = &name))
+                .description(t!(cx, "close-unsaved-body", count = changes))
+                .confirm()
+                .ok_text(t!(cx, "quit-unsaved-confirm"))
+                .ok_variant(gpui_kit::component::button::ButtonVariant::Danger)
+                .on_ok(|_, window, _| {
+                    window.remove_window();
+                    true
+                })
+        });
+        false
+    }
+
+    /// The window's title: the open save, with • while it has unsaved changes.
+    fn update_window_title(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let (title, is_edited) = match &self.opened {
+            Some(opened) => {
+                let session = opened.session.read(cx);
+                let name = labels::slot_name(cx, session.slot());
+                let is_edited = session.change_count() > 0;
+                let mark = if is_edited { " •" } else { "" };
+                (format!("{name}{mark} — {APP_NAME}"), is_edited)
+            }
+            None => (APP_NAME.to_string(), false),
+        };
+        if title != self.window_title {
+            window.set_window_title(&title);
+            window.set_window_edited(is_edited);
+            self.window_title = title;
+        }
     }
 
     fn confirm_save(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -924,7 +981,8 @@ impl Workspace {
 }
 
 impl Render for Workspace {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.update_window_title(window, cx);
         let Some(opened) = &self.opened else {
             return self.render_start(cx).into_any_element();
         };
