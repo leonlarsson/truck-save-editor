@@ -34,6 +34,19 @@ fn main() {
             cx.bind_keys([
                 gpui_kit::KeyBinding::new("ctrl-k", palette::OpenPalette, None),
                 gpui_kit::KeyBinding::new("cmd-k", palette::OpenPalette, None),
+                gpui_kit::KeyBinding::new("ctrl-z", workspace::Undo, Some(workspace::KEY_CONTEXT)),
+                gpui_kit::KeyBinding::new("cmd-z", workspace::Undo, Some(workspace::KEY_CONTEXT)),
+                gpui_kit::KeyBinding::new(
+                    "ctrl-shift-z",
+                    workspace::Redo,
+                    Some(workspace::KEY_CONTEXT),
+                ),
+                gpui_kit::KeyBinding::new("ctrl-y", workspace::Redo, Some(workspace::KEY_CONTEXT)),
+                gpui_kit::KeyBinding::new(
+                    "cmd-shift-z",
+                    workspace::Redo,
+                    Some(workspace::KEY_CONTEXT),
+                ),
             ]);
 
             let options = WindowOptions {

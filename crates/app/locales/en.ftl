@@ -110,6 +110,13 @@ saved-title = Saved “{ $name }”
 saved-backup = The old version is backed up in { $path }
 save-failed = Couldn't save “{ $name }”
 
+## Undo and redo
+
+undo = Undo
+redo = Redo
+undo-tooltip = Undo (Ctrl+Z)
+redo-tooltip = Redo (Ctrl+Shift+Z)
+
 ## Command palette
 
 palette-open = Commands

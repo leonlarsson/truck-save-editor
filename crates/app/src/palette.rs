@@ -30,6 +30,8 @@ pub enum PaletteCommand {
     MaxAllDrivers,
     VisitEveryCity,
     Save,
+    Undo,
+    Redo,
     Discard,
     Backups,
     SwitchSave,
@@ -58,6 +60,8 @@ fn groups(has_coaches: bool) -> Vec<Vec<PaletteCommand>> {
     }
     let app = vec![
         PaletteCommand::Save,
+        PaletteCommand::Undo,
+        PaletteCommand::Redo,
         PaletteCommand::Discard,
         PaletteCommand::Backups,
         PaletteCommand::SwitchSave,
@@ -119,6 +123,8 @@ fn item(command: PaletteCommand, cx: &App) -> CommandItem {
             &["cities", "map", "discover"],
         ),
         PaletteCommand::Save => (t!(cx, "palette-save"), IconName::Save, &["write"]),
+        PaletteCommand::Undo => (t!(cx, "undo"), IconName::Undo2, &["back", "revert"]),
+        PaletteCommand::Redo => (t!(cx, "redo"), IconName::Redo2, &["again", "forward"]),
         PaletteCommand::Discard => (
             t!(cx, "palette-discard"),
             IconName::Undo2,

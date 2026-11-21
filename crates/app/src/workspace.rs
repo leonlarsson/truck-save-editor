@@ -39,6 +39,12 @@ use crate::session::Session;
 use crate::theme;
 use crate::ui::PageHeader;
 
+gpui_kit::actions!(workspace, [Undo, Redo]);
+
+/// The key context of the open save's window content: its shortcuts (Undo, Redo) apply here, and
+/// a focused text field's own shortcuts (its own Undo) win over them.
+pub const KEY_CONTEXT: &str = "Workspace";
+
 pub struct Workspace {
     page: Page,
     focus_handle: FocusHandle,
@@ -211,6 +217,17 @@ impl Workspace {
                 }
             }
             PaletteCommand::Discard => session.update(cx, |session, cx| session.discard(cx)),
+            // Not while saving: the save is being written from the changes as they were.
+            PaletteCommand::Undo => {
+                if !session.read(cx).is_saving() {
+                    session.update(cx, |session, cx| session.undo(cx));
+                }
+            }
+            PaletteCommand::Redo => {
+                if !session.read(cx).is_saving() {
+                    session.update(cx, |session, cx| session.redo(cx));
+                }
+            }
             PaletteCommand::Backups => self.open_backups(window, cx),
             PaletteCommand::SwitchSave => self.close(window, cx),
             PaletteCommand::ToggleTheme => theme::toggle_mode(window, cx),
@@ -612,6 +629,10 @@ impl Workspace {
         };
         let summary = t!(cx, "changes-count", count = changes);
 
+        let (can_undo, can_redo) = {
+            let session = session.read(cx);
+            (session.can_undo(), session.can_redo())
+        };
         PageHeader::new(self.page.title(cx))
             .subtitle(subtitle)
             .action(
@@ -621,9 +642,35 @@ impl Workspace {
                     .child(summary),
             )
             .action(
+                // A plain row, not a `ButtonGroup`: a group sets every button's disabled state to its
+                // own, and Undo and Redo are each available on their own.
+                h_flex()
+                    .child(
+                        Button::new("undo")
+                            .ghost()
+                            .icon(Icon::new(IconName::Undo2))
+                            .tooltip(t!(cx, "undo-tooltip"))
+                            .accessibility_label(t!(cx, "undo"))
+                            .disabled(!can_undo || is_saving)
+                            .on_click(cx.listener(|this, _, window, cx| {
+                                this.run(PaletteCommand::Undo, window, cx)
+                            })),
+                    )
+                    .child(
+                        Button::new("redo")
+                            .ghost()
+                            .icon(Icon::new(IconName::Redo2))
+                            .tooltip(t!(cx, "redo-tooltip"))
+                            .accessibility_label(t!(cx, "redo"))
+                            .disabled(!can_redo || is_saving)
+                            .on_click(cx.listener(|this, _, window, cx| {
+                                this.run(PaletteCommand::Redo, window, cx)
+                            })),
+                    ),
+            )
+            .action(
                 Button::new("discard")
                     .ghost()
-                    .icon(Icon::new(IconName::Undo2))
                     .label(t!(cx, "discard"))
                     .disabled(changes == 0 || is_saving)
                     .on_click(cx.listener(|this, _, _, cx| {
@@ -687,9 +734,20 @@ impl Render for Workspace {
         let session = opened.session.clone();
         h_flex()
             .size_full()
+            .key_context(KEY_CONTEXT)
             .track_focus(&self.focus_handle)
             .on_action(
                 cx.listener(|this, _: &OpenPalette, window, cx| this.open_palette(window, cx)),
+            )
+            .on_action(
+                cx.listener(|this, _: &Undo, window, cx| {
+                    this.run(PaletteCommand::Undo, window, cx)
+                }),
+            )
+            .on_action(
+                cx.listener(|this, _: &Redo, window, cx| {
+                    this.run(PaletteCommand::Redo, window, cx)
+                }),
             )
             .bg(cx.theme().background)
             .text_color(cx.theme().foreground)

@@ -21,25 +21,55 @@ pub struct Session {
     loaded: LoadedSlot,
     /// The career as it is on disk.
     saved_career: Career,
-    career: Career,
     /// The vehicles (trucks and coaches) as they are on disk.
     saved_vehicles: Vec<Vehicle>,
-    /// Trucks to repair when saving, by id.
-    repaired: HashSet<String>,
     /// The garages as they are on disk.
     saved_garages: Vec<Garage>,
-    /// Garages to buy or upgrade to large when saving, by id.
-    upgraded_garages: HashSet<String>,
     /// The hired drivers as they are on disk.
     saved_drivers: Vec<Driver>,
+    /// Every change not saved yet.
+    pending: Pending,
+    /// What `pending` was before each change, latest last: Undo goes back through these.
+    undo: Vec<Pending>,
+    /// What Undo went back from, latest last: Redo goes forward again. A new change clears it.
+    redo: Vec<Pending>,
+    is_saving: bool,
+}
+
+/// Everything changed since the save was loaded (or last saved). Undo and Redo swap whole copies
+/// of it: it's small (a career and a few lists of ids), so copies are cheap, and an undo can never
+/// get out of step with what it undoes.
+#[derive(Clone, Debug, PartialEq)]
+struct Pending {
+    career: Career,
+    /// Vehicles to repair when saving, by id.
+    repaired: HashSet<String>,
+    /// Garages to buy or upgrade to large when saving, by id.
+    upgraded_garages: HashSet<String>,
     /// Drivers to max out when saving, by id.
     maxed_drivers: HashSet<String>,
     /// Whether to mark every city as visited when saving.
     visit_all_cities: bool,
     /// Values changed in All data, by where they are; applied before the other changes.
     raw_edits: BTreeMap<FieldPath, String>,
-    is_saving: bool,
 }
+
+impl Pending {
+    /// No changes: the career as it is on disk.
+    fn none(career: Career) -> Self {
+        Self {
+            career,
+            repaired: HashSet::new(),
+            upgraded_garages: HashSet::new(),
+            maxed_drivers: HashSet::new(),
+            visit_all_cities: false,
+            raw_edits: BTreeMap::new(),
+        }
+    }
+}
+
+/// How many steps Undo remembers.
+const UNDO_LIMIT: usize = 200;
 
 /// One change, for the list shown before saving.
 pub struct Change {
@@ -56,16 +86,13 @@ impl Session {
             saved_vehicles: save::vehicles(&loaded.game),
             saved_garages: save::garages(&loaded.game),
             saved_drivers: save::drivers(&loaded.game),
-            maxed_drivers: HashSet::new(),
-            raw_edits: BTreeMap::new(),
-            visit_all_cities: false,
-            saved_career: career.clone(),
-            career,
+            pending: Pending::none(career.clone()),
+            undo: Vec::new(),
+            redo: Vec::new(),
+            saved_career: career,
             profile,
             slot,
             loaded,
-            repaired: HashSet::new(),
-            upgraded_garages: HashSet::new(),
             is_saving: false,
         })
     }
@@ -83,7 +110,7 @@ impl Session {
     }
 
     pub fn career(&self) -> &Career {
-        &self.career
+        &self.pending.career
     }
 
     pub fn is_saving(&self) -> bool {
@@ -95,10 +122,52 @@ impl Session {
         cx.notify();
     }
 
+    /// Makes a change: everything that changes the save goes through here, so each change is
+    /// one step of Undo.
+    fn change(&mut self, cx: &mut Context<Self>, edit: impl FnOnce(&mut Pending, &Self)) {
+        let before = self.pending.clone();
+        let mut pending = self.pending.clone();
+        edit(&mut pending, self);
+        if pending == before {
+            return;
+        }
+        self.pending = pending;
+        self.undo.push(before);
+        if self.undo.len() > UNDO_LIMIT {
+            self.undo.remove(0);
+        }
+        self.redo.clear();
+        cx.notify();
+    }
+
+    pub fn can_undo(&self) -> bool {
+        !self.undo.is_empty()
+    }
+
+    pub fn can_redo(&self) -> bool {
+        !self.redo.is_empty()
+    }
+
+    /// Goes back one change (Discard counts as one, so it can be undone too).
+    pub fn undo(&mut self, cx: &mut Context<Self>) {
+        if let Some(previous) = self.undo.pop() {
+            let current = std::mem::replace(&mut self.pending, previous);
+            self.redo.push(current);
+            cx.notify();
+        }
+    }
+
+    pub fn redo(&mut self, cx: &mut Context<Self>) {
+        if let Some(next) = self.redo.pop() {
+            let current = std::mem::replace(&mut self.pending, next);
+            self.undo.push(current);
+            cx.notify();
+        }
+    }
+
     /// Changes the career.
     pub fn edit_career(&mut self, cx: &mut Context<Self>, edit: impl FnOnce(&mut Career)) {
-        edit(&mut self.career);
-        cx.notify();
+        self.change(cx, |pending, _| edit(&mut pending.career));
     }
 
     /// The vehicles as they'll be after saving (repaired ones without wear).
@@ -107,7 +176,7 @@ impl Session {
             .iter()
             .map(|truck| {
                 let mut truck = truck.clone();
-                if self.repaired.contains(&truck.id) {
+                if self.pending.repaired.contains(&truck.id) {
                     truck.wear = save::Wear::default();
                 }
                 truck
@@ -117,21 +186,22 @@ impl Session {
 
     /// Marks every worn vehicle of a kind for repair.
     pub fn repair_all(&mut self, kind: VehicleKind, cx: &mut Context<Self>) {
-        for truck in self.saved_vehicles.iter().filter(|v| v.kind == kind) {
-            if truck.wear.worst() > 0.0 {
-                self.repaired.insert(truck.id.clone());
+        self.change(cx, |pending, this| {
+            for truck in this.saved_vehicles.iter().filter(|v| v.kind == kind) {
+                if truck.wear.worst() > 0.0 {
+                    pending.repaired.insert(truck.id.clone());
+                }
             }
-        }
-        cx.notify();
+        });
     }
 
     pub fn change_count(&self) -> usize {
-        self.career.changes_from(&self.saved_career)
-            + usize::from(!self.repaired.is_empty())
-            + usize::from(!self.upgraded_garages.is_empty())
-            + usize::from(!self.maxed_drivers.is_empty())
-            + self.raw_edits.len()
-            + usize::from(self.visit_all_cities)
+        self.pending.career.changes_from(&self.saved_career)
+            + usize::from(!self.pending.repaired.is_empty())
+            + usize::from(!self.pending.upgraded_garages.is_empty())
+            + usize::from(!self.pending.maxed_drivers.is_empty())
+            + self.pending.raw_edits.len()
+            + usize::from(self.pending.visit_all_cities)
     }
 
     /// Every city with how often it was visited, as it'll be after saving.
@@ -139,7 +209,7 @@ impl Session {
         save::cities(&self.loaded.game)
             .into_iter()
             .map(|mut city| {
-                if self.visit_all_cities && city.visits == 0 {
+                if self.pending.visit_all_cities && city.visits == 0 {
                     city.visits = 1;
                 }
                 city
@@ -148,8 +218,7 @@ impl Session {
     }
 
     pub fn visit_all_cities(&mut self, cx: &mut Context<Self>) {
-        self.visit_all_cities = true;
-        cx.notify();
+        self.change(cx, |pending, _| pending.visit_all_cities = true);
     }
 
     /// The save as loaded (or last saved), for All data. Edits aren't in it; see `raw_value`.
@@ -159,37 +228,36 @@ impl Session {
 
     /// A value as it'll be saved: the All data edit if there is one, else what's in the save.
     pub fn raw_value(&self, path: &FieldPath) -> Option<String> {
-        if let Some(edited) = self.raw_edits.get(path) {
+        if let Some(edited) = self.pending.raw_edits.get(path) {
             return Some(edited.clone());
         }
-        let value = self.loaded.game.unit(&path.unit)?.get(&path.field)?;
-        match path.index {
-            None => value.as_single().map(str::to_string),
-            Some(index) => value.items().get(index).cloned(),
-        }
+        self.saved_raw_value(path)
     }
 
     pub fn is_edited(&self, path: &FieldPath) -> bool {
-        self.raw_edits.contains_key(path)
+        self.pending.raw_edits.contains_key(path)
     }
 
     /// Changes one value (in its text form, as All data shows it). Setting it back to what's in
     /// the save removes the change.
     pub fn set_raw_value(&mut self, path: FieldPath, text: String, cx: &mut Context<Self>) {
-        let original = {
-            let edit = self.raw_edits.remove(&path);
-            let original = self.raw_value(&path);
-            if let Some(edit) = edit {
-                self.raw_edits.insert(path.clone(), edit);
+        let original = self.saved_raw_value(&path);
+        self.change(cx, |pending, _| {
+            if original.as_deref() == Some(text.as_str()) {
+                pending.raw_edits.remove(&path);
+            } else {
+                pending.raw_edits.insert(path, text);
             }
-            original
-        };
-        if original.as_deref() == Some(text.as_str()) {
-            self.raw_edits.remove(&path);
-        } else {
-            self.raw_edits.insert(path, text);
+        });
+    }
+
+    /// A value as it is in the save on disk, without All data edits.
+    fn saved_raw_value(&self, path: &FieldPath) -> Option<String> {
+        let value = self.loaded.game.unit(&path.unit)?.get(&path.field)?;
+        match path.index {
+            None => value.as_single().map(str::to_string),
+            Some(index) => value.items().get(index).cloned(),
         }
-        cx.notify();
     }
 
     /// The hired drivers as they'll be after saving.
@@ -198,7 +266,7 @@ impl Session {
             .iter()
             .map(|driver| {
                 let mut driver = driver.clone();
-                if self.maxed_drivers.contains(&driver.id) {
+                if self.pending.maxed_drivers.contains(&driver.id) {
                     driver.skills = save::Skills::maxed();
                 }
                 driver
@@ -208,12 +276,13 @@ impl Session {
 
     /// Gives every hired driver every skill at its highest level and all ADR classes.
     pub fn max_all_drivers(&mut self, cx: &mut Context<Self>) {
-        for driver in &self.saved_drivers {
-            if driver.skills != save::Skills::maxed() {
-                self.maxed_drivers.insert(driver.id.clone());
+        self.change(cx, |pending, this| {
+            for driver in &this.saved_drivers {
+                if driver.skills != save::Skills::maxed() {
+                    pending.maxed_drivers.insert(driver.id.clone());
+                }
             }
-        }
-        cx.notify();
+        });
     }
 
     /// The garages as they'll be after saving.
@@ -222,7 +291,7 @@ impl Session {
             .iter()
             .map(|garage| {
                 let mut garage = garage.clone();
-                if self.upgraded_garages.contains(&garage.id) {
+                if self.pending.upgraded_garages.contains(&garage.id) {
                     garage.is_owned = true;
                     garage.slots = garage.slots.max(save::LARGE_GARAGE_SLOTS);
                 }
@@ -233,17 +302,18 @@ impl Session {
 
     /// Makes every owned garage large; with `buy_all`, buys every garage too.
     pub fn upgrade_garages(&mut self, buy_all: bool, cx: &mut Context<Self>) {
-        for garage in &self.saved_garages {
-            if !garage.is_large() && (garage.is_owned || buy_all) {
-                self.upgraded_garages.insert(garage.id.clone());
+        self.change(cx, |pending, this| {
+            for garage in &this.saved_garages {
+                if !garage.is_large() && (garage.is_owned || buy_all) {
+                    pending.upgraded_garages.insert(garage.id.clone());
+                }
             }
-        }
-        cx.notify();
+        });
     }
 
     /// Every change, described for people.
     pub fn changes(&self, cx: &App) -> Vec<Change> {
-        let (before, after) = (&self.saved_career, &self.career);
+        let (before, after) = (&self.saved_career, &self.pending.career);
         let currency = self.game.currency_symbol();
         let money = |amount: i64| format!("{currency} {}", thousands(amount));
         let mut changes = Vec::new();
@@ -308,7 +378,7 @@ impl Session {
             game_data::city_name(cx, &before.hq_city).into(),
             game_data::city_name(cx, &after.hq_city).into(),
         );
-        for (path, text) in &self.raw_edits {
+        for (path, text) in &self.pending.raw_edits {
             let before = self
                 .loaded
                 .game
@@ -331,7 +401,7 @@ impl Session {
                 text.clone().into(),
             );
         }
-        if self.visit_all_cities {
+        if self.pending.visit_all_cities {
             let unvisited = save::cities(&self.loaded.game)
                 .iter()
                 .filter(|city| city.visits == 0)
@@ -342,18 +412,22 @@ impl Session {
                 t!(cx, "map-visited-all", count = unvisited),
             );
         }
-        if !self.maxed_drivers.is_empty() {
+        if !self.pending.maxed_drivers.is_empty() {
             add(
                 t!(cx, "page-drivers"),
                 t!(cx, "garages-before"),
-                t!(cx, "drivers-maxed", count = self.maxed_drivers.len()),
+                t!(
+                    cx,
+                    "drivers-maxed",
+                    count = self.pending.maxed_drivers.len()
+                ),
             );
         }
-        if !self.upgraded_garages.is_empty() {
+        if !self.pending.upgraded_garages.is_empty() {
             let (bought, upgraded): (Vec<&Garage>, Vec<&Garage>) = self
                 .saved_garages
                 .iter()
-                .filter(|g| self.upgraded_garages.contains(&g.id))
+                .filter(|g| self.pending.upgraded_garages.contains(&g.id))
                 .partition(|g| !g.is_owned);
             add(
                 t!(cx, "garages"),
@@ -366,49 +440,47 @@ impl Session {
                 ),
             );
         }
-        if !self.repaired.is_empty() {
+        if !self.pending.repaired.is_empty() {
             add(
                 t!(cx, "repairs"),
                 t!(cx, "repairs-before"),
-                t!(cx, "repairs-after", count = self.repaired.len()),
+                t!(cx, "repairs-after", count = self.pending.repaired.len()),
             );
         }
         changes
     }
 
+    /// Drops every change. One step of Undo brings them back.
     pub fn discard(&mut self, cx: &mut Context<Self>) {
-        self.career = self.saved_career.clone();
-        self.repaired.clear();
-        self.upgraded_garages.clear();
-        self.maxed_drivers.clear();
-        self.raw_edits.clear();
-        self.visit_all_cities = false;
-        cx.notify();
+        self.change(cx, |pending, this| {
+            *pending = Pending::none(this.saved_career.clone());
+        });
     }
 
     /// The slot as it would be saved: the loaded save with every change applied.
     pub fn prepared(&self) -> save::Result<LoadedSlot> {
         let mut slot = self.loaded.clone();
         // All data edits first, so the typed changes (which name exactly what they change) win.
-        for (path, text) in &self.raw_edits {
+        for (path, text) in &self.pending.raw_edits {
             path.apply(&mut slot.game, text);
         }
-        self.career
+        self.pending
+            .career
             .write_changes(&self.saved_career, &mut slot.game)?;
-        for id in &self.repaired {
+        for id in &self.pending.repaired {
             save::repair(&mut slot.game, id, false);
         }
-        for id in &self.upgraded_garages {
+        for id in &self.pending.upgraded_garages {
             save::upgrade_garage(&mut slot.game, id);
         }
-        for id in &self.maxed_drivers {
+        for id in &self.pending.maxed_drivers {
             save::max_driver(&mut slot.game, id);
         }
-        if self.visit_all_cities {
+        if self.pending.visit_all_cities {
             save::visit_all_cities(&mut slot.game);
         }
         if let Some(info) = &mut slot.info {
-            save::update_info(info, &self.career);
+            save::update_info(info, &self.pending.career);
         }
         Ok(slot)
     }
@@ -417,14 +489,14 @@ impl Session {
     pub fn mark_saved(&mut self, written: LoadedSlot, cx: &mut Context<Self>) {
         self.saved_vehicles = save::vehicles(&written.game);
         self.saved_garages = save::garages(&written.game);
-        self.upgraded_garages.clear();
         self.saved_drivers = save::drivers(&written.game);
-        self.maxed_drivers.clear();
-        self.raw_edits.clear();
-        self.visit_all_cities = false;
         self.loaded = written;
-        self.saved_career = self.career.clone();
-        self.repaired.clear();
+        self.saved_career = self.pending.career.clone();
+        self.pending = Pending::none(self.saved_career.clone());
+        // What's on disk changed under the history; undoing past a save would describe changes
+        // against a save that no longer exists.
+        self.undo.clear();
+        self.redo.clear();
         self.is_saving = false;
         cx.notify();
     }
@@ -501,5 +573,106 @@ impl FieldPath {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use gpui_kit::{AppContext as _, Entity, TestAppContext};
+    use save::{Game, Location, Profile, Slot, SlotKind};
+
+    use super::*;
+
+    /// A tiny made-up save: a career and one worn truck.
+    const SAVE: &str = "SiiNunit\r\n{\r\neconomy : _nameless.1 {\r\n bank: _nameless.2\r\n player: _nameless.3\r\n experience_points: 5000\r\n adr: 0\r\n long_dist: 0\r\n heavy: 0\r\n fragile: 0\r\n urgent: 0\r\n mechanical: 0\r\n}\r\n\r\nbank : _nameless.2 {\r\n money_account: 1000\r\n loans: 0\r\n}\r\n\r\nplayer : _nameless.3 {\r\n hq_city: lyon\r\n}\r\n\r\n}\r\n";
+
+    fn session(cx: &mut TestAppContext) -> Entity<Session> {
+        let loaded = LoadedSlot {
+            dir: "slot".into(),
+            game: sii::parse_text(SAVE).expect("parses"),
+            info: None,
+        };
+        let profile = Profile {
+            game: Game::Ets2,
+            name: "Tester".into(),
+            dir: "profile".into(),
+            location: Location::Local,
+            last_saved: None,
+        };
+        let slot = Slot {
+            dir: "slot".into(),
+            folder: "1".into(),
+            kind: SlotKind::Manual(1),
+            info: Default::default(),
+            modified: None,
+        };
+        cx.new(|_| Session::open(profile, slot, loaded).expect("opens"))
+    }
+
+    fn money(session: &Entity<Session>, cx: &mut TestAppContext) -> i64 {
+        cx.update(|cx| session.read(cx).career().money)
+    }
+
+    fn set_money(session: &Entity<Session>, amount: i64, cx: &mut TestAppContext) {
+        session.update(cx, |session, cx| {
+            session.edit_career(cx, |career| career.money = amount)
+        });
+    }
+
+    #[gpui_kit::test]
+    fn undo_and_redo_step_through_changes(cx: &mut TestAppContext) {
+        let session = session(cx);
+        set_money(&session, 2000, cx);
+        set_money(&session, 3000, cx);
+
+        session.update(cx, |session, cx| session.undo(cx));
+        assert_eq!(money(&session, cx), 2000);
+        session.update(cx, |session, cx| session.undo(cx));
+        assert_eq!(money(&session, cx), 1000);
+        cx.update(|cx| assert!(!session.read(cx).can_undo()));
+
+        session.update(cx, |session, cx| session.redo(cx));
+        assert_eq!(money(&session, cx), 2000);
+
+        // A new change after undoing drops what Redo could have brought back.
+        set_money(&session, 5000, cx);
+        cx.update(|cx| assert!(!session.read(cx).can_redo()));
+    }
+
+    #[gpui_kit::test]
+    fn changes_that_change_nothing_arent_steps(cx: &mut TestAppContext) {
+        let session = session(cx);
+        set_money(&session, 1000, cx);
+        cx.update(|cx| assert!(!session.read(cx).can_undo()));
+    }
+
+    #[gpui_kit::test]
+    fn discard_can_be_undone(cx: &mut TestAppContext) {
+        let session = session(cx);
+        set_money(&session, 2000, cx);
+        session.update(cx, |session, cx| session.visit_all_cities(cx));
+        session.update(cx, |session, cx| session.discard(cx));
+        assert_eq!(money(&session, cx), 1000);
+        cx.update(|cx| assert_eq!(session.read(cx).change_count(), 0));
+
+        session.update(cx, |session, cx| session.undo(cx));
+        assert_eq!(money(&session, cx), 2000);
+        cx.update(|cx| assert_eq!(session.read(cx).change_count(), 2));
+    }
+
+    #[gpui_kit::test]
+    fn saving_starts_a_new_history(cx: &mut TestAppContext) {
+        let session = session(cx);
+        set_money(&session, 2000, cx);
+        session.update(cx, |session, cx| {
+            let written = session.prepared().expect("prepares");
+            session.mark_saved(written, cx);
+        });
+        cx.update(|cx| {
+            let session = session.read(cx);
+            assert_eq!(session.change_count(), 0);
+            assert!(!session.can_undo());
+            assert_eq!(session.career().money, 2000);
+        });
     }
 }

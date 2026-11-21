@@ -100,3 +100,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** the game's icons make the screens speak the game's language at a glance, and drawing them from the player's install keeps SCS's artwork out of the repo. Drawing at the exact size keeps them crisp at any display scale; letting GPUI scale a 260-pixel texture down blurs or aliases it.
 
 **Considered:** extracting the icons once into the repo (SCS's artwork; not ours to redistribute); Lucide stand-ins (fine as the fallback, but generic); a full DDS export (not needed: only the first image is shown).
+
+## 2026-11-21: Undo and redo as whole copies of the pending changes
+
+**Decided:** everything not saved yet lives in one value in the session (`Pending`: the career, repairs, garages, drivers, cities, All data edits). Every change goes through `Session::change`, which keeps the value from before; Undo and Redo swap whole copies. Discard is a change like any other, so it can be undone. Saving starts a new history. Ctrl+Z, Ctrl+Shift+Z and Ctrl+Y work in the workspace's key context, so a focused text field keeps its own undo.
+
+**Why:** the pending changes are small (a career and a few lists of ids), so copies cost nothing, and a copy can't get out of step with what it undoes the way hand-written inverse operations can. Undoing a Discard turns an easy misclick into nothing.
+
+**Considered:** a log of operations with inverses (more code, and every new kind of change needs its inverse written and tested); undo across saves (the history would describe changes against a file that's no longer on disk).

@@ -18,6 +18,7 @@ gpui_kit::assets::icon_assets!(
         ArchiveRestore,
         Map,
         Moon,
+        Redo2,
         Save,
         Search,
         Sun,
