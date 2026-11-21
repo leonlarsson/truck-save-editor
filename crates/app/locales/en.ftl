@@ -202,6 +202,31 @@ column-trucks = Trucks
 column-drivers = Drivers
 garages-table = Garages
 
+## Drivers
+
+drivers-summary = { $count ->
+    [0] No drivers hired yet
+    [one] 1 driver
+   *[other] { $count } drivers
+} · { $maxed ->
+    [0] none fully skilled
+   *[other] { $maxed } fully skilled
+}
+drivers-max-all = Max all drivers
+drivers-max-all-tooltip = Every skill at its highest level and all ADR classes, for every hired driver.
+drivers-maxed = { $count ->
+    [one] 1 driver maxed out
+   *[other] { $count } drivers maxed out
+}
+column-hometown = Hometown
+column-location = Now in
+column-experience = Experience
+column-skills = Skills
+column-adr = ADR
+drivers-table = Drivers
+skills-short = { $long } · { $value } · { $fragile } · { $urgent } · { $eco }
+adr-count = { $count } of { $total }
+
 ## Fleet
 
 fleet-trucks = { $count ->

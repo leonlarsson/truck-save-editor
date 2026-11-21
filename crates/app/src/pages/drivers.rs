@@ -1,0 +1,267 @@
+//! Drivers: everyone the company has hired, with their skills and experience, and one click to max
+//! them all out.
+
+use gpui_kit::component::{
+    ActiveTheme as _, Disableable as _, Sizable as _,
+    button::{Button, ButtonVariants as _},
+    h_flex,
+    table::{Column, ColumnSort, DataTable, TableDelegate, TableState},
+    v_flex,
+};
+use gpui_kit::{
+    App, AppContext as _, Context, Entity, IntoElement, ParentElement as _, Render, SharedString,
+    Styled as _, Subscription, Window, div,
+};
+use save::{Driver, Skills};
+
+use crate::format::thousands;
+use crate::game_data;
+use crate::i18n::t;
+use crate::labels::ADR_CLASS_COUNT;
+use crate::session::Session;
+
+pub struct DriversPage {
+    session: Entity<Session>,
+    table: Entity<TableState<DriverTable>>,
+    _subscriptions: Vec<Subscription>,
+}
+
+impl DriversPage {
+    pub fn new(session: Entity<Session>, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let delegate = DriverTable {
+            drivers: session.read(cx).drivers(),
+            sort: None,
+        };
+        let table = cx.new(|cx| TableState::new(delegate, window, cx).sortable(true));
+        let _subscriptions = vec![cx.observe(&session, |this, session, cx| {
+            let drivers = session.read(cx).drivers();
+            this.table.update(cx, |table, cx| {
+                table.delegate_mut().set_drivers(drivers);
+                table.refresh(cx);
+                cx.notify();
+            });
+            cx.notify();
+        })];
+        Self {
+            session,
+            table,
+            _subscriptions,
+        }
+    }
+}
+
+impl Render for DriversPage {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let drivers = &self.table.read(cx).delegate().drivers;
+        let count = drivers.len();
+        let maxed = drivers
+            .iter()
+            .filter(|d| d.skills == Skills::maxed())
+            .count();
+        let summary = t!(cx, "drivers-summary", count = count, maxed = maxed);
+
+        v_flex()
+            .size_full()
+            .gap_4()
+            .px_8()
+            .py_6()
+            .child(
+                h_flex()
+                    .justify_between()
+                    .items_center()
+                    .gap_4()
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(cx.theme().muted_foreground)
+                            .child(summary),
+                    )
+                    .child(
+                        Button::new("max-drivers")
+                            .small()
+                            .primary()
+                            .label(t!(cx, "drivers-max-all"))
+                            .tooltip(t!(cx, "drivers-max-all-tooltip"))
+                            .disabled(maxed == count)
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.session
+                                    .update(cx, |session, cx| session.max_all_drivers(cx));
+                            })),
+                    ),
+            )
+            .child(
+                div().flex_1().min_h_0().child(
+                    DataTable::new(&self.table)
+                        .stripe(true)
+                        .bordered(true)
+                        .accessibility_label(t!(cx, "drivers-table")),
+                ),
+            )
+    }
+}
+
+struct DriverTable {
+    drivers: Vec<Driver>,
+    sort: Option<(DriverColumn, ColumnSort)>,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum DriverColumn {
+    Hometown,
+    Location,
+    Experience,
+    Skills,
+    Adr,
+}
+
+impl DriverColumn {
+    const ALL: [DriverColumn; 5] = [
+        DriverColumn::Hometown,
+        DriverColumn::Location,
+        DriverColumn::Experience,
+        DriverColumn::Skills,
+        DriverColumn::Adr,
+    ];
+}
+
+fn skill_total(skills: &Skills) -> u32 {
+    skills.levels().iter().map(|(_, l)| u32::from(*l)).sum()
+}
+
+fn adr_count(skills: &Skills) -> u32 {
+    skills.adr.count_ones()
+}
+
+impl DriverTable {
+    fn set_drivers(&mut self, drivers: Vec<Driver>) {
+        self.drivers = drivers;
+        if let Some((column, sort)) = self.sort {
+            self.sort_by(column, sort);
+        }
+    }
+
+    /// Sorts by a column; equal values keep the save's order (the sort is stable).
+    fn sort_by(&mut self, column: DriverColumn, sort: ColumnSort) {
+        if sort == ColumnSort::Default {
+            return;
+        }
+        self.drivers.sort_by(|a, b| {
+            let ordering = match column {
+                DriverColumn::Hometown => a.hometown.cmp(&b.hometown),
+                DriverColumn::Location => a.current_city.cmp(&b.current_city),
+                DriverColumn::Experience => a.experience.cmp(&b.experience),
+                DriverColumn::Skills => skill_total(&a.skills).cmp(&skill_total(&b.skills)),
+                DriverColumn::Adr => adr_count(&a.skills).cmp(&adr_count(&b.skills)),
+            };
+            if sort == ColumnSort::Descending {
+                ordering.reverse()
+            } else {
+                ordering
+            }
+        });
+    }
+
+    fn text(&self, row: usize, column: DriverColumn, cx: &App) -> SharedString {
+        let Some(driver) = self.drivers.get(row) else {
+            return SharedString::default();
+        };
+        let levels = driver.skills.levels();
+        match column {
+            DriverColumn::Hometown => game_data::city_name(cx, &driver.hometown).into(),
+            DriverColumn::Location => game_data::city_name(cx, &driver.current_city).into(),
+            DriverColumn::Experience => t!(
+                cx,
+                "experience-amount",
+                amount = thousands(driver.experience)
+            ),
+            DriverColumn::Skills => t!(
+                cx,
+                "skills-short",
+                long = levels[0].1,
+                value = levels[1].1,
+                fragile = levels[2].1,
+                urgent = levels[3].1,
+                eco = levels[4].1
+            ),
+            DriverColumn::Adr => t!(
+                cx,
+                "adr-count",
+                count = adr_count(&driver.skills),
+                total = ADR_CLASS_COUNT
+            ),
+        }
+    }
+}
+
+impl TableDelegate for DriverTable {
+    fn columns_count(&self, _: &App) -> usize {
+        DriverColumn::ALL.len()
+    }
+
+    fn rows_count(&self, _: &App) -> usize {
+        self.drivers.len()
+    }
+
+    fn column(&self, col_ix: usize, cx: &App) -> Column {
+        match DriverColumn::ALL.get(col_ix) {
+            Some(DriverColumn::Hometown) => Column::new("hometown", t!(cx, "column-hometown"))
+                .width(170.)
+                .sortable(),
+            Some(DriverColumn::Location) => Column::new("location", t!(cx, "column-location"))
+                .width(170.)
+                .sortable(),
+            Some(DriverColumn::Experience) => {
+                Column::new("experience", t!(cx, "column-experience"))
+                    .width(140.)
+                    .text_right()
+                    .sortable()
+            }
+            Some(DriverColumn::Skills) => Column::new("skills", t!(cx, "column-skills"))
+                .width(150.)
+                .sortable(),
+            Some(DriverColumn::Adr) | None => Column::new("adr", t!(cx, "column-adr"))
+                .width(90.)
+                .sortable(),
+        }
+    }
+
+    fn perform_sort(
+        &mut self,
+        col_ix: usize,
+        sort: ColumnSort,
+        _: &mut Window,
+        _: &mut Context<TableState<Self>>,
+    ) {
+        let Some(column) = DriverColumn::ALL.get(col_ix).copied() else {
+            return;
+        };
+        self.sort = (sort != ColumnSort::Default).then_some((column, sort));
+        self.sort_by(column, sort);
+    }
+
+    fn render_td(
+        &mut self,
+        row_ix: usize,
+        col_ix: usize,
+        _: &mut Window,
+        cx: &mut Context<TableState<Self>>,
+    ) -> impl IntoElement {
+        let column = DriverColumn::ALL
+            .get(col_ix)
+            .copied()
+            .unwrap_or(DriverColumn::Hometown);
+        div().child(self.text(row_ix, column, cx))
+    }
+
+    fn cell_label(&self, row_ix: usize, col_ix: usize, cx: &App) -> Option<SharedString> {
+        let column = DriverColumn::ALL.get(col_ix).copied()?;
+        Some(self.text(row_ix, column, cx))
+    }
+
+    fn cell_text(&self, row_ix: usize, col_ix: usize, cx: &App) -> String {
+        DriverColumn::ALL
+            .get(col_ix)
+            .map(|column| self.text(row_ix, *column, cx).to_string())
+            .unwrap_or_default()
+    }
+}

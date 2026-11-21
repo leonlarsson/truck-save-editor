@@ -5,6 +5,7 @@
 //! Without `native` it has no disk access, so the same code can run in a browser later.
 
 mod career;
+mod drivers;
 mod error;
 mod fleet;
 mod game;
@@ -19,6 +20,7 @@ mod store;
 mod time;
 
 pub use career::{ADR_ALL, Career, CoachSkills, MAX_COACH_SKILL_LEVEL, MAX_SKILL_LEVEL, Skills};
+pub use drivers::{Driver, drivers, max_driver};
 pub use error::{Error, Result};
 pub use fleet::{Vehicle, VehicleKind, Wear, model_display_name, repair, vehicles, wear_is_known};
 pub use game::Game;

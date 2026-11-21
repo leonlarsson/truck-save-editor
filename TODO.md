@@ -40,6 +40,8 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [ ] Use the game's language for its names when the app gets more languages (gamedata already takes a language code).
 - [ ] Coach garages: coaches show "No garage"; find where the save keeps them.
 - [ ] HQ city: pick from the cities the company has garages in.
+- [ ] City names from the game's city definitions (`city_name_localized`), not only by token: a few tokens (`vasteraas`) differ from their text keys.
+- [ ] Driver names (not found in `def/` yet; maybe generated or in another archive).
 
 ## Keeping up with the game
 

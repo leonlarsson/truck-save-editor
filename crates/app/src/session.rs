@@ -7,7 +7,7 @@
 use std::collections::HashSet;
 
 use gpui_kit::{App, Context, SharedString};
-use save::{Career, Game, Garage, LoadedSlot, Profile, Slot, Vehicle, VehicleKind};
+use save::{Career, Driver, Game, Garage, LoadedSlot, Profile, Slot, Vehicle, VehicleKind};
 
 use crate::format::thousands;
 use crate::game_data;
@@ -30,6 +30,10 @@ pub struct Session {
     saved_garages: Vec<Garage>,
     /// Garages to buy or upgrade to large when saving, by id.
     upgraded_garages: HashSet<String>,
+    /// The hired drivers as they are on disk.
+    saved_drivers: Vec<Driver>,
+    /// Drivers to max out when saving, by id.
+    maxed_drivers: HashSet<String>,
     is_saving: bool,
 }
 
@@ -47,6 +51,8 @@ impl Session {
             game: profile.game,
             saved_vehicles: save::vehicles(&loaded.game),
             saved_garages: save::garages(&loaded.game),
+            saved_drivers: save::drivers(&loaded.game),
+            maxed_drivers: HashSet::new(),
             saved_career: career.clone(),
             career,
             profile,
@@ -117,6 +123,31 @@ impl Session {
         self.career.changes_from(&self.saved_career)
             + usize::from(!self.repaired.is_empty())
             + usize::from(!self.upgraded_garages.is_empty())
+            + usize::from(!self.maxed_drivers.is_empty())
+    }
+
+    /// The hired drivers as they'll be after saving.
+    pub fn drivers(&self) -> Vec<Driver> {
+        self.saved_drivers
+            .iter()
+            .map(|driver| {
+                let mut driver = driver.clone();
+                if self.maxed_drivers.contains(&driver.id) {
+                    driver.skills = save::Skills::maxed();
+                }
+                driver
+            })
+            .collect()
+    }
+
+    /// Gives every hired driver every skill at its highest level and all ADR classes.
+    pub fn max_all_drivers(&mut self, cx: &mut Context<Self>) {
+        for driver in &self.saved_drivers {
+            if driver.skills != save::Skills::maxed() {
+                self.maxed_drivers.insert(driver.id.clone());
+            }
+        }
+        cx.notify();
     }
 
     /// The garages as they'll be after saving.
@@ -211,6 +242,13 @@ impl Session {
             game_data::city_name(cx, &before.hq_city).into(),
             game_data::city_name(cx, &after.hq_city).into(),
         );
+        if !self.maxed_drivers.is_empty() {
+            add(
+                t!(cx, "page-drivers"),
+                t!(cx, "garages-before"),
+                t!(cx, "drivers-maxed", count = self.maxed_drivers.len()),
+            );
+        }
         if !self.upgraded_garages.is_empty() {
             let (bought, upgraded): (Vec<&Garage>, Vec<&Garage>) = self
                 .saved_garages
@@ -242,6 +280,7 @@ impl Session {
         self.career = self.saved_career.clone();
         self.repaired.clear();
         self.upgraded_garages.clear();
+        self.maxed_drivers.clear();
         cx.notify();
     }
 
@@ -255,6 +294,9 @@ impl Session {
         for id in &self.upgraded_garages {
             save::upgrade_garage(&mut slot.game, id);
         }
+        for id in &self.maxed_drivers {
+            save::max_driver(&mut slot.game, id);
+        }
         if let Some(info) = &mut slot.info {
             save::update_info(info, &self.career);
         }
@@ -266,6 +308,8 @@ impl Session {
         self.saved_vehicles = save::vehicles(&written.game);
         self.saved_garages = save::garages(&written.game);
         self.upgraded_garages.clear();
+        self.saved_drivers = save::drivers(&written.game);
+        self.maxed_drivers.clear();
         self.loaded = written;
         self.saved_career = self.career.clone();
         self.repaired.clear();

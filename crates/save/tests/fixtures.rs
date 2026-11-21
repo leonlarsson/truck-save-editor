@@ -57,6 +57,14 @@ fn real_saves_have_a_career_and_a_fleet() {
         assert!(!garages.is_empty(), "{}: no garages", dir.display());
         assert!(garages.iter().filter(|g| g.is_owned).all(|g| g.slots > 0));
 
+        // Hired drivers read, with skills in range.
+        assert!(save::drivers(&slot.game).iter().all(|d| {
+            d.skills
+                .levels()
+                .iter()
+                .all(|(_, l)| *l <= save::MAX_SKILL_LEVEL)
+        }));
+
         // Writing the unchanged career back leaves the save exactly as it was.
         let before = sii::to_text(&slot.game);
         career.write(&mut slot.game).expect("writes");
