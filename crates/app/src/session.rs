@@ -317,6 +317,34 @@ impl Session {
         cx.notify();
     }
 
+    /// After "Save as new slot": the session now edits the new slot, as written.
+    pub fn moved_to(
+        &mut self,
+        dir: std::path::PathBuf,
+        written: LoadedSlot,
+        cx: &mut Context<Self>,
+    ) {
+        let folder = dir
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        self.slot = Slot {
+            kind: folder
+                .parse()
+                .map(save::SlotKind::Manual)
+                .unwrap_or(save::SlotKind::Other),
+            info: written
+                .info
+                .as_ref()
+                .map(save::SlotInfo::read)
+                .unwrap_or_default(),
+            modified: Some(std::time::SystemTime::now()),
+            folder,
+            dir,
+        };
+        self.mark_saved(written, cx);
+    }
+
     /// The profile's folder name, used to keep its backups apart.
     pub fn profile_folder(&self) -> String {
         self.profile

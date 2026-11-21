@@ -98,6 +98,12 @@ close-unsaved-body = { $count ->
 }
 close-unsaved-confirm = Close without saving
 save-confirm-title = Save changes to “{ $name }”?
+cancel = Cancel
+save-as-new-slot = Save as new slot
+save-as-new-slot-tooltip = Write the changes into a new slot and keep this one as it is.
+new-slot-name = { $name } (edited)
+saved-as-new-title = Saved as “{ $name }”
+saved-as-new-body = “{ $original }” is unchanged. You're now editing the new slot.
 save-confirm-note = A backup of the slot is made first. Close the game before saving: it overwrites saves when it exits.
 save-prepare-failed = Couldn't prepare the save
 save-no-backup-folder-title = Couldn't save

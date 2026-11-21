@@ -52,7 +52,7 @@ Agreed work, in order. Each step should end with something the owner can see or 
 
 ## Starting fresh
 
-- [ ] Save as a new slot: write the edited save into an empty slot instead of over the original.
+- [x] Save as a new slot: write the edited save into an empty slot instead of over the original.
 - [ ] Presets for a fresh start ("Rich start": money, all skills and ADR, a garage), applied to a new profile made in the game.
 
 ## Later

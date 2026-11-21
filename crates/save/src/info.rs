@@ -63,6 +63,19 @@ pub fn read_info(bytes: &[u8]) -> Option<SlotInfo> {
         .map(|document| SlotInfo::read(&document))
 }
 
+/// Gives a slot's summary a name, as the load menu shows it.
+pub fn set_name(info: &mut Document, name: &str) {
+    let Some(id) = info
+        .first_of_kind("save_container")
+        .map(|unit| unit.id.clone())
+    else {
+        return;
+    };
+    if let Some(mut unit) = info.unit_mut(&id) {
+        unit.set("name", Value::single(value::format_string(name)));
+    }
+}
+
 /// Updates the load menu's summary to match a changed career.
 pub fn update_info(info: &mut Document, career: &Career) {
     let Some(id) = info

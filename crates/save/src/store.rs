@@ -80,6 +80,46 @@ pub fn save(game: Game, slot: &LoadedSlot, backups_root: &Path, profile: &str) -
     Ok(backup)
 }
 
+/// Writes a slot's save into a new slot next to it (the next free number in the profile's `save`
+/// folder), named `name`, leaving the original untouched. The original's other files (the preview
+/// pictures) are copied along. Returns the new slot's folder.
+pub fn save_as_new_slot(game: Game, slot: &LoadedSlot, name: &str) -> Result<PathBuf> {
+    if is_game_running(game) {
+        return Err(Error::GameRunning);
+    }
+    let saves = slot
+        .dir
+        .parent()
+        .ok_or_else(|| Error::NotASlot(slot.dir.clone()))?;
+    let next = std::fs::read_dir(saves)
+        .map_err(io("couldn't read", saves))?
+        .flatten()
+        .filter_map(|entry| entry.file_name().to_str()?.parse::<u32>().ok())
+        .max()
+        .unwrap_or(0)
+        + 1;
+    let dir = saves.join(next.to_string());
+    std::fs::create_dir(&dir).map_err(io("couldn't create the new slot", &dir))?;
+
+    // The pictures and anything else the slot has; the save and its summary are written below.
+    let entries = std::fs::read_dir(&slot.dir).map_err(io("couldn't read", &slot.dir))?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let file_name = entry.file_name();
+        if path.is_file() && file_name != "game.sii" && file_name != "info.sii" {
+            std::fs::copy(&path, dir.join(&file_name)).map_err(io("couldn't copy", &path))?;
+        }
+    }
+
+    write_atomically(&dir.join("game.sii"), sii::to_text(&slot.game).as_bytes())?;
+    if let Some(info) = &slot.info {
+        let mut info = info.clone();
+        crate::info::set_name(&mut info, name);
+        write_atomically(&dir.join("info.sii"), sii::to_text(&info).as_bytes())?;
+    }
+    Ok(dir)
+}
+
 /// Copies a slot's files into a new, timestamped backup folder.
 pub fn back_up(slot_dir: &Path, backups_root: &Path, profile: &str) -> Result<Backup> {
     let slot_name = slot_dir
@@ -218,6 +258,39 @@ mod tests {
         assert_eq!(Career::read(&restored.game).expect("reads").money, 100);
         assert!(before_restore.dir.join("game.sii").is_file());
         assert_eq!(backups(&backups_root, "John", "9").len(), 2);
+    }
+
+    #[test]
+    fn saves_as_a_new_slot_leaving_the_original_alone() {
+        let scratch = Scratch::new("new-slot");
+        let saves = scratch.0.join("profile/save");
+        let original = saves.join("3");
+        std::fs::create_dir_all(&original).expect("creates the slot");
+        std::fs::create_dir_all(saves.join("autosave")).expect("creates another slot");
+        std::fs::write(original.join("game.sii"), SAVE).expect("writes the save");
+        std::fs::write(
+            original.join("info.sii"),
+            "SiiNunit\r\n{\r\nsave_container : _nameless.9 {\r\n name: \"Old\"\r\n}\r\n\r\n}\r\n",
+        )
+        .expect("writes the summary");
+        std::fs::write(original.join("preview.tga"), b"picture").expect("writes the preview");
+
+        let mut slot = load(&original).expect("loads");
+        let mut career = Career::read(&slot.game).expect("reads");
+        career.money = 9_000;
+        career.write(&mut slot.game).expect("changes it");
+        let dir = save_as_new_slot(Game::Ets2, &slot, "Old (edited)").expect("saves");
+
+        assert_eq!(dir, saves.join("4"));
+        assert_eq!(
+            std::fs::read_to_string(original.join("game.sii")).expect("original"),
+            SAVE
+        );
+        let copy = load(&dir).expect("loads the copy");
+        assert_eq!(Career::read(&copy.game).expect("reads").money, 9_000);
+        let info = crate::info::SlotInfo::read(copy.info.as_ref().expect("has a summary"));
+        assert_eq!(info.name.as_deref(), Some("Old (edited)"));
+        assert!(dir.join("preview.tga").is_file());
     }
 
     #[test]

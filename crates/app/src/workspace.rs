@@ -200,12 +200,39 @@ impl Workspace {
                             .child(t!(cx, "save-confirm-note")),
                     ),
                 )
-                .width(px(520.))
-                .confirm()
-                .ok_text(t!(cx, "save"))
-                .on_ok(move |_, window, cx| {
-                    start_save(session.clone(), window, cx);
-                    true
+                .width(px(560.))
+                .footer({
+                    let as_new = session.clone();
+                    let over = session.clone();
+                    h_flex()
+                        .w_full()
+                        .justify_end()
+                        .gap_2()
+                        .child(
+                            Button::new("cancel-save")
+                                .outline()
+                                .label(t!(cx, "cancel"))
+                                .on_click(|_, window, cx| window.close_dialog(cx)),
+                        )
+                        .child(
+                            Button::new("save-as-new")
+                                .outline()
+                                .label(t!(cx, "save-as-new-slot"))
+                                .tooltip(t!(cx, "save-as-new-slot-tooltip"))
+                                .on_click(move |_, window, cx| {
+                                    window.close_dialog(cx);
+                                    start_save_as_new_slot(as_new.clone(), window, cx);
+                                }),
+                        )
+                        .child(
+                            Button::new("save-over")
+                                .primary()
+                                .label(t!(cx, "save"))
+                                .on_click(move |_, window, cx| {
+                                    window.close_dialog(cx);
+                                    start_save(over.clone(), window, cx);
+                                }),
+                        )
                 })
         });
     }
@@ -517,6 +544,65 @@ fn start_save(session: Entity<Session>, window: &mut Window, cx: &mut App) {
                         Notification::new()
                             .with_type(NotificationType::Error)
                             .title(t!(cx, "save-failed", name = &name))
+                            .message(error.to_string()),
+                        cx,
+                    );
+                }
+            });
+        })
+        .detach();
+}
+
+/// Writes the session's changes into a new slot next to the original, which stays as it was; the
+/// editor then carries on with the new slot ("Save as").
+fn start_save_as_new_slot(session: Entity<Session>, window: &mut Window, cx: &mut App) {
+    let slot = match session.read(cx).prepared() {
+        Ok(slot) => slot,
+        Err(error) => {
+            window.push_notification(
+                Notification::new()
+                    .with_type(NotificationType::Error)
+                    .title(t!(cx, "save-prepare-failed"))
+                    .message(error.to_string()),
+                cx,
+            );
+            return;
+        }
+    };
+    let (game, original_name) = {
+        let session = session.read(cx);
+        (session.game(), labels::slot_name(cx, session.slot()))
+    };
+    let new_name = t!(cx, "new-slot-name", name = &original_name).to_string();
+    session.update(cx, |session, cx| session.set_saving(true, cx));
+
+    window
+        .spawn(cx, async move |cx| {
+            let name = new_name.clone();
+            let result = cx
+                .background_spawn(async move {
+                    let dir = save::save_as_new_slot(game, &slot, &name)?;
+                    let written = save::load(&dir)?;
+                    Ok::<_, save::Error>((dir, written))
+                })
+                .await;
+            let _ = cx.update(|window, cx| match result {
+                Ok((dir, written)) => {
+                    session.update(cx, |session, cx| session.moved_to(dir, written, cx));
+                    window.push_notification(
+                        Notification::new()
+                            .with_type(NotificationType::Success)
+                            .title(t!(cx, "saved-as-new-title", name = &new_name))
+                            .message(t!(cx, "saved-as-new-body", original = &original_name)),
+                        cx,
+                    );
+                }
+                Err(error) => {
+                    session.update(cx, |session, cx| session.set_saving(false, cx));
+                    window.push_notification(
+                        Notification::new()
+                            .with_type(NotificationType::Error)
+                            .title(t!(cx, "save-failed", name = &new_name))
                             .message(error.to_string()),
                         cx,
                     );
