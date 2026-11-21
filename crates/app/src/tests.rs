@@ -245,3 +245,29 @@ fn renaming_the_company_changes_only_its_name(cx: &mut TestAppContext) {
     session.update(cx, |session, cx| session.undo(cx));
     assert_eq!(change_count(&workspace, cx), 0);
 }
+
+#[gpui_kit::test]
+fn ctrl_and_a_number_goes_to_a_page_and_enter_opens_a_row(cx: &mut TestAppContext) {
+    let slot = TempSlot::new("keyboard");
+    let (handle, _) = open(cx, &slot);
+    act(cx, handle, |window, cx| window.press("ctrl-2", cx));
+    act(cx, handle, |window, _| {
+        assert!(
+            window.try_find("refuel-all").is_some(),
+            "Ctrl+2 shows Fleet"
+        );
+    });
+
+    // Pick the first row, then Enter opens its panel.
+    act(cx, handle, |window, cx| window.click("table-cell-0:0", cx));
+    act(cx, handle, |window, cx| window.press("enter", cx));
+    cx.executor()
+        .advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    act(cx, handle, |window, _| {
+        assert!(
+            window.try_find("fill-tank").is_some(),
+            "Enter opened the truck's panel"
+        );
+    });
+}

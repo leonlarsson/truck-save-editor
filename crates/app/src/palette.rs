@@ -187,10 +187,39 @@ fn item(command: PaletteCommand, cx: &App) -> CommandItem {
             &["dark", "light", "theme"],
         ),
     };
-    CommandItem::new()
+    let item = CommandItem::new()
         .label(label)
         .icon(Icon::new(icon))
-        .keywords(keywords.iter().copied())
+        .keywords(keywords.iter().copied());
+    // Pages show their shortcut (Ctrl+1 …). The item dispatches the action too, which for going
+    // to a page is harmless alongside the palette's own handling; other commands don't get one,
+    // or they'd run twice.
+    match command {
+        PaletteCommand::Go(page) => match page_shortcut(page) {
+            Some(action) => item.action(action),
+            None => item,
+        },
+        _ => item,
+    }
+}
+
+fn page_shortcut(page: Page) -> Option<Box<dyn gpui_kit::Action>> {
+    use crate::workspace::{
+        GoToPage1, GoToPage2, GoToPage3, GoToPage4, GoToPage5, GoToPage6, GoToPage7, GoToPage8,
+    };
+    let index = Page::ALL.iter().position(|p| *p == page)?;
+    let action: Box<dyn gpui_kit::Action> = match index {
+        0 => Box::new(GoToPage1),
+        1 => Box::new(GoToPage2),
+        2 => Box::new(GoToPage3),
+        3 => Box::new(GoToPage4),
+        4 => Box::new(GoToPage5),
+        5 => Box::new(GoToPage6),
+        6 => Box::new(GoToPage7),
+        7 => Box::new(GoToPage8),
+        _ => return None,
+    };
+    Some(action)
 }
 
 /// Opens the palette over the window; confirming a command runs it on the workspace.

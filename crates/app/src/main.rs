@@ -39,6 +39,16 @@ pub fn bind_keys(cx: &mut gpui_kit::App) {
         KeyBinding::new("ctrl-shift-z", workspace::Redo, workspace),
         KeyBinding::new("ctrl-y", workspace::Redo, workspace),
         KeyBinding::new("cmd-shift-z", workspace::Redo, workspace),
+        // Enter on a table's selected row opens its detail panel.
+        KeyBinding::new("enter", workspace::OpenDetails, Some("DataTable")),
+        KeyBinding::new("ctrl-1", workspace::GoToPage1, None),
+        KeyBinding::new("ctrl-2", workspace::GoToPage2, None),
+        KeyBinding::new("ctrl-3", workspace::GoToPage3, None),
+        KeyBinding::new("ctrl-4", workspace::GoToPage4, None),
+        KeyBinding::new("ctrl-5", workspace::GoToPage5, None),
+        KeyBinding::new("ctrl-6", workspace::GoToPage6, None),
+        KeyBinding::new("ctrl-7", workspace::GoToPage7, None),
+        KeyBinding::new("ctrl-8", workspace::GoToPage8, None),
     ]);
 }
 

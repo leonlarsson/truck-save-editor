@@ -8,8 +8,8 @@ use gpui_kit::component::{
     v_flex,
 };
 use gpui_kit::{
-    App, AppContext as _, Context, Entity, IntoElement, ParentElement as _, Render, SharedString,
-    Styled as _, Subscription, Window, div, rems,
+    App, AppContext as _, Context, Entity, InteractiveElement as _, IntoElement,
+    ParentElement as _, Render, SharedString, Styled as _, Subscription, Window, div, rems,
 };
 use save::{Vehicle, VehicleKind};
 
@@ -19,6 +19,7 @@ use crate::i18n::t;
 use crate::pages::details;
 use crate::session::Session;
 use crate::ui::{FilterBar, FilterChanged, GameIconView};
+use crate::workspace::OpenDetails;
 
 pub struct FleetPage {
     session: Entity<Session>,
@@ -243,12 +244,31 @@ impl Render for FleetPage {
             )
             .child(self.filter.clone())
             .child(
-                div().flex_1().min_h_0().child(
-                    DataTable::new(&self.table)
-                        .stripe(true)
-                        .bordered(true)
-                        .accessibility_label(t!(cx, "trucks-table")),
-                ),
+                div()
+                    .flex_1()
+                    .min_h_0()
+                    // Enter on the selected row opens it, like a double-click.
+                    .on_action(cx.listener(|this, _: &OpenDetails, window, cx| {
+                        let table = this.table.clone();
+                        let Some(row) = table.read(cx).selected_row() else {
+                            return;
+                        };
+                        if let Some(item) = table
+                            .read(cx)
+                            .delegate()
+                            .trucks
+                            .get(row)
+                            .map(|row| row.vehicle.clone())
+                        {
+                            details::open_vehicle(this.session.clone(), &item, window, cx);
+                        }
+                    }))
+                    .child(
+                        DataTable::new(&self.table)
+                            .stripe(true)
+                            .bordered(true)
+                            .accessibility_label(t!(cx, "trucks-table")),
+                    ),
             )
     }
 }

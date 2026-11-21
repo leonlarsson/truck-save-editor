@@ -45,7 +45,23 @@ use crate::theme;
 use crate::ui::PageHeader;
 use save::VehicleKind;
 
-gpui_kit::actions!(workspace, [Undo, Redo]);
+gpui_kit::actions!(
+    workspace,
+    [
+        Undo,
+        Redo,
+        /// Enter on a table row: open its detail panel.
+        OpenDetails,
+        GoToPage1,
+        GoToPage2,
+        GoToPage3,
+        GoToPage4,
+        GoToPage5,
+        GoToPage6,
+        GoToPage7,
+        GoToPage8,
+    ]
+);
 
 /// The key context of the open save's window content.
 pub const KEY_CONTEXT: &str = "Workspace";
@@ -234,6 +250,14 @@ impl Workspace {
         self.opened.as_ref().map(|opened| opened.session.clone())
     }
 
+    /// Ctrl+1 … Ctrl+8: the pages in the sidebar's order.
+    fn go_to_page(&mut self, index: usize, cx: &mut Context<Self>) {
+        if let Some(page) = Page::ALL.get(index) {
+            self.page = *page;
+            cx.notify();
+        }
+    }
+
     /// Opens the command palette (only while a save is open: every command acts on it).
     fn open_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(opened) = &self.opened else {
@@ -394,6 +418,7 @@ impl Workspace {
                                     .small()
                                     .icon(Icon::new(IconName::FolderOpen))
                                     .tooltip(t!(cx, "backup-show"))
+                                    .accessibility_label(t!(cx, "backup-show"))
                                     .on_click(move |_, _, cx| cx.reveal_path(&reveal)),
                             )
                             .child(
@@ -544,6 +569,14 @@ impl Workspace {
                         }),
                 )
                 .width(px(560.))
+                // Enter saves, like clicking Save (the dialog's own Confirm action); Esc cancels.
+                .on_ok({
+                    let session = session.clone();
+                    move |_, window, cx| {
+                        start_save(session.clone(), window, cx);
+                        true
+                    }
+                })
                 .footer({
                     let as_new = session.clone();
                     let over = session.clone();
@@ -701,6 +734,7 @@ impl Workspace {
                                     .small()
                                     .icon(Icon::new(IconName::ArchiveRestore))
                                     .tooltip(t!(cx, "backups"))
+                                    .accessibility_label(t!(cx, "backups"))
                                     .on_click(cx.listener(|this, _, window, cx| {
                                         this.open_backups(window, cx)
                                     })),
@@ -716,6 +750,11 @@ impl Workspace {
                                 IconName::Moon
                             }))
                             .tooltip(if is_dark {
+                                t!(cx, "theme-light")
+                            } else {
+                                t!(cx, "theme-dark")
+                            })
+                            .accessibility_label(if is_dark {
                                 t!(cx, "theme-light")
                             } else {
                                 t!(cx, "theme-dark")
@@ -874,6 +913,14 @@ impl Render for Workspace {
             .on_action(
                 cx.listener(|this, _: &OpenPalette, window, cx| this.open_palette(window, cx)),
             )
+            .on_action(cx.listener(|this, _: &GoToPage1, _, cx| this.go_to_page(0, cx)))
+            .on_action(cx.listener(|this, _: &GoToPage2, _, cx| this.go_to_page(1, cx)))
+            .on_action(cx.listener(|this, _: &GoToPage3, _, cx| this.go_to_page(2, cx)))
+            .on_action(cx.listener(|this, _: &GoToPage4, _, cx| this.go_to_page(3, cx)))
+            .on_action(cx.listener(|this, _: &GoToPage5, _, cx| this.go_to_page(4, cx)))
+            .on_action(cx.listener(|this, _: &GoToPage6, _, cx| this.go_to_page(5, cx)))
+            .on_action(cx.listener(|this, _: &GoToPage7, _, cx| this.go_to_page(6, cx)))
+            .on_action(cx.listener(|this, _: &GoToPage8, _, cx| this.go_to_page(7, cx)))
             .bg(cx.theme().background)
             .text_color(cx.theme().foreground)
             .child(self.render_sidebar(&session, cx))
