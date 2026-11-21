@@ -271,3 +271,35 @@ fn ctrl_and_a_number_goes_to_a_page_and_enter_opens_a_row(cx: &mut TestAppContex
         );
     });
 }
+
+#[gpui_kit::test]
+fn escape_leaves_a_field_then_closes_its_panel(cx: &mut TestAppContext) {
+    let slot = TempSlot::new("escape");
+    let (handle, _) = open(cx, &slot);
+    act(cx, handle, |window, cx| window.press("ctrl-2", cx));
+    act(cx, handle, |window, cx| {
+        window.click(("details", 0usize), cx)
+    });
+    cx.executor()
+        .advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+
+    act(cx, handle, |window, cx| window.click("amount-input", cx));
+    act(cx, handle, |window, cx| window.press("escape", cx));
+    act(cx, handle, |window, _| {
+        assert!(
+            window.try_find("fill-tank").is_some(),
+            "the first Esc only leaves the field"
+        );
+    });
+    act(cx, handle, |window, cx| window.press("escape", cx));
+    cx.executor()
+        .advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    act(cx, handle, |window, _| {
+        assert!(
+            window.try_find("fill-tank").is_none(),
+            "the second Esc closes the panel"
+        );
+    });
+}

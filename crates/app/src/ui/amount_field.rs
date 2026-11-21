@@ -7,12 +7,12 @@
 
 use gpui_kit::component::{
     ActiveTheme as _, Sizable as _,
-    input::{Input, InputEvent, InputState},
+    input::{self, Input, InputEvent, InputState},
     v_flex,
 };
 use gpui_kit::{
-    AppContext as _, Context, Entity, EventEmitter, Focusable as _, InteractiveElement as _,
-    IntoElement, KeyDownEvent, MouseDownEvent, ParentElement as _, Render, SharedString,
+    AppContext as _, Context, Entity, EventEmitter, FocusHandle, Focusable as _,
+    InteractiveElement as _, IntoElement, MouseDownEvent, ParentElement as _, Render, SharedString,
     Styled as _, Subscription, Window, div, prelude::FluentBuilder as _,
 };
 
@@ -22,6 +22,9 @@ use crate::format::{parse_amount, thousands};
 pub struct AmountChanged(pub i64);
 
 pub struct AmountField {
+    /// The field's own focus, outside the text box: where focus goes when it leaves editing, so it
+    /// stays inside whatever holds the field (a panel still hears Esc to close).
+    focus_handle: FocusHandle,
     input: Entity<InputState>,
     value: i64,
     min: Option<i64>,
@@ -63,6 +66,7 @@ impl AmountField {
             });
         Self {
             input,
+            focus_handle: cx.focus_handle(),
             value,
             min: None,
             label: label.into(),
@@ -129,7 +133,7 @@ impl AmountField {
     fn cancel(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.is_editing(window, cx) {
             self.is_cancelling = true;
-            window.blur(cx);
+            self.focus_handle.focus(window, cx);
         }
     }
 
@@ -137,7 +141,7 @@ impl AmountField {
     /// away from a field when empty space is clicked, so the field does it itself.
     fn leave(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.is_editing(window, cx) {
-            window.blur(cx);
+            self.focus_handle.focus(window, cx);
         }
     }
 
@@ -168,9 +172,14 @@ impl Render for AmountField {
         let muted = cx.theme().muted_foreground;
         v_flex()
             .gap_1p5()
-            .capture_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
-                if event.keystroke.key == "escape" {
+            .track_focus(&self.focus_handle)
+            // While editing, Esc is the field's: it leaves the field, and doesn't also close the
+            // panel or dialog the field is in (the text box passes Esc on when it has nothing of
+            // its own to cancel). The next Esc does that. Caught before the text box sees it.
+            .capture_action(cx.listener(|this, _: &input::Escape, window, cx| {
+                if this.is_editing(window, cx) {
                     this.cancel(window, cx);
+                    cx.stop_propagation();
                 }
             }))
             .on_mouse_down_out(cx.listener(|this, _: &MouseDownEvent, window, cx| {
