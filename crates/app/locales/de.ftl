@@ -265,6 +265,8 @@ filter-clear = Filter zurücksetzen
 fleet-search = Nach Modell, Kennzeichen oder Garage suchen
 fleet-filter-worn = Reparaturbedürftig
 fleet-filter-no-garage = Ohne Garage
+fleet-filter-yours = Deine
+fleet-yours = Deiner
 garages-search = Nach Stadt suchen
 garages-filter-owned = Im Besitz
 garages-filter-not-large = Nicht groß
@@ -698,6 +700,7 @@ plate-white-on-blue = Weiß auf Blau
 plate-white-on-red = Weiß auf Rot
 plate-white-on-green = Weiß auf Grün
 plate-gold-on-black = Gold auf Schwarz
+plate-custom = Andere Farben
 truck-engine = Motor
 truck-transmission = Getriebe
 truck-part-pick = Wählen…
@@ -718,6 +721,9 @@ edit-unrestricted = Überall
 edit-fuel = { $percent } % Kraftstoff
 edit-badge = Mit Kühlergrill-Emblem
 edit-no-badge = Ohne Kühlergrill-Emblem
+edit-plate = { $plate } · { $colours }
+edit-odometer = { $km } km auf dem Tacho
+edit-wear = { $part } { $percent } % verschlissen
 
 # Profile tools
 profile-tools-open = Profilwerkzeuge…

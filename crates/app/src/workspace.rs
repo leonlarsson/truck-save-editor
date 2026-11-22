@@ -626,13 +626,22 @@ impl Workspace {
 
     /// Ctrl+S: the save dialog, when there's something to save and no save under way.
     fn save_from_shortcut(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(opened) = &self.opened else {
-            return;
-        };
-        let session = opened.session.read(cx);
-        if session.change_count() > 0 && !session.is_saving() {
-            self.confirm_save(window, cx);
-        }
+        // An amount still being typed (not yet confirmed with Enter) is part of the save: leaving
+        // its field confirms it, which shows once the window has drawn the focus change, so the
+        // dialog opens after that frame.
+        window.blur(cx);
+        let workspace = cx.entity().downgrade();
+        window.on_next_frame(move |window, cx| {
+            let _ = workspace.update(cx, |this, cx| {
+                let Some(opened) = &this.opened else {
+                    return;
+                };
+                let session = opened.session.read(cx);
+                if session.change_count() > 0 && !session.is_saving() {
+                    this.confirm_save(window, cx);
+                }
+            });
+        });
     }
 
     fn confirm_save(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -640,11 +649,10 @@ impl Workspace {
             return;
         };
         let session = opened.session.clone();
-        let (name, changes, is_cloud, is_loose) = {
+        let (name, is_cloud, is_loose) = {
             let session = session.read(cx);
             (
                 labels::slot_name(cx, session.slot()),
-                session.changes(cx),
                 session.profile().location == save::Location::SteamCloud,
                 session.profile().location == save::Location::Loose,
             )
@@ -653,6 +661,9 @@ impl Workspace {
 
         window.open_alert_dialog(cx, move |alert, _, cx| {
             let session = session.clone();
+            // Read on every draw: a field left by opening the dialog confirms its amount after it
+            // opened, and that change belongs in the list.
+            let changes = session.read(cx).changes(cx);
             // A long list (a big Quick start) scrolls, so the buttons stay in view.
             let list = v_flex()
                 .id("save-changes")
@@ -662,20 +673,25 @@ impl Workspace {
                 // What changed on one line, before → after below it: names of any length
                 // (a truck and its plate) read whole instead of wrapping in a narrow column.
                 .children(changes.iter().map(|change| {
+                    // `min_w_0` and wrapping: a long value (a plate with the game's markup, say)
+                    // stays inside the dialog.
                     v_flex()
                         .text_sm()
+                        .min_w_0()
                         .child(div().font_medium().child(change.what.clone()))
                         .child(
                             h_flex()
                                 .flex_wrap()
                                 .gap_x_2()
+                                .min_w_0()
                                 .child(
                                     div()
+                                        .min_w_0()
                                         .text_color(cx.theme().muted_foreground)
                                         .child(change.before.clone()),
                                 )
                                 .child(div().text_color(cx.theme().muted_foreground).child("→"))
-                                .child(div().child(change.after.clone())),
+                                .child(div().min_w_0().child(change.after.clone())),
                         )
                 }));
             alert

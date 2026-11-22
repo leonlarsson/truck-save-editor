@@ -203,3 +203,52 @@ pub fn ago(cx: &App, when: SystemTime) -> SharedString {
         t!(cx, "time-just-now")
     }
 }
+
+/// The plate colour schemes the editor offers, by key, the game's own plate first.
+pub const PLATE_SCHEMES: [&str; 8] = [
+    "plain", "yellow", "white", "black", "blue", "red", "green", "gold",
+];
+
+/// A plate colour scheme's colours: (background, letters) as red, green, blue; `None` for the
+/// game's own plate.
+pub fn plate_scheme_colours(key: &str) -> Option<([u8; 3], [u8; 3])> {
+    const BLACK: [u8; 3] = [0, 0, 0];
+    const WHITE: [u8; 3] = [255, 255, 255];
+    match key {
+        "yellow" => Some(([255, 204, 0], BLACK)),
+        "white" => Some((WHITE, BLACK)),
+        "black" => Some((BLACK, WHITE)),
+        "blue" => Some(([0, 51, 153], WHITE)),
+        "red" => Some(([190, 20, 30], WHITE)),
+        "green" => Some(([0, 110, 60], WHITE)),
+        "gold" => Some((BLACK, [212, 175, 55])),
+        _ => None,
+    }
+}
+
+/// A scheme's name by its key (`None`: colours none of the schemes has).
+pub fn plate_scheme_name(cx: &App, key: Option<&str>) -> SharedString {
+    match key {
+        Some("plain") => t!(cx, "plate-plain"),
+        Some("yellow") => t!(cx, "plate-black-on-yellow"),
+        Some("white") => t!(cx, "plate-black-on-white"),
+        Some("black") => t!(cx, "plate-white-on-black"),
+        Some("blue") => t!(cx, "plate-white-on-blue"),
+        Some("red") => t!(cx, "plate-white-on-red"),
+        Some("green") => t!(cx, "plate-white-on-green"),
+        Some("gold") => t!(cx, "plate-gold-on-black"),
+        _ => t!(cx, "plate-custom"),
+    }
+}
+
+/// The scheme of a plate as the save holds it (`license_plate`'s value): the game's own, one of
+/// the editor's, or `None` for colours none of them has.
+pub fn plate_scheme_of(plate: &str) -> Option<&'static str> {
+    match save::plate_colours(plate) {
+        None => Some("plain"),
+        Some(colours) => PLATE_SCHEMES
+            .iter()
+            .copied()
+            .find(|key| plate_scheme_colours(key) == Some(colours)),
+    }
+}

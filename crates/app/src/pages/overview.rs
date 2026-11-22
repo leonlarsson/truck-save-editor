@@ -50,6 +50,7 @@ impl OverviewPage {
         };
         let money = cx.new(|cx| {
             AmountField::new(career.money, t!(cx, "money-label"), window, cx)
+                .id("money-input")
                 .prefix(currency)
                 .hint(t!(cx, "amount-hint"))
         });

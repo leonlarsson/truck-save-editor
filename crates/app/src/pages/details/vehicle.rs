@@ -815,36 +815,18 @@ struct PlateColours {
 impl PlateColours {
     /// The schemes, with the game's own plate first.
     fn all(cx: &gpui_kit::App) -> Vec<PlateColours> {
-        let scheme = |key: &'static str, name: SharedString| PlateColours {
-            key: key.into(),
-            name,
-        };
-        vec![
-            scheme("plain", t!(cx, "plate-plain")),
-            scheme("yellow", t!(cx, "plate-black-on-yellow")),
-            scheme("white", t!(cx, "plate-black-on-white")),
-            scheme("black", t!(cx, "plate-white-on-black")),
-            scheme("blue", t!(cx, "plate-white-on-blue")),
-            scheme("red", t!(cx, "plate-white-on-red")),
-            scheme("green", t!(cx, "plate-white-on-green")),
-            scheme("gold", t!(cx, "plate-gold-on-black")),
-        ]
+        crate::labels::PLATE_SCHEMES
+            .iter()
+            .map(|key| PlateColours {
+                key: (*key).into(),
+                name: crate::labels::plate_scheme_name(cx, Some(key)),
+            })
+            .collect()
     }
 
     /// (background, letters) as red, green, blue; `None` for the game's own plate.
     fn colours(key: &str) -> Option<([u8; 3], [u8; 3])> {
-        const BLACK: [u8; 3] = [0, 0, 0];
-        const WHITE: [u8; 3] = [255, 255, 255];
-        match key {
-            "yellow" => Some(([255, 204, 0], BLACK)),
-            "white" => Some((WHITE, BLACK)),
-            "black" => Some((BLACK, WHITE)),
-            "blue" => Some(([0, 51, 153], WHITE)),
-            "red" => Some(([190, 20, 30], WHITE)),
-            "green" => Some(([0, 110, 60], WHITE)),
-            "gold" => Some((BLACK, [212, 175, 55])),
-            _ => None,
-        }
+        crate::labels::plate_scheme_colours(key)
     }
 }
 

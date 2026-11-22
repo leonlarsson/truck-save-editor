@@ -278,6 +278,8 @@ filter-clear = Wyczyść filtry
 fleet-search = Szukaj po modelu, rejestracji lub garażu
 fleet-filter-worn = Wymaga naprawy
 fleet-filter-no-garage = Bez garażu
+fleet-filter-yours = Twoje
+fleet-yours = Twoja
 garages-search = Szukaj po mieście
 garages-filter-owned = Posiadane
 garages-filter-not-large = Nie duże
@@ -731,6 +733,7 @@ plate-white-on-blue = Białe na niebieskim
 plate-white-on-red = Białe na czerwonym
 plate-white-on-green = Białe na zielonym
 plate-gold-on-black = Złote na czarnym
+plate-custom = Inne kolory
 truck-engine = Silnik
 truck-transmission = Skrzynia biegów
 truck-part-pick = Wybierz…
@@ -751,6 +754,9 @@ edit-unrestricted = Wszędzie
 edit-fuel = { $percent } % paliwa
 edit-badge = Z logo na grillu
 edit-no-badge = Bez logo na grillu
+edit-plate = { $plate } · { $colours }
+edit-odometer = Przebieg: { $km } km
+edit-wear = { $part }: { $percent } % zużycia
 
 # Profile tools
 profile-tools-open = Narzędzia profilu…

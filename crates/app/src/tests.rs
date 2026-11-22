@@ -339,17 +339,86 @@ fn ctrl_s_opens_the_save_dialog_only_when_there_is_something_to_save(cx: &mut Te
     let slot = TempSlot::new("ctrl-s");
     let (handle, workspace) = open(cx, &slot);
 
-    act(cx, handle, |window, cx| window.press("ctrl-s", cx));
+    press_ctrl_s(cx, handle);
     assert!(!has_dialog(cx, handle), "nothing to save, no dialog");
 
     run_command(cx, handle, "visit");
-    act(cx, handle, |window, cx| window.press("ctrl-s", cx));
+    press_ctrl_s(cx, handle);
     assert!(has_dialog(cx, handle), "the save dialog opened");
 
     // Escape leaves it without saving: the change is still waiting.
     act(cx, handle, |window, cx| window.press("escape", cx));
     assert!(!has_dialog(cx, handle));
     assert_eq!(change_count(&workspace, cx), 1);
+}
+
+/// Ctrl+S, then the next frame: the dialog opens after the frame that confirms a field being
+/// typed in (tests have no frame loop of their own).
+fn press_ctrl_s(cx: &mut TestAppContext, handle: AnyWindowHandle) {
+    act(cx, handle, |window, cx| window.press("ctrl-s", cx));
+    act(cx, handle, |window, cx| {
+        window.simulate_next_frame(cx);
+    });
+}
+
+#[gpui_kit::test]
+fn an_amount_typed_without_enter_is_part_of_the_save(cx: &mut TestAppContext) {
+    let slot = TempSlot::new("typed");
+    let (handle, workspace) = open(cx, &slot);
+    // A headless window starts inactive, and an inactive window gets no focus events.
+    act(cx, handle, |window, cx| {
+        window.activate_window();
+        window.render_frame(cx);
+    });
+    act(cx, handle, |window, cx| window.click("money-input", cx));
+    act(cx, handle, |window, cx| window.input("5000", cx));
+    assert_eq!(change_count(&workspace, cx), 0, "not confirmed yet");
+
+    press_ctrl_s(cx, handle);
+    assert_eq!(
+        change_count(&workspace, cx),
+        1,
+        "leaving the field confirmed it"
+    );
+    assert!(has_dialog(cx, handle), "and the save dialog opened with it");
+}
+
+#[gpui_kit::test]
+fn vehicle_panel_edits_read_like_the_panel_in_the_change_list(cx: &mut TestAppContext) {
+    let slot = TempSlot::new("plate");
+    let (_, workspace) = open(cx, &slot);
+    let session = session(&workspace, cx);
+    let plate = save::coloured_plate("AB 123", "france", [0, 51, 153], [255, 255, 255]);
+    session.update(cx, |session, cx| {
+        session.set_field(
+            "_nameless.4",
+            "license_plate",
+            None,
+            format!("\"{plate}\""),
+            cx,
+        )
+    });
+    session.update(cx, |session, cx| {
+        session.set_field("_nameless.4", "odometer", None, "1337".into(), cx)
+    });
+    cx.update(|cx| {
+        let lines: Vec<(String, String)> = session
+            .read(cx)
+            .changes(cx)
+            .iter()
+            .map(|change| (change.before.to_string(), change.after.to_string()))
+            .collect();
+        let plate = (
+            "The game's own plate".to_string(),
+            "White on blue".to_string(),
+        );
+        let odometer = (
+            "1,000 km on the odometer".to_string(),
+            "1,337 km on the odometer".to_string(),
+        );
+        assert!(lines.contains(&plate), "{lines:?}");
+        assert!(lines.contains(&odometer), "{lines:?}");
+    });
 }
 
 /// The session of the open save.

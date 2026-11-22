@@ -164,6 +164,35 @@ pub struct QuickStartPlan {
 }
 
 /// One change, for the list shown before saving.
+/// The wear fields a vehicle keeps on itself, with their parts' label keys.
+const VEHICLE_WEAR_FIELDS: [&str; 6] = [
+    "engine_wear",
+    "transmission_wear",
+    "cabin_wear",
+    "chassis_wear",
+    "trailer_body_wear",
+    "wheels_wear",
+];
+
+/// A plate's text without the game's markup or its country (`AB 123`).
+fn plate_text(value: &str) -> String {
+    let text = sii::value::parse_string(value);
+    let plate = text
+        .split_once('|')
+        .map_or(text.as_ref(), |(plate, _)| plate);
+    let mut clean = String::with_capacity(plate.len());
+    let mut in_tag = false;
+    for c in plate.chars() {
+        match c {
+            '<' => in_tag = true,
+            '>' => in_tag = false,
+            _ if !in_tag => clean.push(c),
+            _ => {}
+        }
+    }
+    clean.trim().to_string()
+}
+
 pub struct Change {
     pub what: SharedString,
     pub before: SharedString,
@@ -171,6 +200,91 @@ pub struct Change {
 }
 
 impl Session {
+    /// A truck's or trailer's plate, odometer or wear, as the change list shows it: the vehicle
+    /// by model and plate, then the value before and after in words. `None` for anything else.
+    fn describe_vehicle_field(
+        &self,
+        cx: &App,
+        path: &FieldPath,
+        text: &str,
+    ) -> Option<(SharedString, SharedString, SharedString)> {
+        let vehicle = self.saved_vehicles.iter().find(|v| v.id == path.unit)?;
+        let what = t!(
+            cx,
+            "move-what-truck",
+            model = crate::game_data::model_name(cx, vehicle).unwrap_or_default(),
+            plate = vehicle.plate.clone()
+        );
+        let saved = self.saved_value(path).unwrap_or_default();
+        let field = path.field.as_str();
+        if field == "license_plate" {
+            let scheme = |value: &str| {
+                crate::labels::plate_scheme_name(cx, crate::labels::plate_scheme_of(value))
+            };
+            let (old_text, new_text) = (plate_text(&saved), plate_text(text));
+            let (old_scheme, new_scheme) = (scheme(&saved), scheme(text));
+            let (old, new) = if old_text == new_text {
+                (old_scheme, new_scheme)
+            } else if old_scheme == new_scheme {
+                (old_text.into(), new_text.into())
+            } else {
+                (
+                    t!(cx, "edit-plate", plate = old_text, colours = old_scheme),
+                    t!(cx, "edit-plate", plate = new_text, colours = new_scheme),
+                )
+            };
+            return Some((what, old, new));
+        }
+        if field == "odometer" {
+            let km = |value: &str| thousands(sii::value::parse_i64(value).unwrap_or(0));
+            return Some((
+                what,
+                t!(cx, "edit-odometer", km = km(&saved)),
+                t!(cx, "edit-odometer", km = km(text)),
+            ));
+        }
+        if VEHICLE_WEAR_FIELDS.contains(&field) {
+            // The most worn item (a wheel, say), before and after.
+            let worst = |document: &sii::Document| -> i64 {
+                let values: Vec<String> =
+                    match document.unit(&path.unit).and_then(|unit| unit.get(field)) {
+                        Some(sii::Value::Single(value)) => vec![value.clone()],
+                        Some(sii::Value::Array(items)) => items.clone(),
+                        None => Vec::new(),
+                    };
+                let worst = values
+                    .iter()
+                    .filter_map(|value| sii::value::parse_f32(value))
+                    .fold(0.0_f32, f32::max);
+                (f64::from(worst) * 100.0).round() as i64
+            };
+            let part = match field {
+                "engine_wear" => t!(cx, "part-engine"),
+                "transmission_wear" => t!(cx, "part-transmission"),
+                "cabin_wear" => t!(cx, "part-cabin"),
+                "chassis_wear" => t!(cx, "part-chassis"),
+                "trailer_body_wear" => t!(cx, "part-body"),
+                _ => t!(cx, "part-wheels"),
+            };
+            return Some((
+                what,
+                t!(
+                    cx,
+                    "edit-wear",
+                    part = part.clone(),
+                    percent = worst(&self.loaded.game)
+                ),
+                t!(
+                    cx,
+                    "edit-wear",
+                    part = part,
+                    percent = worst(&self.preview())
+                ),
+            ));
+        }
+        None
+    }
+
     pub fn open(profile: Profile, slot: Slot, loaded: LoadedSlot) -> save::Result<Self> {
         let career = Career::read(&loaded.game)?;
         Ok(Self {
@@ -902,7 +1016,20 @@ impl Session {
             game_data::city_name(cx, &before.hq_city).into(),
             game_data::city_name(cx, &after.hq_city).into(),
         );
+        // A vehicle panel's edits (plate, odometer, repairs) read like the panel; each part's wear
+        // once, however many wheels it has.
+        let mut described_wear: std::collections::HashSet<(&str, &str)> =
+            std::collections::HashSet::new();
         for (path, text) in &self.pending.raw_edits {
+            if let Some((what, old, new)) = self.describe_vehicle_field(cx, path, text) {
+                if VEHICLE_WEAR_FIELDS.contains(&path.field.as_str())
+                    && !described_wear.insert((path.unit.as_str(), path.field.as_str()))
+                {
+                    continue;
+                }
+                add(what, old, new);
+                continue;
+            }
             let before = self
                 .loaded
                 .game

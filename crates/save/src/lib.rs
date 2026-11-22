@@ -96,8 +96,8 @@ pub use store::{
 #[cfg(feature = "native")]
 pub use time::{utc_parts, utc_timestamp};
 pub use vehicle_edits::{
-    TrailerLoad, VehicleEdit, apply_vehicle_edit, badge, coloured_plate, trailer_chain,
-    trailer_load, vehicle_part,
+    TrailerLoad, VehicleEdit, apply_vehicle_edit, badge, coloured_plate, plate_colours,
+    trailer_chain, trailer_load, vehicle_part,
 };
 
 /// The newest save format version (`version` in `info.sii`) the editor has been tested with.

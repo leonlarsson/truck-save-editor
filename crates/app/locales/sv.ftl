@@ -261,6 +261,8 @@ filter-clear = Rensa filter
 fleet-search = Sök på modell, registreringsnummer eller garage
 fleet-filter-worn = Behöver reparation
 fleet-filter-no-garage = Utan garage
+fleet-filter-yours = Dina
+fleet-yours = Din
 garages-search = Sök på stad
 garages-filter-owned = Egna
 garages-filter-not-large = Inte stora
@@ -694,6 +696,7 @@ plate-white-on-blue = Vitt på blått
 plate-white-on-red = Vitt på rött
 plate-white-on-green = Vitt på grönt
 plate-gold-on-black = Guld på svart
+plate-custom = Andra färger
 truck-engine = Motor
 truck-transmission = Växellåda
 truck-part-pick = Välj…
@@ -714,6 +717,9 @@ edit-unrestricted = Överallt
 edit-fuel = { $percent } % bränsle
 edit-badge = Med grillemblem
 edit-no-badge = Utan grillemblem
+edit-plate = { $plate } · { $colours }
+edit-odometer = { $km } km på mätaren
+edit-wear = { $part } { $percent } % slitage
 
 # Profile tools
 profile-tools-open = Profilverktyg…

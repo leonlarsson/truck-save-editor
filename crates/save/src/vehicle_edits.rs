@@ -318,9 +318,36 @@ pub fn coloured_plate(text: &str, country: &str, background: [u8; 3], letters: [
     }
 }
 
+/// The colours of a plate `coloured_plate` wrote, as (background, letters) in red, green, blue;
+/// `None` for any other plate (the game's own, whatever its markup). `plate` is the field's value,
+/// quoted or not, with or without its country.
+pub fn plate_colours(plate: &str) -> Option<([u8; 3], [u8; 3])> {
+    let text = value::parse_string(plate);
+    let rest = text.strip_prefix("<img src=/material/ui/white.mat color=")?;
+    let background = rest.get(..8)?;
+    let (_, after) = rest.split_once("<color value=")?;
+    let letters = after.get(..8)?;
+    // The game's order: alpha, blue, green, red.
+    let rgb = |hex: &str| -> Option<[u8; 3]> {
+        let byte = |at: usize| u8::from_str_radix(hex.get(at..at + 2)?, 16).ok();
+        Some([byte(6)?, byte(4)?, byte(2)?])
+    };
+    Some((rgb(background)?, rgb(letters)?))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reads_back_the_colours_of_a_coloured_plate() {
+        let plate = coloured_plate("AB 123", "sweden", [0, 51, 153], [255, 255, 255]);
+        assert_eq!(
+            plate_colours(&format!("\"{plate}\"")),
+            Some(([0, 51, 153], [255, 255, 255]))
+        );
+        assert_eq!(plate_colours("\"AB 123|sweden\""), None);
+    }
 
     const SAVE: &str = "SiiNunit\r\n{\r\neconomy : e {\r\n player: p\r\n}\r\n\r\nplayer : p {\r\n trucks: 1\r\n trucks[0]: truck.1\r\n trailers: 1\r\n trailers[0]: trailer.a\r\n}\r\n\r\ntrailer : trailer.a {\r\n trailer_definition: def.a\r\n cargo_mass: 0\r\n slave_trailer: trailer.b\r\n}\r\n\r\ntrailer : trailer.b {\r\n trailer_definition: def.b\r\n cargo_mass: 0\r\n slave_trailer: null\r\n}\r\n\r\ntrailer_def : def.a {\r\n chassis_mass: 6000\r\n body_mass: 2000\r\n country_validity: 2\r\n country_validity[0]: sweden\r\n country_validity[1]: norway\r\n}\r\n\r\ntrailer_def : def.b {\r\n chassis_mass: 3000\r\n body_mass: 1000\r\n country_validity: 1\r\n country_validity[0]: finland\r\n}\r\n\r\nvehicle : truck.1 {\r\n fuel_relative: 1\r\n accessories: 2\r\n accessories[0]: acc.data\r\n accessories[1]: acc.badge\r\n}\r\n\r\nvehicle_accessory : acc.data {\r\n data_path: \"/def/vehicle/truck/volvo.fh16_2012/data.sii\"\r\n}\r\n\r\nvehicle_addon_accessory : acc.badge {\r\n data_path: \"/def/vehicle/truck/volvo.fh16_2012/accessory/badge/gold.sii\"\r\n}\r\n\r\n}\r\n";
 

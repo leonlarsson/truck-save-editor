@@ -261,6 +261,8 @@ filter-clear = Clear filters
 fleet-search = Search by model, plate or garage
 fleet-filter-worn = Needs repair
 fleet-filter-no-garage = No garage
+fleet-filter-yours = Yours
+fleet-yours = Yours
 garages-search = Search by city
 garages-filter-owned = Owned
 garages-filter-not-large = Not large
@@ -694,6 +696,7 @@ plate-white-on-blue = White on blue
 plate-white-on-red = White on red
 plate-white-on-green = White on green
 plate-gold-on-black = Gold on black
+plate-custom = Other colours
 truck-engine = Engine
 truck-transmission = Transmission
 truck-part-pick = Choose…
@@ -714,6 +717,9 @@ edit-unrestricted = Everywhere
 edit-fuel = { $percent } % fuel
 edit-badge = With the grille badge
 edit-no-badge = No grille badge
+edit-plate = { $plate } · { $colours }
+edit-odometer = { $km } km on the odometer
+edit-wear = { $part } { $percent } % worn
 
 # Profile tools
 profile-tools-open = Profile tools…

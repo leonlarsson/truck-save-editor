@@ -7,6 +7,7 @@ use gpui_kit::component::{
     h_flex,
     select::{SearchableVec, Select, SelectEvent, SelectState},
     table::{Column, ColumnSort, DataTable, TableDelegate, TableEvent, TableState},
+    tag::Tag,
     v_flex,
 };
 use gpui_kit::{
@@ -41,6 +42,7 @@ pub struct FleetPage {
 /// The Fleet filter's toggles, in order.
 const FILTER_WORN: usize = 0;
 const FILTER_NO_GARAGE: usize = 1;
+const FILTER_YOURS: usize = 2;
 
 impl FleetPage {
     pub fn new(session: Entity<Session>, window: &mut Window, cx: &mut Context<Self>) -> Self {
@@ -57,6 +59,7 @@ impl FleetPage {
         let toggles = vec![
             t!(cx, "fleet-filter-worn"),
             t!(cx, "fleet-filter-no-garage"),
+            t!(cx, "fleet-filter-yours"),
         ];
         let placeholder = t!(cx, "fleet-search");
         let filter = cx.new(|cx| FilterBar::new(placeholder, toggles, window, cx));
@@ -136,7 +139,21 @@ impl FleetPage {
 impl FleetPage {
     /// Puts the session's current vehicles of the shown kind into the table.
     fn reload(&mut self, cx: &mut Context<Self>) {
-        let all = rows(of_kind(self.session.read(cx).vehicles(), self.kind), cx);
+        // The truck the player drives and the trailer they pull.
+        let yours: Vec<String> = {
+            let session = self.session.read(cx);
+            [session.own_truck(), save::own_trailer(&session.preview())]
+                .into_iter()
+                .flatten()
+                .collect()
+        };
+        let mut all = rows(
+            of_kind(self.session.read(cx).vehicles(), self.kind),
+            &yours,
+            cx,
+        );
+        // Yours first, until a column's heading sorts the table.
+        all.sort_by_key(|row| !row.is_yours);
         let total = all.len();
         let existing: Vec<String> = all.iter().map(|row| row.vehicle.id.clone()).collect();
         let vehicles: Vec<Row> = {
@@ -151,6 +168,7 @@ impl FleetPage {
                         .unwrap_or_default();
                     (!filter.is_on(FILTER_WORN) || truck.wear.worst() > 0.0)
                         && (!filter.is_on(FILTER_NO_GARAGE) || truck.garage_city.is_none())
+                        && (!filter.is_on(FILTER_YOURS) || row.is_yours)
                         && filter.matches(&[&row.name, &truck.plate, &garage], cx)
                 })
                 .collect()
@@ -299,10 +317,11 @@ fn of_kind(vehicles: Vec<Vehicle>, kind: VehicleKind) -> Vec<Vehicle> {
     vehicles.into_iter().filter(|v| v.kind == kind).collect()
 }
 
-fn rows(vehicles: Vec<Vehicle>, cx: &App) -> Vec<Row> {
+fn rows(vehicles: Vec<Vehicle>, yours: &[String], cx: &App) -> Vec<Row> {
     vehicles
         .into_iter()
         .map(|vehicle| Row {
+            is_yours: yours.contains(&vehicle.id),
             name: game_data::model_name(cx, &vehicle)
                 .map(SharedString::from)
                 .unwrap_or_else(|| t!(cx, "unknown-truck")),
@@ -473,6 +492,8 @@ impl Render for FleetPage {
 /// so sorting doesn't look names up again).
 struct Row {
     vehicle: Vehicle,
+    /// The truck the player drives, or the trailer they pull.
+    is_yours: bool,
     name: SharedString,
     logo: Option<std::sync::Arc<gamedata::GameIcon>>,
 }
@@ -814,7 +835,15 @@ impl TableDelegate for TruckTable {
                                 .channel(gamedata::RED, cx.theme().muted_foreground)
                         })),
                 )
-                .child(crate::ui::cell_text(text)),
+                .child(crate::ui::cell_text(text))
+                // Said in words, not only a colour.
+                .children(row.filter(|row| row.is_yours).map(|_| {
+                    Tag::primary()
+                        .outline()
+                        .xsmall()
+                        .flex_shrink_0()
+                        .child(t!(cx, "fleet-yours"))
+                })),
             // The wear, and Repair for a worn vehicle: always shown, not only on hover.
             TruckColumn::Wear => {
                 let repair = truck.filter(|truck| truck.wear.worst() > 0.0).map(|truck| {
