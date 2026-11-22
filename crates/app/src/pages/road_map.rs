@@ -1,18 +1,18 @@
-//! The map's roads, as a picture: a dot for every road and junction on the game's map (read from
-//! its files, see `gamedata::map_roads`), the ones driven in this save in the accent colour, and
-//! where the player's truck is. The mouse wheel zooms around the pointer, dragging moves the map,
-//! and buttons do both from the keyboard.
+//! The map's roads: a dot for every road and junction on the game's map (read from its files, see
+//! `gamedata::map_roads`), the ones driven in this save in the accent colour, and where the
+//! player's truck is. The mouse wheel zooms around the pointer, dragging moves the map, and
+//! buttons do both from the keyboard.
 //!
-//! What's on screen is drawn in the background as one picture of just the area shown, at the
-//! screen's own resolution, so dots stay sharp at any zoom: hundreds of thousands of dots are far
-//! too many to draw as shapes on every frame. While the map moves, the last picture is stretched
-//! and shifted to follow at once, and a sharp one replaces it a moment later.
+//! Drawn the way web maps are: in square tiles at fixed zoom levels, each drawn once in the
+//! background and kept. Moving the map reuses the tiles already drawn; zooming shows the nearest
+//! level's tiles, scaled, with coarser ones underneath, until sharper ones are ready on top, so
+//! nothing goes blank or jumps. The truck is drawn over the tiles on every frame, at one size.
+//! Hundreds of thousands of dots are far too many to draw as shapes on every frame.
 
 use std::cell::Cell;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::Arc;
-use std::time::Duration;
 
 use gpui_kit::component::{
     ActiveTheme as _, Sizable as _,
@@ -20,27 +20,35 @@ use gpui_kit::component::{
     h_flex, v_flex,
 };
 use gpui_kit::{
-    AppContext as _, Bounds, Context, Corners, Entity, InteractiveElement as _, IntoElement,
-    MouseButton, ParentElement as _, Pixels, Point, Render, RenderImage, Rgba, Styled as _, Task,
-    Window, canvas, div, point, px, rems, size,
+    AppContext as _, BorderStyle, Bounds, Context, Corners, Entity, Hsla, InteractiveElement as _,
+    IntoElement, MouseButton, ParentElement as _, Pixels, Point, Render, RenderImage, Rgba,
+    Styled as _, Task, Window, canvas, div, point, px, quad, rems, size,
 };
 
 use crate::game_data;
 use crate::i18n::t;
 use crate::session::Session;
 
-/// A dot's size on screen, in pixels, when the whole map shows; dots grow as it's zoomed in.
+/// A tile's side, in screen pixels.
+const TILE: f32 = 256.0;
+/// The deepest zoom level (each level is twice as close as the one before).
+const MAX_LEVEL: i32 = 13;
+/// How many levels coarser a tile can be to stand in for one not drawn yet.
+const BACKING_LEVELS: i32 = 6;
+/// How many tiles are kept; the least recently shown go first.
+const KEPT_TILES: usize = 160;
+/// The side of the cells roads are sorted into, in metres, to find a tile's roads quickly.
+const CELL: f32 = 5000.0;
+/// A dot's size on screen, in pixels, zoomed out; dots grow as the map is zoomed in.
 const DOT: f32 = 2.0;
 /// The largest a dot gets, in pixels.
-const LARGEST_DOT: f32 = 7.0;
+const LARGEST_DOT: f32 = 6.0;
 /// How many metres a dot stands for once zoomed in (about a road piece).
 const DOT_METRES: f32 = 40.0;
 /// The truck's marker's radius on screen, in pixels.
 const MARKER: f32 = 6.0;
 /// The closest zoom: metres a screen pixel shows.
 const CLOSEST: f32 = 1.5;
-/// How long the map waits after moving before drawing it sharp again.
-const SETTLE: Duration = Duration::from_millis(80);
 /// One button press's zoom.
 const STEP: f32 = 1.6;
 
@@ -62,31 +70,96 @@ struct World {
     south: f32,
 }
 
-/// What a picture shows: drawn again when any of it changes.
+/// The roads, sorted into cells so a tile finds its own without looking at all of them.
+struct Index {
+    roads: Arc<Vec<gamedata::MapRoad>>,
+    world: World,
+    /// Metres per pixel at level 0, where one tile holds the whole map.
+    base: f32,
+    cells: HashMap<(i32, i32), Vec<u32>>,
+}
+
+impl Index {
+    fn new(roads: Arc<Vec<gamedata::MapRoad>>) -> Option<Self> {
+        let world = world_of(&roads)?;
+        let base = (world.east - world.west).max(world.south - world.north) / TILE;
+        let mut cells: HashMap<(i32, i32), Vec<u32>> = HashMap::new();
+        for (index, road) in roads.iter().enumerate() {
+            cells
+                .entry(cell_of(road.x, road.z))
+                .or_default()
+                .push(index as u32);
+        }
+        Some(Self {
+            roads,
+            world,
+            base,
+            cells,
+        })
+    }
+
+    fn metres_per_pixel(&self, level: i32) -> f32 {
+        self.base / 2f32.powi(level)
+    }
+
+    /// A tile's side, in metres.
+    fn tile_metres(&self, level: i32) -> f32 {
+        TILE * self.metres_per_pixel(level)
+    }
+
+    /// The level whose tiles are at least as sharp as the view.
+    fn level_for(&self, view: View) -> i32 {
+        ((self.base / view.metres_per_pixel).log2().ceil() as i32).clamp(0, MAX_LEVEL)
+    }
+
+    /// A tile's extent, in the game's metres: west, north, east, south.
+    fn tile_extent(&self, key: TileKey) -> (f32, f32, f32, f32) {
+        let side = self.tile_metres(key.level);
+        let west = self.world.west + key.x as f32 * side;
+        let north = self.world.north + key.y as f32 * side;
+        (west, north, west + side, north + side)
+    }
+
+    /// Every road in the cells this extent touches.
+    fn roads_in(&self, west: f32, north: f32, east: f32, south: f32) -> Vec<&gamedata::MapRoad> {
+        let (first, last) = (cell_of(west, north), cell_of(east, south));
+        let mut found = Vec::new();
+        for x in first.0..=last.0 {
+            for z in first.1..=last.1 {
+                if let Some(indices) = self.cells.get(&(x, z)) {
+                    found.extend(indices.iter().map(|&index| &self.roads[index as usize]));
+                }
+            }
+        }
+        found
+    }
+}
+
+fn cell_of(x: f32, z: f32) -> (i32, i32) {
+    ((x / CELL).floor() as i32, (z / CELL).floor() as i32)
+}
+
+/// One tile: its zoom level and place in that level's grid.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+struct TileKey {
+    level: i32,
+    x: i32,
+    y: i32,
+}
+
+/// What tiles are drawn for: new tiles when any of it changes.
 #[derive(Clone, Debug, PartialEq)]
-struct Request {
-    view: View,
-    /// The area's size on screen, in pixels.
-    width: f32,
-    height: f32,
+struct Look {
     driven: usize,
-    position: Option<String>,
     is_dark: bool,
+    scale: f32,
 }
 
-/// A picture drawn, and what it shows.
-struct Picture {
-    image: Arc<RenderImage>,
-    request: Request,
-}
-
-/// The colours a picture is drawn in, as blue, green, red, alpha (GPUI's image order).
+/// The colours tiles are drawn in, as blue, green, red, alpha (GPUI's image order).
 #[derive(Clone, Copy)]
 struct Palette {
     road: [u8; 4],
     driven: [u8; 4],
-    marker: [u8; 4],
-    marker_edge: [u8; 4],
 }
 
 fn bgra(color: Rgba, alpha: f32) -> [u8; 4] {
@@ -99,18 +172,30 @@ fn bgra(color: Rgba, alpha: f32) -> [u8; 4] {
     ]
 }
 
+/// A tile drawn: its picture (`None` where it has no roads), and when it was last shown.
+struct Tile {
+    image: Option<Arc<RenderImage>>,
+    shown: u64,
+}
+
 pub struct RoadMap {
     session: Entity<Session>,
     view: Option<View>,
-    world: Option<World>,
     /// Where the map's area is on screen, as last laid out (set while painting).
     area: Rc<Cell<Option<Bounds<Pixels>>>>,
-    picture: Option<Picture>,
-    /// What's being drawn (or was last drawn), so the same picture isn't asked for twice.
-    requested: Option<Request>,
+    index: Option<Arc<Index>>,
+    is_indexing: bool,
+    /// What the tiles are drawn for, and the roads driven then.
+    look: Option<Look>,
+    driven: Option<Arc<HashSet<u64>>>,
+    tiles: HashMap<TileKey, Tile>,
+    /// Tiles being drawn.
+    drawing: HashSet<TileKey>,
+    /// Counts frames, to keep the tiles shown most recently.
+    frame: u64,
     /// Dragging: where the pointer went down, and the view then.
     drag: Option<(Point<Pixels>, View)>,
-    _drawing: Option<Task<()>>,
+    _work: Vec<Task<()>>,
 }
 
 impl RoadMap {
@@ -119,12 +204,16 @@ impl RoadMap {
         Self {
             session,
             view: None,
-            world: None,
             area: Rc::new(Cell::new(None)),
-            picture: None,
-            requested: None,
+            index: None,
+            is_indexing: false,
+            look: None,
+            driven: None,
+            tiles: HashMap::new(),
+            drawing: HashSet::new(),
+            frame: 0,
             drag: None,
-            _drawing: None,
+            _work: Vec::new(),
         }
     }
 
@@ -142,10 +231,10 @@ impl RoadMap {
 
     /// The farthest zoom: a little beyond the whole map.
     fn farthest(&self) -> f32 {
-        match (self.world, self.area.get()) {
-            (Some(world), Some(area)) => {
+        match (&self.index, self.area.get()) {
+            (Some(index), Some(area)) => {
                 Self::fitted(
-                    world,
+                    index.world,
                     f32::from(area.size.width),
                     f32::from(area.size.height),
                 )
@@ -181,9 +270,9 @@ impl RoadMap {
     }
 
     fn fit(&mut self, cx: &mut Context<Self>) {
-        if let (Some(world), Some(area)) = (self.world, self.area.get()) {
+        if let (Some(index), Some(area)) = (&self.index, self.area.get()) {
             self.view = Some(Self::fitted(
-                world,
+                index.world,
                 f32::from(area.size.width),
                 f32::from(area.size.height),
             ));
@@ -191,81 +280,230 @@ impl RoadMap {
         }
     }
 
-    /// Asks for a sharp picture of what's shown, once it has settled, if there isn't one.
-    fn redraw_if_changed(&mut self, window: &Window, cx: &mut Context<Self>) {
+    /// Gets ready what the next frame needs: the roads sorted, the roads driven, and the tiles
+    /// in view (drawn in the background, as many as are missing).
+    fn prepare(&mut self, window: &Window, cx: &mut Context<Self>) {
         let Some(roads) = game_data::map_roads(cx) else {
             return;
         };
-        if self.world.is_none() {
-            self.world = world_of(&roads);
-        }
-        let (Some(world), Some(area)) = (self.world, self.area.get()) else {
+        let Some(index) = self.index.clone() else {
+            if !self.is_indexing {
+                self.is_indexing = true;
+                self._work.push(cx.spawn(async move |this, cx| {
+                    let index = cx
+                        .background_spawn(async move { Index::new(roads).map(Arc::new) })
+                        .await;
+                    let _ = this.update(cx, |this, cx| {
+                        this.index = index;
+                        cx.notify();
+                    });
+                }));
+            }
             return;
         };
-        let (width, height) = (f32::from(area.size.width), f32::from(area.size.height));
-        let view = *self
-            .view
-            .get_or_insert_with(|| Self::fitted(world, width, height));
+
+        // A new look (roads driven, light or dark, screen resolution): tiles drawn again.
         let document = self.session.read(cx).preview();
-        let position = save::position(&document).map(|position| position.placement);
-        let request = Request {
-            view,
-            width,
-            height,
+        let look = Look {
             driven: save::discovered_roads(&document),
-            position: position.clone(),
             is_dark: cx.theme().is_dark(),
+            scale: window.scale_factor(),
         };
-        if self.requested.as_ref() == Some(&request) {
+        if self.look.as_ref() != Some(&look) {
+            self.look = Some(look);
+            self.driven = None;
+            self.drawing.clear();
+            for (_, tile) in self.tiles.drain() {
+                if let Some(image) = tile.image {
+                    cx.drop_image(image, None);
+                }
+            }
+            self._work.push(cx.spawn(async move |this, cx| {
+                let driven = cx
+                    .background_spawn(async move {
+                        let driven: HashSet<u64> = document
+                            .first_of_kind("economy")
+                            .map(|economy| {
+                                economy
+                                    .items("discovered_items")
+                                    .iter()
+                                    .filter_map(|id| id.parse().ok())
+                                    .collect()
+                            })
+                            .unwrap_or_default();
+                        Arc::new(driven)
+                    })
+                    .await;
+                let _ = this.update(cx, |this, cx| {
+                    this.driven = Some(driven);
+                    cx.notify();
+                });
+            }));
+        }
+
+        let Some(area) = self.area.get() else {
+            return;
+        };
+        let view = *self.view.get_or_insert_with(|| {
+            Self::fitted(
+                index.world,
+                f32::from(area.size.width),
+                f32::from(area.size.height),
+            )
+        });
+        let Some(driven) = self.driven.clone() else {
+            return;
+        };
+        let level = index.level_for(view);
+        let missing: Vec<TileKey> = visible_tiles(&index, view, area, level)
+            .into_iter()
+            .filter(|key| !self.tiles.contains_key(key) && !self.drawing.contains(key))
+            .collect();
+        if missing.is_empty() {
             return;
         }
-        self.requested = Some(request.clone());
+        self.drawing.extend(missing.iter().copied());
         let theme = cx.theme();
         let palette = Palette {
             road: bgra(theme.muted_foreground.into(), 0.4),
             driven: bgra(theme.primary.into(), 1.0),
-            marker: bgra(theme.danger.into(), 1.0),
-            marker_edge: bgra(theme.background.into(), 1.0),
         };
+        let look = self.look.clone();
         let scale = window.scale_factor();
-        // Moving: wait until it stops before drawing; the last picture follows meanwhile.
-        let settle = self.picture.is_some();
-        self._drawing = Some(cx.spawn(async move |this, cx| {
-            if settle {
-                cx.background_executor().timer(SETTLE).await;
-            }
-            let drawn = request.clone();
-            let image = cx
+        self._work.retain(|task| !task.is_ready());
+        self._work.push(cx.spawn(async move |this, cx| {
+            let drawn = cx
                 .background_spawn(async move {
-                    let driven: HashSet<u64> = document
-                        .first_of_kind("economy")
-                        .map(|economy| {
-                            economy
-                                .items("discovered_items")
-                                .iter()
-                                .filter_map(|id| id.parse().ok())
-                                .collect()
-                        })
-                        .unwrap_or_default();
-                    let truck = position.as_deref().and_then(placement_xz);
-                    draw(&roads, &driven, truck, palette, &drawn, scale)
+                    missing
+                        .into_iter()
+                        .map(|key| (key, draw_tile(&index, &driven, key, palette, scale)))
+                        .collect::<Vec<_>>()
                 })
                 .await;
             let _ = this.update(cx, |this, cx| {
-                if let Some(image) = image {
-                    let old = this.picture.replace(Picture {
-                        image: Arc::new(image),
-                        request,
-                    });
-                    // The old picture's copy on the graphics card goes with it.
-                    if let Some(old) = old {
-                        cx.drop_image(old.image, None);
+                // Drawn for a look that's gone: of no use.
+                if this.look != look {
+                    for (_, image) in drawn {
+                        if let Some(image) = image {
+                            cx.drop_image(Arc::new(image), None);
+                        }
                     }
+                    return;
                 }
+                let frame = this.frame;
+                for (key, image) in drawn {
+                    this.drawing.remove(&key);
+                    this.tiles.insert(
+                        key,
+                        Tile {
+                            image: image.map(Arc::new),
+                            shown: frame,
+                        },
+                    );
+                }
+                this.forget_old_tiles(cx);
                 cx.notify();
             });
         }));
     }
+
+    /// Keeps the tiles shown most recently, up to `KEPT_TILES`.
+    fn forget_old_tiles(&mut self, cx: &mut Context<Self>) {
+        if self.tiles.len() <= KEPT_TILES {
+            return;
+        }
+        let mut by_age: Vec<(TileKey, u64)> = self
+            .tiles
+            .iter()
+            .map(|(key, tile)| (*key, tile.shown))
+            .collect();
+        by_age.sort_by_key(|(_, shown)| *shown);
+        let extra = self.tiles.len() - KEPT_TILES;
+        for (key, _) in by_age.into_iter().take(extra) {
+            if let Some(Tile {
+                image: Some(image), ..
+            }) = self.tiles.remove(&key)
+            {
+                cx.drop_image(image, None);
+            }
+        }
+    }
+
+    /// What to paint for each tile in view, marking the tiles used as shown: the tile itself
+    /// once drawn, otherwise the closest coarser tile drawn, scaled up and cut to the missing
+    /// tile's square (never underneath a tile that's ready, where it would show through the gaps
+    /// between roads). Each entry: the square to fill, where the picture goes, the picture.
+    fn tiles_to_paint(&mut self) -> Vec<TilePaint> {
+        let (Some(index), Some(view), Some(area)) = (&self.index, self.view, self.area.get())
+        else {
+            return Vec::new();
+        };
+        self.frame += 1;
+        let level = index.level_for(view);
+        let mut paint = Vec::new();
+        for key in visible_tiles(index, view, area, level) {
+            let square = tile_bounds(index, key, view, area);
+            // The tile, else its closest drawn ancestor (`None` for one with no roads).
+            let found = (0..=BACKING_LEVELS.min(level)).find_map(|up| {
+                let ancestor = TileKey {
+                    level: key.level - up,
+                    x: key.x >> up,
+                    y: key.y >> up,
+                };
+                self.tiles.get_mut(&ancestor).map(|tile| {
+                    tile.shown = self.frame;
+                    (ancestor, tile.image.clone())
+                })
+            });
+            if let Some((ancestor, Some(image))) = found {
+                paint.push(TilePaint {
+                    square,
+                    placed: tile_bounds(index, ancestor, view, area),
+                    image,
+                });
+            }
+        }
+        paint
+    }
+}
+
+/// One square of the map to paint: `square` on screen, filled from `image` placed at `placed`
+/// (the same for a tile drawn at this zoom; bigger, for a coarser one standing in).
+struct TilePaint {
+    square: Bounds<Pixels>,
+    placed: Bounds<Pixels>,
+    image: Arc<RenderImage>,
+}
+
+/// The tiles of a level that the view shows.
+fn visible_tiles(index: &Index, view: View, area: Bounds<Pixels>, level: i32) -> Vec<TileKey> {
+    let side = index.tile_metres(level);
+    let half_width = f32::from(area.size.width) / 2.0 * view.metres_per_pixel;
+    let half_height = f32::from(area.size.height) / 2.0 * view.metres_per_pixel;
+    let count = 1 << level;
+    let column = |x: f32| (((x - index.world.west) / side).floor() as i32).clamp(0, count - 1);
+    let row = |z: f32| (((z - index.world.north) / side).floor() as i32).clamp(0, count - 1);
+    let (first_x, last_x) = (column(view.x - half_width), column(view.x + half_width));
+    let (first_y, last_y) = (row(view.z - half_height), row(view.z + half_height));
+    let mut keys = Vec::new();
+    for y in first_y..=last_y {
+        for x in first_x..=last_x {
+            keys.push(TileKey { level, x, y });
+        }
+    }
+    keys
+}
+
+/// Where a tile goes on screen.
+fn tile_bounds(index: &Index, key: TileKey, view: View, area: Bounds<Pixels>) -> Bounds<Pixels> {
+    let (west, north, east, south) = index.tile_extent(key);
+    let to_screen = |x: f32, z: f32| {
+        point(
+            area.center().x + px((x - view.x) / view.metres_per_pixel),
+            area.center().y + px((z - view.z) / view.metres_per_pixel),
+        )
+    };
+    Bounds::from_corners(to_screen(west, north), to_screen(east, south))
 }
 
 /// The extent of the roads.
@@ -296,97 +534,70 @@ fn placement_xz(placement: &str) -> Option<(f32, f32)> {
     Some((x, z))
 }
 
-/// The picture of what `request` shows, at `scale` device pixels per screen pixel: every road a
-/// dot, the driven ones on top, then the truck's marker. `None` for an empty area.
-fn draw(
-    roads: &[gamedata::MapRoad],
+/// One tile's picture, at `scale` device pixels per screen pixel: every road in it a dot, the
+/// driven ones on top. `None` when no road touches it.
+fn draw_tile(
+    index: &Index,
     driven: &HashSet<u64>,
-    truck: Option<(f32, f32)>,
+    key: TileKey,
     palette: Palette,
-    request: &Request,
     scale: f32,
 ) -> Option<RenderImage> {
-    let width = (request.width * scale).round() as i64;
-    let height = (request.height * scale).round() as i64;
-    if width <= 0 || height <= 0 {
+    let side = (TILE * scale).round() as i64;
+    let (west, north, east, south) = index.tile_extent(key);
+    let metres = (east - west) / side as f32;
+    let dot = ((DOT_METRES / index.metres_per_pixel(key.level)).clamp(DOT, LARGEST_DOT) * scale)
+        .round() as i64;
+    // Dots just outside the tile reach into it.
+    let margin = dot as f32 * metres;
+    let roads = index.roads_in(west - margin, north - margin, east + margin, south + margin);
+    if roads.is_empty() {
         return None;
     }
-    let view = request.view;
-    // Metres per device pixel, and a dot's size: bigger as the map is zoomed in.
-    let metres = view.metres_per_pixel / scale;
-    let dot = ((DOT_METRES / view.metres_per_pixel).clamp(DOT, LARGEST_DOT) * scale).round() as i64;
-    let to_pixel = |x: f32, z: f32| {
-        (
-            ((x - view.x) / metres) as i64 + width / 2,
-            // The game's `z` runs south: north at the top.
-            ((z - view.z) / metres) as i64 + height / 2,
-        )
-    };
-    let mut pixels = vec![0u8; (width * height * 4) as usize];
+    let mut pixels = vec![0u8; (side * side * 4) as usize];
     let mut put = |x: i64, y: i64, color: [u8; 4]| {
-        if x >= 0 && y >= 0 && x < width && y < height {
-            let at = ((y * width + x) * 4) as usize;
+        if x >= 0 && y >= 0 && x < side && y < side {
+            let at = ((y * side + x) * 4) as usize;
             pixels[at..at + 4].copy_from_slice(&color);
         }
     };
-    let paint_roads = |is_driven: bool, color: [u8; 4], put: &mut dyn FnMut(i64, i64, [u8; 4])| {
+    let mut any = false;
+    for is_driven in [false, true] {
+        let color = if is_driven {
+            palette.driven
+        } else {
+            palette.road
+        };
         for road in roads
             .iter()
             .filter(|road| driven.contains(&road.id) == is_driven)
         {
-            let (px, py) = to_pixel(road.x, road.z);
-            if px < -dot || py < -dot || px > width + dot || py > height + dot {
+            let x = ((road.x - west) / metres) as i64 - dot / 2;
+            let y = ((road.z - north) / metres) as i64 - dot / 2;
+            if x + dot < 0 || y + dot < 0 || x >= side || y >= side {
                 continue;
             }
+            any = true;
             for dy in 0..dot {
                 for dx in 0..dot {
-                    put(px + dx - dot / 2, py + dy - dot / 2, color);
-                }
-            }
-        }
-    };
-    paint_roads(false, palette.road, &mut put);
-    paint_roads(true, palette.driven, &mut put);
-    if let Some((x, z)) = truck {
-        let (cx, cy) = to_pixel(x, z);
-        let inner = (MARKER * scale) as i64;
-        let outer = inner + (2.0 * scale) as i64;
-        for dy in -outer..=outer {
-            for dx in -outer..=outer {
-                let distance = dx * dx + dy * dy;
-                if distance <= inner * inner {
-                    put(cx + dx, cy + dy, palette.marker);
-                } else if distance <= outer * outer {
-                    put(cx + dx, cy + dy, palette.marker_edge);
+                    put(x + dx, y + dy, color);
                 }
             }
         }
     }
-    let buffer = image::RgbaImage::from_raw(width as u32, height as u32, pixels)?;
+    if !any {
+        return None;
+    }
+    let buffer = image::RgbaImage::from_raw(side as u32, side as u32, pixels)?;
     Some(RenderImage::new(vec![image::Frame::new(buffer)]))
-}
-
-/// Where a picture drawn for one view goes on screen for another, in `area`.
-fn placed(picture: &Request, view: View, area: Bounds<Pixels>) -> Bounds<Pixels> {
-    let ratio = picture.view.metres_per_pixel / view.metres_per_pixel;
-    let (width, height) = (picture.width * ratio, picture.height * ratio);
-    // The picture's middle, on screen now.
-    let middle_x = (picture.view.x - view.x) / view.metres_per_pixel;
-    let middle_z = (picture.view.z - view.z) / view.metres_per_pixel;
-    Bounds::new(
-        point(
-            area.center().x + px(middle_x - width / 2.0),
-            area.center().y + px(middle_z - height / 2.0),
-        ),
-        size(px(width), px(height)),
-    )
 }
 
 impl Render for RoadMap {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        self.redraw_if_changed(window, cx);
+        self.prepare(window, cx);
+        let paint = self.tiles_to_paint();
         let theme = cx.theme();
-        let swatch = |color: gpui_kit::Hsla, label: gpui_kit::SharedString| {
+        let swatch = |color: Hsla, label: gpui_kit::SharedString| {
             h_flex()
                 .gap_1p5()
                 .items_center()
@@ -435,36 +646,57 @@ impl Render for RoadMap {
             );
 
         let has_roads = game_data::map_roads(cx).is_some();
-        let message = match (&self.picture, has_roads) {
-            (None, true) => Some(t!(cx, "road-map-drawing")),
-            (None, false) => Some(t!(cx, "road-map-needs-game")),
+        let message = match (paint.is_empty(), has_roads) {
+            (true, true) => Some(t!(cx, "road-map-drawing")),
+            (_, false) => Some(t!(cx, "road-map-needs-game")),
             _ => None,
         };
+        // The truck, drawn over the tiles at one size whatever the zoom.
+        let truck = save::position(&self.session.read(cx).preview())
+            .and_then(|position| placement_xz(&position.placement));
+        let view = self.view;
+        let marker = (theme.danger, theme.background);
         let area = self.area.clone();
         let entity = cx.entity().downgrade();
-        let picture = self
-            .picture
-            .as_ref()
-            .map(|picture| (picture.image.clone(), picture.request.clone()));
-        let view = self.view;
         let map = canvas(
             move |bounds, _, cx| {
-                // The area's size decides the picture's: a new size, a new picture.
+                // The area's size decides which tiles show: a new size, a new look.
                 if area.get() != Some(bounds) {
                     area.set(Some(bounds));
                     let _ = entity.update(cx, |_, cx| cx.notify());
                 }
             },
             move |bounds, _, window, _| {
-                if let (Some((image, request)), Some(view)) = (picture, view) {
+                for tile in paint {
+                    let square = tile.square.intersect(&bounds);
                     let _ = window.paint_image(
-                        bounds,
-                        placed(&request, view, bounds),
+                        square,
+                        tile.placed,
                         Corners::default(),
-                        image,
+                        tile.image,
                         0,
                         false,
                     );
+                }
+                if let (Some((x, z)), Some(view)) = (truck, view) {
+                    let middle = point(
+                        bounds.center().x + px((x - view.x) / view.metres_per_pixel),
+                        bounds.center().y + px((z - view.z) / view.metres_per_pixel),
+                    );
+                    if bounds.contains(&middle) {
+                        let radius = px(MARKER);
+                        window.paint_quad(quad(
+                            Bounds::new(
+                                point(middle.x - radius, middle.y - radius),
+                                size(radius * 2.0, radius * 2.0),
+                            ),
+                            radius,
+                            marker.0,
+                            px(2.0),
+                            marker.1,
+                            BorderStyle::Solid,
+                        ));
+                    }
                 }
             },
         )
@@ -539,6 +771,21 @@ impl Render for RoadMap {
 mod tests {
     use super::*;
 
+    fn roads() -> Arc<Vec<gamedata::MapRoad>> {
+        Arc::new(vec![
+            gamedata::MapRoad {
+                id: 1,
+                x: 0.0,
+                z: 0.0,
+            },
+            gamedata::MapRoad {
+                id: 2,
+                x: 25_600.0,
+                z: 12_800.0,
+            },
+        ])
+    }
+
     #[test]
     fn reads_a_placements_ground_position() {
         assert_eq!(
@@ -548,63 +795,65 @@ mod tests {
         assert_eq!(placement_xz("nothing"), None);
     }
 
-    fn request(view: View) -> Request {
-        Request {
-            view,
-            width: 200.0,
-            height: 100.0,
-            driven: 0,
-            position: None,
-            is_dark: false,
-        }
+    #[test]
+    fn one_tile_holds_the_whole_map_at_level_zero() {
+        let index = Index::new(roads()).expect("an index");
+        // 25,600 m wide over 256 pixels: 100 m a pixel.
+        assert_eq!(index.metres_per_pixel(0), 100.0);
+        assert_eq!(index.tile_metres(1), 12_800.0);
+        // A view 50 m a pixel needs level 1's tiles; 30 m, level 2's.
+        let view = |metres_per_pixel| View {
+            x: 0.0,
+            z: 0.0,
+            metres_per_pixel,
+        };
+        assert_eq!(index.level_for(view(50.0)), 1);
+        assert_eq!(index.level_for(view(30.0)), 2);
+        assert_eq!(index.roads_in(-10.0, -10.0, 10.0, 10.0).len(), 1);
     }
 
     #[test]
-    fn draws_the_area_shown_at_the_screens_resolution() {
-        let roads = [
-            gamedata::MapRoad {
-                id: 1,
-                x: 0.0,
-                z: 0.0,
-            },
-            gamedata::MapRoad {
-                id: 2,
-                x: 100.0,
-                z: 50.0,
-            },
-        ];
+    fn draws_a_tile_with_its_roads_and_skips_an_empty_one() {
+        let index = Index::new(roads()).expect("an index");
         let palette = Palette {
             road: [1, 1, 1, 255],
             driven: [2, 2, 2, 255],
-            marker: [3, 3, 3, 255],
-            marker_edge: [4, 4, 4, 255],
         };
         let driven: HashSet<u64> = [2].into_iter().collect();
-        let world = world_of(&roads).expect("an extent");
-        let view = RoadMap::fitted(world, 200.0, 100.0);
-        let picture = draw(&roads, &driven, None, palette, &request(view), 2.0).expect("a picture");
+        let whole = TileKey {
+            level: 0,
+            x: 0,
+            y: 0,
+        };
+        let picture = draw_tile(&index, &driven, whole, palette, 2.0).expect("a picture");
         let drawn = picture.size(0);
-        // At a scale of 2, twice the area's size.
-        assert_eq!((drawn.width.0, drawn.height.0), (400, 200));
+        // At a scale of 2, twice a tile's side.
+        assert_eq!((drawn.width.0, drawn.height.0), (512, 512));
+        // Level 3: the tile at (3, 3) holds neither road.
+        let empty = TileKey {
+            level: 3,
+            x: 3,
+            y: 3,
+        };
+        assert!(draw_tile(&index, &driven, empty, palette, 1.0).is_none());
     }
 
     #[test]
-    fn places_an_older_picture_where_the_map_has_moved() {
+    fn places_tiles_where_the_view_puts_them() {
+        let index = Index::new(roads()).expect("an index");
+        let area = Bounds::new(point(px(0.0), px(0.0)), size(px(256.0), px(256.0)));
+        let whole = TileKey {
+            level: 0,
+            x: 0,
+            y: 0,
+        };
+        // The view at the tile's middle, at its own scale: the tile fills the area.
         let view = View {
-            x: 0.0,
-            z: 0.0,
-            metres_per_pixel: 10.0,
+            x: 12_800.0,
+            z: 12_800.0,
+            metres_per_pixel: 100.0,
         };
-        let area = Bounds::new(point(px(0.0), px(0.0)), size(px(200.0), px(100.0)));
-        // Same view: right where it was.
-        assert_eq!(placed(&request(view), view, area), area);
-        // Zoomed in twice as far: twice the size, still centred.
-        let closer = View {
-            metres_per_pixel: 5.0,
-            ..view
-        };
-        let placed = placed(&request(view), closer, area);
-        assert_eq!(placed.size, size(px(400.0), px(200.0)));
-        assert_eq!(placed.center(), area.center());
+        assert_eq!(tile_bounds(&index, whole, view, area), area);
+        assert_eq!(visible_tiles(&index, view, area, 0), [whole]);
     }
 }
