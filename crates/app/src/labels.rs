@@ -111,6 +111,22 @@ pub fn location(cx: &App, location: Location) -> SharedString {
     }
 }
 
+/// A profile as lists show it: its name and where it's kept (`Anna · Steam Cloud`), with the game
+/// when it isn't ETS2.
+pub fn profile_place(cx: &App, profile: &save::Profile) -> SharedString {
+    let place = location(cx, profile.location);
+    match profile.game {
+        save::Game::Ets2 => t!(cx, "profile-place", name = &profile.name, place = place),
+        save::Game::Ats => t!(
+            cx,
+            "profile-game-place",
+            name = &profile.name,
+            game = "ATS",
+            place = place
+        ),
+    }
+}
+
 /// How long ago something happened, roughly: `just now`, `5 minutes ago`, `3 years ago`.
 /// (Relative times need no time zone, and read better than dates in lists.)
 pub fn ago(cx: &App, when: SystemTime) -> SharedString {

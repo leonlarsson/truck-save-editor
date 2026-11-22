@@ -643,3 +643,27 @@ edit-unrestricted = Överallt
 edit-fuel = { $percent } % bränsle
 edit-badge = Med emblem
 edit-no-badge = Utan emblem
+
+# Profile tools
+profile-tools-open = Profilverktyg…
+profile-tools-title = Profilen ”{ $name }”
+profile-tools-backup = Säkerhetskopiera profilen
+profile-tools-backup-description = En kopia av hela profilen (varje sparfil, dess bilder och inställningar), sparad med de andra säkerhetskopiorna.
+profile-tools-backup-now = Säkerhetskopiera nu
+profile-tools-backed-up = Säkerhetskopierad ({ $size } MB).
+profile-tools-copy = Gör en kopia
+profile-tools-copy-description = En andra profil med allt i den här, med ett nytt namn. Den görs på den här datorn (Steam Cloud visar bara profiler som spelet har gjort), och utan din World of Trucks-inloggning: koppla den i spelet om du vill.
+profile-tools-copy-suggestion = { $name } kopia
+profile-tools-copy-now = Gör kopian
+profile-tools-copied = ”{ $name }” är gjord. Den finns i spelets profillista.
+profile-tools-copy-name-empty = Ge kopian ett namn.
+profile-tools-copy-name-taken = Det finns redan en profil med det namnet.
+profile-tools-copy-no-documents = Spelets mapp under Dokument hittades inte. Starta spelet en gång och försök igen.
+profile-tools-settings = Kopiera inställningarna
+profile-tools-settings-description = Den här profilens grafik, kontroller och spelalternativ, över en annan profils. Den andra profilens egna inställningar säkerhetskopieras först.
+profile-tools-settings-pick = Välj en profil…
+profile-tools-settings-now = Kopiera inställningarna
+profile-tools-settings-copied = Kopierade till ”{ $name }”.
+profile-tools-settings-none = Det finns ingen annan profil med inställningar att kopiera till.
+profile-tools-running = Stäng spelet först: det skriver profiler när det avslutas.
+profile-tools-failed = Det gick inte: { $error }

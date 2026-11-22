@@ -369,9 +369,39 @@ impl Render for OpenSavePage {
             Some(profiles) => {
                 let selected = self.selected_profile.min(profiles.len() - 1);
                 let (profile, slots) = &profiles[selected];
+                let tools_profile = profile.clone();
+                let all_profiles: Vec<Profile> = profiles
+                    .iter()
+                    .map(|(profile, _)| profile.clone())
+                    .collect();
+                let start = cx.entity().downgrade();
                 v_flex()
                     .gap_6()
-                    .child(div().px_3().child(self.render_profiles(profiles, cx)))
+                    .child(
+                        h_flex()
+                            .px_3()
+                            .gap_3()
+                            .flex_wrap()
+                            .justify_between()
+                            .items_center()
+                            .child(self.render_profiles(profiles, cx))
+                            .child(
+                                Button::new("profile-tools")
+                                    .ghost()
+                                    .small()
+                                    .icon(Icon::new(IconName::User))
+                                    .label(t!(cx, "profile-tools-open"))
+                                    .on_click(move |_, window, cx| {
+                                        crate::pages::profile_tools::open(
+                                            tools_profile.clone(),
+                                            all_profiles.clone(),
+                                            start.clone(),
+                                            window,
+                                            cx,
+                                        )
+                                    }),
+                            ),
+                    )
                     .child(self.render_slots(profile, slots, cx))
                     .into_any_element()
             }

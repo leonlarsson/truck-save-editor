@@ -19,6 +19,8 @@ mod map;
 mod preview;
 mod profile_file;
 #[cfg(feature = "native")]
+mod profile_tools;
+#[cfg(feature = "native")]
 mod profiles;
 mod removals;
 #[cfg(feature = "native")]
@@ -55,6 +57,11 @@ pub use profile_file::{
 };
 #[cfg(feature = "native")]
 pub use profile_file::{load_profile_file, save_profile_file};
+#[cfg(feature = "native")]
+pub use profile_tools::{
+    CopyProblem, ProfileBackup, back_up_profile, copy_destination, copy_profile,
+    copy_profile_settings, profile_folder_name,
+};
 #[cfg(feature = "native")]
 pub use profiles::{
     Location, PROFILE_DIRS_VARIABLE, Profile, Slot, SlotKind, decode_profile_folder, find_profiles,

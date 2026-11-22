@@ -643,3 +643,27 @@ edit-unrestricted = Everywhere
 edit-fuel = { $percent } % fuel
 edit-badge = With a badge
 edit-no-badge = No badge
+
+# Profile tools
+profile-tools-open = Profile tools…
+profile-tools-title = Profile “{ $name }”
+profile-tools-backup = Back up the profile
+profile-tools-backup-description = A copy of the whole profile (every save, its photos and settings), kept with the other backups.
+profile-tools-backup-now = Back up now
+profile-tools-backed-up = Backed up ({ $size } MB).
+profile-tools-copy = Make a copy
+profile-tools-copy-description = A second profile with everything in this one, under a new name. It's made on this PC (Steam Cloud only shows profiles the game made), and without your World of Trucks login: link it in the game if you want to.
+profile-tools-copy-suggestion = { $name } copy
+profile-tools-copy-now = Make the copy
+profile-tools-copied = Made “{ $name }”. It's in the game's profile list.
+profile-tools-copy-name-empty = Give the copy a name.
+profile-tools-copy-name-taken = There's a profile with that name already.
+profile-tools-copy-no-documents = The game's folder in Documents wasn't found. Start the game once, then try again.
+profile-tools-settings = Copy the settings
+profile-tools-settings-description = This profile's graphics, controls and gameplay options, over another profile's. The other profile's own settings are backed up first.
+profile-tools-settings-pick = Choose a profile…
+profile-tools-settings-now = Copy the settings
+profile-tools-settings-copied = Copied to “{ $name }”.
+profile-tools-settings-none = There's no other profile with settings to copy to.
+profile-tools-running = Close the game first: it writes profiles when it exits.
+profile-tools-failed = That didn't work: { $error }

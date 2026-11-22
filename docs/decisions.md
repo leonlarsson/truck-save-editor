@@ -188,3 +188,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** players asked to tidy fleets and maps. The lists alongside differ by game version (`driver_flags` and `driver_undrivable_truck_timers` in 1.62, `driver_quit_warned` in older saves, sometimes kept empty), so they're named, and checked on every real save by a fixture test. Every discovered road is a map item id; listing all of them means reading the map's binary sector files, whose format changes with game versions.
 
 **Considered:** paying like the game's sale (its price rules aren't in the save); removing a truck with its driver in one go (two clear steps are easier to undo and to explain); discovering roads from the map sectors (fragile).
+
+## 2026-11-22: Profile tools, and the game's own settings
+
+**Decided:** from the start screen, a profile can be backed up whole (copied into the backups folder), copied under a new name, and have its settings (`config.cfg`) copied over another profile's; the profile's name can be changed with the company's. Settings → In the game turns the developer console and convoys of up to 128 trucks on and off in the game's `config.cfg`. Every write backs up what it replaces and is refused while the game runs.
+
+**Why:** a copy is made as a local profile, because the game lists local profiles from the disk while Steam Cloud only shows files the game wrote (found in the in-game check). The copy's World of Trucks login is emptied, so two profiles never share one, and nothing reads it. Renaming changes `profile_name` only: the folder keeps its name, since Steam Cloud knows the files under it. The game writes `config.cfg` and profiles when it exits, so changes made while it runs would be lost.
+
+**Considered:** zipping backups (a plain folder can be opened and restored by hand, like slot backups); renaming the profile's folder (breaks Steam Cloud); keeping the login in a copy (two profiles linked to one account).

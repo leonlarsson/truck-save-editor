@@ -9,6 +9,7 @@ pub mod jobs;
 pub mod map;
 pub mod open_save;
 pub mod overview;
+pub mod profile_tools;
 pub mod settings;
 
 use gpui_kit::{App, SharedString};
