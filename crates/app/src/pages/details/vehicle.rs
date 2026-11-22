@@ -674,6 +674,7 @@ impl Render for VehicleDetail {
                                 .xsmall()
                                 .ghost()
                                 .label(t!(cx, "truck-remove-badge"))
+                                .tooltip(t!(cx, "truck-remove-badge-tooltip"))
                                 .on_click(cx.listener(move |this, _, _, cx| {
                                     let edit = save::VehicleEdit::RemoveBadge {
                                         vehicle: id.clone(),

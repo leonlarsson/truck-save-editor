@@ -735,8 +735,9 @@ truck-engine = Silnik
 truck-transmission = Skrzynia biegów
 truck-part-pick = Wybierz…
 truck-part-loading = Czytanie danych gry…
-truck-badge = Plakietka
-truck-remove-badge = Usuń plakietkę
+truck-badge = Logo na grillu
+truck-remove-badge = Usuń logo
+truck-remove-badge-tooltip = Usuwa logo producenta z przedniego grilla.
 trailer-load = Ładunek
 trailer-cargo = Ładunek
 trailer-empty-weight = Masa własna
@@ -748,8 +749,8 @@ edit-empty = { $tonnes } t pusta
 edit-restricted = Tylko niektóre kraje
 edit-unrestricted = Wszędzie
 edit-fuel = { $percent } % paliwa
-edit-badge = Z plakietką
-edit-no-badge = Bez plakietki
+edit-badge = Z logo na grillu
+edit-no-badge = Bez logo na grillu
 
 # Profile tools
 profile-tools-open = Narzędzia profilu…

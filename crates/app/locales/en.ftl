@@ -698,8 +698,9 @@ truck-engine = Engine
 truck-transmission = Transmission
 truck-part-pick = Choose…
 truck-part-loading = Reading the game…
-truck-badge = Badge
-truck-remove-badge = Remove badge
+truck-badge = Grille badge
+truck-remove-badge = Remove the badge
+truck-remove-badge-tooltip = Takes the maker's badge (the brand emblem) off the front grille.
 trailer-load = Load
 trailer-cargo = Cargo
 trailer-empty-weight = Empty weight
@@ -711,8 +712,8 @@ edit-empty = { $tonnes } t empty
 edit-restricted = Some countries only
 edit-unrestricted = Everywhere
 edit-fuel = { $percent } % fuel
-edit-badge = With a badge
-edit-no-badge = No badge
+edit-badge = With the grille badge
+edit-no-badge = No grille badge
 
 # Profile tools
 profile-tools-open = Profile tools…

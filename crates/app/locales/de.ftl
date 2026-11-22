@@ -702,8 +702,9 @@ truck-engine = Motor
 truck-transmission = Getriebe
 truck-part-pick = Wählen…
 truck-part-loading = Spiel wird gelesen…
-truck-badge = Emblem
+truck-badge = Kühlergrill-Emblem
 truck-remove-badge = Emblem entfernen
+truck-remove-badge-tooltip = Entfernt das Markenemblem vom Kühlergrill.
 trailer-load = Ladung
 trailer-cargo = Fracht
 trailer-empty-weight = Leergewicht
@@ -715,8 +716,8 @@ edit-empty = { $tonnes } t leer
 edit-restricted = Nur einige Länder
 edit-unrestricted = Überall
 edit-fuel = { $percent } % Kraftstoff
-edit-badge = Mit Emblem
-edit-no-badge = Ohne Emblem
+edit-badge = Mit Kühlergrill-Emblem
+edit-no-badge = Ohne Kühlergrill-Emblem
 
 # Profile tools
 profile-tools-open = Profilwerkzeuge…

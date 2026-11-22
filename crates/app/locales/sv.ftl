@@ -698,8 +698,9 @@ truck-engine = Motor
 truck-transmission = Växellåda
 truck-part-pick = Välj…
 truck-part-loading = Läser spelet…
-truck-badge = Emblem
+truck-badge = Grillemblem
 truck-remove-badge = Ta bort emblemet
+truck-remove-badge-tooltip = Tar bort tillverkarens emblem från grillen.
 trailer-load = Last
 trailer-cargo = Last
 trailer-empty-weight = Tomvikt
@@ -711,8 +712,8 @@ edit-empty = { $tonnes } t tom
 edit-restricted = Bara vissa länder
 edit-unrestricted = Överallt
 edit-fuel = { $percent } % bränsle
-edit-badge = Med emblem
-edit-no-badge = Utan emblem
+edit-badge = Med grillemblem
+edit-no-badge = Utan grillemblem
 
 # Profile tools
 profile-tools-open = Profilverktyg…
