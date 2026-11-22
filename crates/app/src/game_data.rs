@@ -17,6 +17,18 @@ struct Loaded {
     is_loading: bool,
 }
 
+/// Every road and junction on the game's map, by id (for Discover every road), read after the
+/// rest of the game's data so it never holds that up. `None` until read, or without the game.
+#[derive(Default)]
+struct RoadIds(Option<Arc<Vec<u64>>>);
+
+impl Global for RoadIds {}
+
+/// The map's roads and junctions, once read (`None` before, or without the game).
+pub fn road_ids(cx: &App) -> Option<Arc<Vec<u64>>> {
+    cx.try_global::<RoadIds>().and_then(|roads| roads.0.clone())
+}
+
 impl Global for Loaded {}
 
 /// Starts reading the game's data in the background; windows redraw when it arrives.
@@ -40,6 +52,7 @@ pub fn reload(cx: &mut App) {
     }
     cx.global_mut::<Loaded>().is_loading = true;
     let dir = install_dir(cx);
+    let roads_dir = dir.clone();
     let language = crate::settings::get(cx).language.game_code();
     cx.spawn(async move |cx| {
         let (data, installed) = cx
@@ -60,6 +73,17 @@ pub fn reload(cx: &mut App) {
                 installed: installed.map(Arc::new),
                 is_loading: false,
             });
+            cx.refresh_windows();
+        });
+        // Then the map's roads: a second or two of reading, which only Discover every road needs.
+        let roads = cx
+            .background_spawn(async move {
+                let ids = gamedata::road_ids(Game::Ets2, roads_dir.as_deref()?);
+                (!ids.is_empty()).then(|| Arc::new(ids))
+            })
+            .await;
+        cx.update(|cx| {
+            cx.set_global(RoadIds(roads));
             cx.refresh_windows();
         });
     })

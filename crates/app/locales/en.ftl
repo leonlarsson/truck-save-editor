@@ -691,6 +691,9 @@ roads-count = { $count ->
 roads-none = None
 map-forget-roads = Forget visited roads
 map-forget-roads-tooltip = The map's discovered roads start over, as on a new profile. Cities you've visited stay visited.
+map-discover-roads = Discover every road
+map-discover-roads-tooltip = Marks every road and junction on the map as driven, yours and your map DLCs', read from the game's own map. Cities you haven't been to stay unvisited.
+map-discover-roads-needs-game = Needs the game installed on this PC: its map says where the roads are.
 
 # Truck and trailer details
 plate-colours = Plate colours

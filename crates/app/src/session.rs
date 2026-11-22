@@ -48,6 +48,16 @@ pub struct Session {
 /// Everything changed since the save was loaded (or last saved). Undo and Redo swap whole copies
 /// of it: it's small (a career and a few lists of ids), so copies are cheap, and an undo can never
 /// get out of step with what it undoes.
+/// What happens to the map's discovered roads.
+#[derive(Clone, Debug, PartialEq)]
+enum RoadsChange {
+    /// Every road driven is forgotten.
+    Forget,
+    /// Every road and junction on the map is driven (their ids, read from the game's map; shared,
+    /// since every undo step keeps a copy of the pending changes).
+    DiscoverAll(Arc<Vec<u64>>),
+}
+
 #[derive(Clone, Debug, PartialEq)]
 struct Pending {
     career: Career,
@@ -82,8 +92,8 @@ struct Pending {
     remove_job_deadline: bool,
     /// Drivers, trucks, trailers and garages to remove from the company, in the order asked.
     removed: Vec<save::Removal>,
-    /// Whether to forget every road driven.
-    forget_roads: bool,
+    /// Every road driven forgotten, or every road on the map discovered.
+    roads: Option<RoadsChange>,
     /// Changes to single trucks and trailers (cargo, weight, countries, fuel, badge); a later one
     /// of the same kind for the same vehicle replaces the earlier.
     vehicle_edits: Vec<save::VehicleEdit>,
@@ -118,7 +128,7 @@ impl Pending {
             cancel_job: false,
             remove_job_deadline: false,
             removed: Vec::new(),
-            forget_roads: false,
+            roads: None,
             vehicle_edits: Vec::new(),
             drive_truck: None,
             move_to: None,
@@ -658,7 +668,7 @@ impl Session {
             + usize::from(self.pending.move_to.is_some())
             + usize::from(self.pending.quick_travel)
             + self.pending.player_edits.len()
-            + usize::from(self.pending.forget_roads)
+            + usize::from(self.pending.roads.is_some())
     }
 
     /// Every city with how often it was visited, as it'll be after saving.
@@ -929,7 +939,14 @@ impl Session {
 
     /// Forgets every road driven.
     pub fn forget_roads(&mut self, cx: &mut Context<Self>) {
-        self.change(cx, |pending, _| pending.forget_roads = true);
+        self.change(cx, |pending, _| pending.roads = Some(RoadsChange::Forget));
+    }
+
+    /// Marks every road and junction on the map (`ids`, from the game's map) as driven.
+    pub fn discover_roads(&mut self, ids: Arc<Vec<u64>>, cx: &mut Context<Self>) {
+        self.change(cx, |pending, _| {
+            pending.roads = Some(RoadsChange::DiscoverAll(ids))
+        });
     }
 
     /// The trucks and drivers asked to move that end up in another garage than on disk: (id,
@@ -1401,8 +1418,8 @@ impl Session {
                 t!(cx, "player-quick-travel-after"),
             );
         }
-        if self.pending.forget_roads {
-            let (saved, _) = self.discovered_roads();
+        if self.pending.roads.is_some() {
+            let (saved, after) = self.discovered_roads();
             add(
                 &map,
                 t!(cx, "roads-what"),
@@ -1412,7 +1429,16 @@ impl Session {
                     count = saved,
                     amount = crate::format::thousands(saved as i64)
                 ),
-                t!(cx, "roads-none"),
+                if after == 0 {
+                    t!(cx, "roads-none")
+                } else {
+                    t!(
+                        cx,
+                        "roads-count",
+                        count = after,
+                        amount = crate::format::thousands(after as i64)
+                    )
+                },
             );
         }
         if self.pending.cancel_job || self.pending.remove_job_deadline {
@@ -1575,8 +1601,12 @@ impl Session {
         if let Some(info) = &mut slot.info {
             save::update_info(info, &self.pending.career);
         }
-        if self.pending.forget_roads {
-            save::forget_roads(&mut slot.game, slot.info.as_mut());
+        match &self.pending.roads {
+            Some(RoadsChange::Forget) => save::forget_roads(&mut slot.game, slot.info.as_mut()),
+            Some(RoadsChange::DiscoverAll(ids)) => {
+                save::discover_roads(&mut slot.game, ids, slot.info.as_mut());
+            }
+            None => {}
         }
         Ok(slot)
     }

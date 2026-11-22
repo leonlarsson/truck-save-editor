@@ -695,6 +695,9 @@ roads-count = { $count ->
 roads-none = Keine
 map-forget-roads = Befahrene Straßen vergessen
 map-forget-roads-tooltip = Die entdeckten Straßen der Karte beginnen von vorn, wie bei einem neuen Profil. Besuchte Städte bleiben besucht.
+map-discover-roads = Alle Straßen entdecken
+map-discover-roads-tooltip = Markiert jede Straße und Kreuzung der Karte als befahren, auch in deinen Karten-DLCs, gelesen aus der Karte des Spiels. Städte, in denen du nicht warst, bleiben unbesucht.
+map-discover-roads-needs-game = Braucht das auf diesem PC installierte Spiel: Seine Karte sagt, wo die Straßen sind.
 
 # Truck and trailer details
 plate-colours = Kennzeichenfarben

@@ -691,6 +691,9 @@ roads-count = { $count ->
 roads-none = Inga
 map-forget-roads = Glöm besökta vägar
 map-forget-roads-tooltip = Kartans upptäckta vägar börjar om, som på en ny profil. Städer du har besökt förblir besökta.
+map-discover-roads = Upptäck alla vägar
+map-discover-roads-tooltip = Markerar varje väg och korsning på kartan som körd, även i dina kart-DLC, läst från spelets egen karta. Städer du inte varit i förblir obesökta.
+map-discover-roads-needs-game = Kräver att spelet är installerat på den här datorn: dess karta säger var vägarna finns.
 
 # Truck and trailer details
 plate-colours = Skyltens färger

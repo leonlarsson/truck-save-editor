@@ -10,6 +10,7 @@ mod content;
 mod icon;
 mod install;
 mod recruitment;
+mod roads;
 mod texture;
 mod vehicles;
 
@@ -22,6 +23,7 @@ use save::{Game, LevelTable};
 pub use content::{Installed, installed};
 pub use icon::{ALPHA, BLUE, GREEN, GameIcon, RED};
 pub use install::find_install;
+pub use roads::{road_ids, sector_roads};
 pub use texture::{decode_rgba, distance_field_coverage};
 pub use vehicles::{Part, PartKind, model_parts};
 

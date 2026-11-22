@@ -375,6 +375,45 @@ pub fn forget_roads(document: &mut Document, info: Option<&mut Document>) {
     }
 }
 
+/// Marks every road in `ids` as driven (the game's map, read by the caller from its files), as well
+/// as those already driven: the list is sorted, each id once. The load menu's summary says the
+/// map is explored. Returns how many roads were added.
+pub fn discover_roads(document: &mut Document, ids: &[u64], info: Option<&mut Document>) -> usize {
+    let Some(economy) = document.first_of_kind("economy") else {
+        return 0;
+    };
+    if economy.get("discovered_items").is_none() {
+        return 0;
+    }
+    let economy_id = economy.id.clone();
+    let mut all: Vec<u64> = economy
+        .items("discovered_items")
+        .iter()
+        .filter_map(|id| id.parse().ok())
+        .collect();
+    let Some(mut unit) = document.unit_mut(&economy_id) else {
+        return 0;
+    };
+    let before = all.len();
+    all.extend_from_slice(ids);
+    all.sort_unstable();
+    all.dedup();
+    let added = all.len().saturating_sub(before);
+    unit.set(
+        "discovered_items",
+        Value::Array(all.iter().map(u64::to_string).collect()),
+    );
+    if let Some(info) = info {
+        let id = info.units().first().map(|unit| unit.id.clone());
+        if let Some(mut unit) = id.and_then(|id| info.unit_mut(&id))
+            && unit.get("info_explored_ratio").is_some()
+        {
+            unit.set("info_explored_ratio", Value::single("1"));
+        }
+    }
+    added
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -385,6 +424,20 @@ mod tests {
 
     fn document() -> Document {
         sii::parse_text(SAVE).expect("parses")
+    }
+
+    #[test]
+    fn discovers_roads_keeping_the_ones_driven_once_each() {
+        let mut document = document();
+        assert_eq!(discover_roads(&mut document, &[5678, 9, 99999], None), 2);
+        assert_eq!(
+            document
+                .unit("e")
+                .expect("economy")
+                .items("discovered_items"),
+            ["9", "1234", "5678", "99999"]
+        );
+        assert_eq!(discovered_roads(&document), 4);
     }
 
     #[test]

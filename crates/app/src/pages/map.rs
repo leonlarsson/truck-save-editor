@@ -294,6 +294,29 @@ impl Render for MapPage {
                                             .update(cx, |session, cx| session.forget_roads(cx));
                                     })),
                             )
+                            .child({
+                                // Needs the game's map, read in the background after startup.
+                                let roads = game_data::road_ids(cx);
+                                let (_, after) = self.session.read(cx).discovered_roads();
+                                let is_all = roads.as_ref().is_some_and(|ids| after >= ids.len());
+                                Button::new("discover-roads")
+                                    .small()
+                                    .outline()
+                                    .label(t!(cx, "map-discover-roads"))
+                                    .tooltip(if roads.is_some() {
+                                        t!(cx, "map-discover-roads-tooltip")
+                                    } else {
+                                        t!(cx, "map-discover-roads-needs-game")
+                                    })
+                                    .disabled(roads.is_none() || is_all)
+                                    .on_click(cx.listener(move |this, _, _, cx| {
+                                        if let Some(ids) = roads.clone() {
+                                            this.session.update(cx, |session, cx| {
+                                                session.discover_roads(ids, cx)
+                                            });
+                                        }
+                                    }))
+                            })
                             .child(
                                 Button::new("visit-all")
                                     .small()
