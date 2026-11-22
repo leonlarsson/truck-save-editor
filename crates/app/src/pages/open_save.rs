@@ -69,8 +69,12 @@ pub struct OpenSavePage {
     previews: HashMap<PathBuf, Arc<RenderImage>>,
     /// Each slot row's focus, by slot folder, so Tab reaches the rows and Enter opens one.
     row_focus: HashMap<PathBuf, FocusHandle>,
+    /// The added folders the last look used, to look again when the settings change them (a
+    /// reset in Settings).
+    looked_with: Vec<PathBuf>,
     _search: Option<Task<()>>,
     _previews: Option<Task<()>>,
+    _settings: Option<gpui_kit::Subscription>,
 }
 
 impl EventEmitter<OpenSlot> for OpenSavePage {}
@@ -86,9 +90,17 @@ impl OpenSavePage {
             add_problem: None,
             previews: HashMap::new(),
             row_focus: HashMap::new(),
+            looked_with: Vec::new(),
             _search: None,
             _previews: None,
+            _settings: None,
         };
+        page._settings = Some(cx.observe_global::<crate::settings::Settings>(|page, cx| {
+            if crate::settings::get(cx).profile_dirs != page.looked_with {
+                page.add_problem = None;
+                page.look(cx);
+            }
+        }));
         page.search(cx);
         page
     }
@@ -118,6 +130,7 @@ impl OpenSavePage {
             .map(|(profile, _)| profile.dir.clone());
         let select_after = self.select_after.take();
         let added = crate::settings::get(cx).profile_dirs;
+        self.looked_with = added.clone();
         self._search = Some(cx.spawn(async move |this, cx| {
             let found = cx
                 .background_spawn(async move {

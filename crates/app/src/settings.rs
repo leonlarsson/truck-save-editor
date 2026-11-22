@@ -138,6 +138,18 @@ pub fn get(cx: &App) -> Settings {
     cx.try_global::<Settings>().cloned().unwrap_or_default()
 }
 
+/// Puts every setting back as on the first start (language, appearance, the game's folder,
+/// folders added on the start screen, the update check), and applies them. Saves and backups
+/// aren't settings and stay as they are.
+pub fn reset(window: &mut gpui_kit::Window, cx: &mut App) {
+    let defaults = Settings::default();
+    update(cx, |settings| *settings = defaults.clone());
+    // Each applied as if chosen: the words, the numbers' style, the game's data (its folder and
+    // language), the theme.
+    crate::i18n::set_language(defaults.language, cx);
+    crate::theme::set_appearance(defaults.appearance, window, cx);
+}
+
 /// Changes the settings and writes them down. Not being able to write them isn't worth stopping
 /// for: the change still holds until the app closes.
 pub fn update(cx: &mut App, change: impl FnOnce(&mut Settings)) {

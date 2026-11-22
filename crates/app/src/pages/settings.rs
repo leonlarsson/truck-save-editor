@@ -2,7 +2,7 @@
 //! version is out, and what this app is. Changes apply at once and are kept for next time.
 
 use gpui_kit::component::{
-    ActiveTheme as _, Disableable as _, Selectable as _, Sizable as _,
+    ActiveTheme as _, Disableable as _, Selectable as _, Sizable as _, WindowExt as _,
     button::{Button, ButtonGroup, ButtonVariants as _},
     checkbox::Checkbox,
     h_flex,
@@ -225,6 +225,19 @@ impl Render for SettingsPage {
                 .child(self.render_game_settings(cx))
                 .child(self.render_updates(cx))
                 .child(
+                    Section::new(t!(cx, "settings-reset"))
+                        .description(t!(cx, "settings-reset-description"))
+                        .child(
+                            h_flex().child(
+                                Button::new("reset-settings")
+                                    .small()
+                                    .outline()
+                                    .label(t!(cx, "settings-reset-button"))
+                                    .on_click(|_, window, cx| confirm_reset(window, cx)),
+                            ),
+                        ),
+                )
+                .child(
                     Section::new(t!(cx, "settings-about")).child(
                         v_flex()
                             .gap_2()
@@ -269,6 +282,23 @@ impl Render for SettingsPage {
                 ),
         )
     }
+}
+
+/// Asks before putting every setting back as on the first start.
+fn confirm_reset(window: &mut Window, cx: &mut gpui_kit::App) {
+    window.open_alert_dialog(cx, |alert, _, cx| {
+        alert
+            .title(t!(cx, "settings-reset-confirm-title"))
+            .description(t!(cx, "settings-reset-description"))
+            .confirm()
+            // The kit's own Cancel is English; ours follows the app's language.
+            .cancel_text(t!(cx, "cancel"))
+            .ok_text(t!(cx, "settings-reset-confirm"))
+            .on_ok(|_, window, cx| {
+                settings::reset(window, cx);
+                true
+            })
+    });
 }
 
 /// The game's `config.cfg`, if it has one.
