@@ -25,9 +25,11 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [x] Make another truck your own; take the player to a city, the headquarters or another save's spot (2026-11-22).
 - [ ] In game: Drive it yourself, Take me to a city, Take me to headquarters, another save's spot. The trips rely on schedule_quick_travel and schedule_transfer_to_hq doing what their names say.
 - [x] Make another trailer your own (Pull it yourself, 2026-11-22; not tried in game yet).
-- [ ] In game: Your day (Rest, Clear the record, Repair the cargo, the clock buttons), Pull it yourself (2026-11-22, not tried in game yet).
+- [x] In game (2026-11-22): Rest and the clock (Evening) on a Steam Cloud profile.
+- [ ] In game: Clear the record, Repair the cargo (none to try yet), Pull it yourself.
 - [ ] Report a problem: Settings → About, the palette, the no-saves screen, and the button on error messages open a filled-in GitHub issue (2026-11-22, check on Windows that the browser opens with the text).
-- [ ] In game: picked rows (bulk Repair, Fill the tanks, Move to garage, Remove, Max their skills, Make them large) and Save over another… on a Steam Cloud profile (2026-11-22, not tried in game yet).
+- [x] In game (2026-11-22): Max their skills on two picked drivers.
+- [ ] In game: picked rows (bulk Repair, Fill the tanks, Move to garage, Remove, Make them large) and Save over another… on a Steam Cloud profile (2026-11-22, not tried in game yet).
 
 ## 4. Picking a save
 
