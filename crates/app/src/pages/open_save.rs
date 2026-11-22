@@ -327,8 +327,21 @@ impl OpenSavePage {
         profiles: &[(Profile, Vec<Slot>)],
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
+        // The folders added on this screen: a profile found in one is named by that folder (an
+        // added backup of a profile would otherwise read the same as the profile itself).
+        let added: Vec<PathBuf> = self
+            .found
+            .iter()
+            .flat_map(|found| found.folders.iter())
+            .filter(|folder| folder.source == Source::Added)
+            .map(|folder| folder.dir.clone())
+            .collect();
         let describe = |profile: &Profile| -> SharedString {
-            let place = labels::location(cx, profile.location);
+            let root = profile.dir.parent();
+            let place = match root.filter(|root| added.iter().any(|dir| dir == root)) {
+                Some(root) => added_folder_name(root).into(),
+                None => labels::location(cx, profile.location),
+            };
             match profile.game {
                 Game::Ets2 => t!(cx, "profile-place", name = &profile.name, place = place),
                 Game::Ats => t!(
@@ -973,6 +986,25 @@ fn thumbnail(preview: Option<Arc<RenderImage>>, cx: &Context<OpenSavePage>) -> i
     }
 }
 
+/// A folder added on the start screen, by name: its own, or the one around it when it's the
+/// game's usual `profiles` folder (`ETS2 save backups\profiles` reads as `ETS2 save backups`).
+fn added_folder_name(root: &std::path::Path) -> String {
+    let name = |path: &std::path::Path| {
+        path.file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+    };
+    match name(root) {
+        Some(own)
+            if own.eq_ignore_ascii_case("profiles")
+                || own.eq_ignore_ascii_case("steam_profiles") =>
+        {
+            root.parent().and_then(name).unwrap_or(own)
+        }
+        Some(own) => own,
+        None => root.to_string_lossy().into_owned(),
+    }
+}
+
 /// A path as the start screen shows it: small, in the code font, wrapping where it must.
 fn path_text(path: &std::path::Path, cx: &Context<OpenSavePage>) -> impl IntoElement {
     div()
@@ -1057,6 +1089,18 @@ mod tests {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(&self.0);
         }
+    }
+
+    #[test]
+    fn names_added_folders_by_what_they_hold() {
+        assert_eq!(
+            added_folder_name(std::path::Path::new("/docs/ETS2 save backups")),
+            "ETS2 save backups"
+        );
+        assert_eq!(
+            added_folder_name(std::path::Path::new("/d/Old PC/profiles")),
+            "Old PC"
+        );
     }
 
     #[gpui_kit::test]
