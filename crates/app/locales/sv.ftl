@@ -699,7 +699,7 @@ player-trip-tooltip = Spelet tar din lastbil dit när du laddar sparfilen, som d
 player-trip-city = Till { $city }, när sparfilen laddas
 player-trip-hq = Till huvudkontoret, när sparfilen laddas
 player-trip-unavailable = Den här sparfilen kan inte be spelet om en resa (en äldre version av spelet).
-player-move = Flytta dit en annan sparfil är
+player-move = Där en annan sparfil är…
 player-move-pick = Välj en sparfil…
 player-move-description = Din lastbil flyttas dit den står i en annan sparfil i den här profilen.
 player-move-reading = Läser ”{ $save }”…
@@ -717,8 +717,8 @@ day-rested = Utvilad
 day-record = Polisregister
 day-record-summary = { $count ->
     [0] Rent
-    [one] En förseelse, { $amount } € i böter
-   *[other] { $count } förseelser, { $amount } € i böter
+    [one] En förseelse, { $amount } i böter
+   *[other] { $count } förseelser, { $amount } i böter
 }
 day-record-clear-button = Rensa registret
 day-record-tooltip = Tar bort varje förseelse ur registret. Böter som redan är betalda förblir betalda.

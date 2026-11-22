@@ -699,7 +699,7 @@ player-trip-tooltip = The game takes your truck there when you load the save, th
 player-trip-city = To { $city }, when the save loads
 player-trip-hq = To headquarters, when the save loads
 player-trip-unavailable = This save can't ask the game for a trip (an older game version).
-player-move = Move to where another save is
+player-move = Where another save is…
 player-move-pick = Choose a save…
 player-move-description = Your truck moves to where it stands in another save of this profile.
 player-move-reading = Reading “{ $save }”…
@@ -717,8 +717,8 @@ day-rested = Rested
 day-record = Police record
 day-record-summary = { $count ->
     [0] Clean
-    [one] One offence, € { $amount } in fines
-   *[other] { $count } offences, € { $amount } in fines
+    [one] One offence, { $amount } in fines
+   *[other] { $count } offences, { $amount } in fines
 }
 day-record-clear-button = Clear the record
 day-record-tooltip = Removes every offence from the record. Fines already paid stay paid.

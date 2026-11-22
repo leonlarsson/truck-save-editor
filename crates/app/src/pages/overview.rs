@@ -583,7 +583,12 @@ impl OverviewPage {
                     cx,
                     "day-record-summary",
                     count = offences,
-                    amount = crate::format::thousands(fines)
+                    // The game's own currency (€ or $), written the way the app writes money.
+                    amount = format!(
+                        "{} {}",
+                        self.session.read(cx).game().currency_symbol(),
+                        crate::format::thousands(fines)
+                    )
                 ),
                 Button::new("clear-record")
                     .small()

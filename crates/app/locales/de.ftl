@@ -703,7 +703,7 @@ player-trip-tooltip = Das Spiel bringt deinen Lkw beim Laden des Spielstands dor
 player-trip-city = Nach { $city }, beim Laden des Spielstands
 player-trip-hq = Zum Hauptquartier, beim Laden des Spielstands
 player-trip-unavailable = Dieser Spielstand kann das Spiel nicht um eine Reise bitten (eine ältere Spielversion).
-player-move = Dorthin, wo ein anderer Spielstand ist
+player-move = Wo ein anderer Spielstand ist…
 player-move-pick = Spielstand wählen…
 player-move-description = Dein Lkw wird dorthin versetzt, wo er in einem anderen Spielstand dieses Profils steht.
 player-move-reading = „{ $save }“ wird gelesen…
@@ -721,8 +721,8 @@ day-rested = Ausgeruht
 day-record = Polizeiregister
 day-record-summary = { $count ->
     [0] Sauber
-    [one] Ein Verstoß, € { $amount } Bußgeld
-   *[other] { $count } Verstöße, € { $amount } Bußgeld
+    [one] Ein Verstoß, { $amount } Bußgeld
+   *[other] { $count } Verstöße, { $amount } Bußgeld
 }
 day-record-clear-button = Register löschen
 day-record-tooltip = Entfernt jeden Verstoß aus dem Register. Bereits bezahlte Bußgelder bleiben bezahlt.

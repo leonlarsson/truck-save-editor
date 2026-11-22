@@ -735,7 +735,7 @@ player-trip-tooltip = Gra przeniesie tam twoją ciężarówkę przy wczytaniu za
 player-trip-city = Cel: { $city }, przy wczytaniu zapisu
 player-trip-hq = Do siedziby firmy, przy wczytaniu zapisu
 player-trip-unavailable = Ten zapis nie może poprosić gry o podróż (starsza wersja gry).
-player-move = Przenieś tam, gdzie jest w innym zapisie
+player-move = Miejsce z innego zapisu…
 player-move-pick = Wybierz zapis…
 player-move-description = Twoja ciężarówka przeniesie się tam, gdzie stoi w innym zapisie tego profilu.
 player-move-reading = Czytanie zapisu „{ $save }”…
@@ -753,9 +753,9 @@ day-rested = Wypoczęty
 day-record = Kartoteka policyjna
 day-record-summary = { $count ->
     [0] Czysta
-    [one] Jedno wykroczenie, mandaty: € { $amount }
-    [few] { $count } wykroczenia, mandaty: € { $amount }
-   *[many] { $count } wykroczeń, mandaty: € { $amount }
+    [one] Jedno wykroczenie, mandaty: { $amount }
+    [few] { $count } wykroczenia, mandaty: { $amount }
+   *[many] { $count } wykroczeń, mandaty: { $amount }
 }
 day-record-clear-button = Wyczyść kartotekę
 day-record-tooltip = Usuwa każde wykroczenie z kartoteki. Już zapłacone mandaty pozostają zapłacone.
