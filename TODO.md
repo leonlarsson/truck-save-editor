@@ -92,7 +92,7 @@ Agreed work, in order. Each step should end with something the owner can see or 
 
 ## Later
 
-- [ ] American Truck Simulator: test on real ATS saves (the code is written for both from the start).
+- [ ] American Truck Simulator: test on real ATS saves (the code is written for both from the start). Until then, ATS profiles and saves show a warning (2026-11-22). Still ETS2-only: the game's data (city names, ranks, engines, icons, the DLC check), distances in miles, and Settings (the game's folder, whether it's running, its config.cfg).
 - [x] App icon (`scripts/make-icon.py`, embedded in the .exe) and a release workflow (version tag → draft release).
 - [ ] A final product name (Truck Save Editor for now, in `APP_NAME`; never a game name, those are SCS trademarks), signed Windows builds (see `docs/releasing.md` → Code signing), the first release (the owner's call; the pipeline is ready, `docs/releasing.md`).
 - [ ] Web version, on hold (the owner's call, 2026-11-21): the desktop app comes first. The core crates stay free of UI and disk access so it stays possible (GPUI's web target, or a page around the core compiled to wasm), but no work on it until it's picked up again.

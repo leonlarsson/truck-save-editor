@@ -9,6 +9,7 @@
 use gpui_kit::assets::IconName;
 use gpui_kit::component::{
     ActiveTheme as _, Icon, Selectable as _, Sizable as _, StyledExt as _,
+    alert::Alert,
     button::{Button, ButtonGroup, ButtonVariants as _},
     h_flex,
     list::ListItem,
@@ -847,6 +848,17 @@ impl Render for OpenSavePage {
                     .gap_6()
                     .when(profiles.len() > 1, |this| {
                         this.child(div().px_3().child(self.render_profiles(profiles, cx)))
+                    })
+                    // Before opening one: what isn't supported for this game yet.
+                    .when(profile.game != Game::Ets2, |this| {
+                        this.child(
+                            Alert::warning("unsupported-game", t!(cx, "ats-warning"))
+                                .text_color(cx.theme().foreground)
+                                .icon(
+                                    Icon::new(IconName::TriangleAlert)
+                                        .text_color(cx.theme().warning),
+                                ),
+                        )
                     })
                     .child(
                         h_flex()

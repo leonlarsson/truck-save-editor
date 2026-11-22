@@ -171,6 +171,7 @@ save-profile-failed = Sparfilen skrevs, men inte företagsnamnet: det väntar fo
 ## Warnings
 
 newer-game-warning = Den här sparfilen kommer från en nyare version av spelet än redigeraren har testats med. Allt som redigeraren inte förstår lämnas orört, men kontrollera dina ändringar i spelet och behåll säkerhetskopian.
+ats-warning = American Truck Simulator stöds inte fullt ut än. Sparfilerna öppnas och sparas säkert, med en säkerhetskopia, men stadsnamn, motorer, DLC-kontrollen och avstånd (i km, inte miles) kommer från Euro Truck Simulator 2 eller saknas. Kontrollera ändringarna i spelet.
 
 ## Undo and redo
 

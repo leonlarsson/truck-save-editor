@@ -171,6 +171,7 @@ save-profile-failed = The save was written, but the company name couldn't be: it
 ## Warnings
 
 newer-game-warning = This save is from a newer version of the game than this editor has been tested with. Everything the editor doesn't understand is kept as it is, but check your changes in the game, and keep the backup.
+ats-warning = American Truck Simulator isn't fully supported yet. Its saves open and save safely, with a backup, but city names, engines, the DLC check and distances (shown in km, not miles) come from Euro Truck Simulator 2 or are missing. Check your changes in the game.
 
 ## Undo and redo
 
