@@ -21,7 +21,7 @@ pub use filter_bar::{FilterBar, FilterChanged, fold, table_or_empty};
 pub use game_icon::GameIconView;
 pub use level_picker::LevelPicker;
 pub use page::{PageHeader, page_body};
-pub use picks::{Choice, PickBar, Picks, owned_garages, pick_box};
+pub use picks::{Choice, PickBar, Picks, keep_clicks, owned_garages, pick_box, picks_done};
 pub use section::Section;
 pub use stat::Stat;
 pub use step_buttons::StepButtons;

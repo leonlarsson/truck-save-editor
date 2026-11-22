@@ -33,7 +33,6 @@ pub struct FleetPage {
     /// The company's garages, to move the picked trucks to.
     garages: Entity<SelectState<SearchableVec<crate::ui::Choice>>>,
     /// How the last action on the picked rows went (some may not have fit).
-    pick_status: Option<SharedString>,
     /// Whether the garage list needs filling again.
     garages_stale: bool,
     _subscriptions: Vec<Subscription>,
@@ -107,12 +106,13 @@ impl FleetPage {
                     let moved = this
                         .session
                         .update(cx, |session, cx| session.move_many(&ids, &garage, cx));
-                    this.pick_status = Some(crate::labels::picks_outcome(
+                    let outcome = crate::labels::picks_outcome(
                         cx,
                         crate::labels::PickAction::Move,
                         moved,
                         ids.len(),
-                    ));
+                    );
+                    crate::ui::picks_done(outcome, moved == ids.len(), window, cx);
                     this.garages
                         .update(cx, |select, cx| select.set_selected_index(None, window, cx));
                     cx.notify();
@@ -125,7 +125,6 @@ impl FleetPage {
             table,
             filter,
             garages,
-            pick_status: None,
             garages_stale: true,
             _subscriptions,
         };
@@ -187,7 +186,6 @@ impl FleetPage {
 
     fn show(&mut self, kind: VehicleKind, cx: &mut Context<Self>) {
         self.kind = kind;
-        self.pick_status = None;
         self.table
             .update(cx, |table, _| table.delegate_mut().picks.clear());
         let columns: Vec<TruckColumn> = TruckColumn::ALL
@@ -226,14 +224,16 @@ impl FleetPage {
             });
         });
         let action =
-            |id: &'static str, label: SharedString| Button::new(id).xsmall().outline().label(label);
+            |id: &'static str, label: SharedString| Button::new(id).small().outline().label(label);
         let repair_ids = ids.clone();
         bar = bar.action(
             action("picks-repair", t!(cx, "repair")).on_click(cx.listener(
-                move |this, _, _, cx| {
+                move |this, _, window, cx| {
                     let ids = repair_ids.clone();
                     this.session
                         .update(cx, |session, cx| session.repair_many(&ids, cx));
+                    let title = t!(cx, "picks-done-repair", count = ids.len());
+                    crate::ui::picks_done(title, true, window, cx);
                 },
             )),
         );
@@ -241,10 +241,12 @@ impl FleetPage {
             let fuel_ids = ids.clone();
             bar = bar.action(
                 action("picks-refuel", t!(cx, "picks-refuel")).on_click(cx.listener(
-                    move |this, _, _, cx| {
+                    move |this, _, window, cx| {
                         let ids = fuel_ids.clone();
                         this.session
                             .update(cx, |session, cx| session.refuel_many(&ids, cx));
+                        let title = t!(cx, "picks-done-refuel", count = ids.len());
+                        crate::ui::picks_done(title, true, window, cx);
                     },
                 )),
             );
@@ -253,7 +255,7 @@ impl FleetPage {
             bar = bar.action(
                 div().w(rems(13.)).child(
                     Select::new(&self.garages)
-                        .xsmall()
+                        .small()
                         .placeholder(t!(cx, "picks-move"))
                         .accessibility_label(t!(cx, "picks-move")),
                 ),
@@ -266,7 +268,7 @@ impl FleetPage {
                 action("picks-remove", t!(cx, "picks-remove"))
                     .danger()
                     .tooltip(t!(cx, "remove-tooltip"))
-                    .on_click(cx.listener(move |this, _, _, cx| {
+                    .on_click(cx.listener(move |this, _, window, cx| {
                         let removals: Vec<save::Removal> = remove_ids
                             .iter()
                             .map(|id| match kind {
@@ -278,22 +280,15 @@ impl FleetPage {
                         let removed = this
                             .session
                             .update(cx, |session, cx| session.remove_many(removals, cx));
-                        this.pick_status = Some(crate::labels::picks_outcome(
+                        let outcome = crate::labels::picks_outcome(
                             cx,
                             crate::labels::PickAction::Remove,
                             removed,
                             count,
-                        ));
+                        );
+                        crate::ui::picks_done(outcome, removed == count, window, cx);
                         cx.notify();
                     })),
-            );
-        }
-        if let Some(status) = self.pick_status.clone() {
-            bar = bar.action(
-                div()
-                    .text_xs()
-                    .text_color(cx.theme().muted_foreground)
-                    .child(status),
             );
         }
         Some(bar)
@@ -741,6 +736,7 @@ impl TableDelegate for TruckTable {
             .w_full()
             .flex()
             .justify_center()
+            .on_mouse_down(gpui_kit::MouseButton::Left, crate::ui::keep_clicks)
             .child(
                 crate::ui::pick_box("pick-all", is_all, t!(cx, "picks-all")).on_click(cx.listener(
                     move |table, _: &bool, _, cx| {
@@ -792,6 +788,7 @@ impl TableDelegate for TruckTable {
                 let label = t!(cx, "picks-row", name = truck.plate.clone());
                 return cell
                     .justify_center()
+                    .on_mouse_down(gpui_kit::MouseButton::Left, crate::ui::keep_clicks)
                     .child(
                         crate::ui::pick_box(("pick", row_ix), self.picks.contains(&id), label)
                             .on_click(cx.listener(move |table, _: &bool, _, cx| {

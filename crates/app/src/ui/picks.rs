@@ -8,7 +8,7 @@
 use std::collections::BTreeSet;
 
 use gpui_kit::component::{
-    ActiveTheme as _, Sizable as _,
+    Sizable as _,
     button::{Button, ButtonVariants as _},
     checkbox::Checkbox,
     h_flex,
@@ -119,14 +119,14 @@ impl PickBar {
 impl RenderOnce for PickBar {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
         let on_clear = self.on_clear;
+        // The same height and buttons as the toolbar it takes the place of, so picking a row
+        // doesn't move the table, and on the page's own background, where buttons show their
+        // hover.
         h_flex()
             .gap_2()
             .flex_wrap()
             .items_center()
-            .px_3()
-            .min_h(gpui_kit::rems(1.75))
-            .rounded(cx.theme().radius)
-            .bg(cx.theme().secondary)
+            .min_h(gpui_kit::rems(1.5))
             .child(
                 div()
                     .text_sm()
@@ -138,12 +138,41 @@ impl RenderOnce for PickBar {
             .child(div().flex_1())
             .child(
                 Button::new("clear-picks")
-                    .xsmall()
+                    .small()
                     .ghost()
                     .label(t!(cx, "picks-clear"))
                     .on_click(move |_, window, cx| on_clear(window, cx)),
             )
     }
+}
+
+/// Keeps a checkbox's clicks in its cell: otherwise the row (or heading) takes them too,
+/// selecting the row, and a quick second click opens the row's panel as a double-click. Put on
+/// the cell around the checkbox.
+pub fn keep_clicks(_: &gpui_kit::MouseDownEvent, _: &mut Window, cx: &mut App) {
+    cx.stop_propagation();
+}
+
+/// Says what an action on the picked rows did: done for all of them, or for some (with why the
+/// rest weren't, in `title`). Undo takes it back, and nothing is written until saving.
+pub fn picks_done(title: SharedString, is_complete: bool, window: &mut Window, cx: &mut App) {
+    use gpui_kit::component::{
+        WindowExt as _,
+        notification::{Notification, NotificationType},
+    };
+    let kind = if is_complete {
+        NotificationType::Success
+    } else {
+        NotificationType::Warning
+    };
+    let body = t!(cx, "picks-done-body");
+    window.push_notification(
+        Notification::new()
+            .with_type(kind)
+            .title(title)
+            .message(body),
+        cx,
+    );
 }
 
 /// An item in a list to choose from (a garage to move picked rows to): shown by its name, chosen

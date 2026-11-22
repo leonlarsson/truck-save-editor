@@ -821,6 +821,23 @@ picks-removed-all = { $count ->
    *[other] Removed all { $count }.
 }
 picks-clear = Clear
+picks-done-repair = { $count ->
+    [one] Repaired 1 vehicle
+   *[other] Repaired { $count } vehicles
+}
+picks-done-refuel = { $count ->
+    [one] Filled 1 tank
+   *[other] Filled { $count } tanks
+}
+picks-done-max = { $count ->
+    [one] Maxed 1 driver's skills
+   *[other] Maxed { $count } drivers' skills
+}
+picks-done-large = { $count ->
+    [one] Made 1 garage large
+   *[other] Made { $count } garages large
+}
+picks-done-body = Undo takes it back. Nothing is written until you save.
 picks-all = Pick every row shown
 picks-row = Pick { $name }
 

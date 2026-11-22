@@ -862,6 +862,31 @@ picks-removed-all = { $count ->
    *[many] Usunięto wszystkie { $count }.
 }
 picks-clear = Wyczyść
+picks-done-repair = { $count ->
+    [one] Naprawiono 1 pojazd
+    [few] Naprawiono { $count } pojazdy
+    [many] Naprawiono { $count } pojazdów
+   *[other] Naprawiono { $count } pojazdu
+}
+picks-done-refuel = { $count ->
+    [one] Zatankowano 1 zbiornik
+    [few] Zatankowano { $count } zbiorniki
+    [many] Zatankowano { $count } zbiorników
+   *[other] Zatankowano { $count } zbiornika
+}
+picks-done-max = { $count ->
+    [one] Zmaksymalizowano umiejętności 1 kierowcy
+    [few] Zmaksymalizowano umiejętności { $count } kierowców
+    [many] Zmaksymalizowano umiejętności { $count } kierowców
+   *[other] Zmaksymalizowano umiejętności { $count } kierowcy
+}
+picks-done-large = { $count ->
+    [one] Powiększono 1 garaż
+    [few] Powiększono { $count } garaże
+    [many] Powiększono { $count } garaży
+   *[other] Powiększono { $count } garażu
+}
+picks-done-body = Cofnij odwraca zmianę. Nic nie zostanie zapisane, dopóki nie zapiszesz.
 picks-all = Wybierz każdy widoczny wiersz
 picks-row = Wybierz: { $name }
 

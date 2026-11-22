@@ -825,6 +825,23 @@ picks-removed-all = { $count ->
    *[other] Alle { $count } entfernt.
 }
 picks-clear = Auswahl aufheben
+picks-done-repair = { $count ->
+    [one] 1 Fahrzeug repariert
+   *[other] { $count } Fahrzeuge repariert
+}
+picks-done-refuel = { $count ->
+    [one] 1 Tank gefüllt
+   *[other] { $count } Tanks gefüllt
+}
+picks-done-max = { $count ->
+    [one] Fähigkeiten von 1 Fahrer maximiert
+   *[other] Fähigkeiten von { $count } Fahrern maximiert
+}
+picks-done-large = { $count ->
+    [one] 1 Garage vergrößert
+   *[other] { $count } Garagen vergrößert
+}
+picks-done-body = Mit Rückgängig lässt es sich zurücknehmen. Geschrieben wird erst beim Speichern.
 picks-all = Jede angezeigte Zeile auswählen
 picks-row = { $name } auswählen
 

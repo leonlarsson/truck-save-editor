@@ -821,6 +821,23 @@ picks-removed-all = { $count ->
    *[other] Tog bort alla { $count }.
 }
 picks-clear = Rensa
+picks-done-repair = { $count ->
+    [one] Lagade 1 fordon
+   *[other] Lagade { $count } fordon
+}
+picks-done-refuel = { $count ->
+    [one] Fyllde 1 tank
+   *[other] Fyllde { $count } tankar
+}
+picks-done-max = { $count ->
+    [one] Maxade färdigheterna för 1 förare
+   *[other] Maxade färdigheterna för { $count } förare
+}
+picks-done-large = { $count ->
+    [one] Gjorde 1 garage stort
+   *[other] Gjorde { $count } garage stora
+}
+picks-done-body = Ångra tar tillbaka det. Inget skrivs förrän du sparar.
 picks-all = Välj varje rad som visas
 picks-row = Välj { $name }
 

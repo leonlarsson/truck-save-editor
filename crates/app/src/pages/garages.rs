@@ -31,7 +31,6 @@ pub struct GaragesPage {
     headquarters: Entity<SelectState<SearchableVec<CityOption>>>,
     filter: Entity<FilterBar>,
     /// How the last action on the picked rows went.
-    pick_status: Option<SharedString>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -112,7 +111,6 @@ impl GaragesPage {
             table,
             headquarters,
             filter,
-            pick_status: None,
             _subscriptions,
         };
         page.reload(cx);
@@ -181,7 +179,7 @@ impl GaragesPage {
         let table = self.table.clone();
         let large_ids = ids.clone();
         let remove_ids = ids;
-        let mut bar = crate::ui::PickBar::new(picks.len(), move |_, cx| {
+        let bar = crate::ui::PickBar::new(picks.len(), move |_, cx| {
             table.update(cx, |table, cx| {
                 table.delegate_mut().picks.clear();
                 cx.notify();
@@ -189,23 +187,25 @@ impl GaragesPage {
         })
         .action(
             Button::new("picks-large")
-                .xsmall()
+                .small()
                 .outline()
                 .label(t!(cx, "picks-large"))
-                .on_click(cx.listener(move |this, _, _, cx| {
+                .on_click(cx.listener(move |this, _, window, cx| {
                     let ids = large_ids.clone();
                     this.session
                         .update(cx, |session, cx| session.upgrade_garages_many(&ids, cx));
+                    let title = t!(cx, "picks-done-large", count = ids.len());
+                    crate::ui::picks_done(title, true, window, cx);
                 })),
         )
         .action(
             Button::new("picks-remove")
-                .xsmall()
+                .small()
                 .outline()
                 .danger()
                 .label(t!(cx, "picks-remove"))
                 .tooltip(t!(cx, "remove-tooltip"))
-                .on_click(cx.listener(move |this, _, _, cx| {
+                .on_click(cx.listener(move |this, _, window, cx| {
                     let removals: Vec<save::Removal> = remove_ids
                         .iter()
                         .map(|id| save::Removal::Garage(id.clone()))
@@ -214,23 +214,16 @@ impl GaragesPage {
                     let removed = this
                         .session
                         .update(cx, |session, cx| session.remove_many(removals, cx));
-                    this.pick_status = Some(crate::labels::picks_outcome(
+                    let outcome = crate::labels::picks_outcome(
                         cx,
                         crate::labels::PickAction::Remove,
                         removed,
                         count,
-                    ));
+                    );
+                    crate::ui::picks_done(outcome, removed == count, window, cx);
                     cx.notify();
                 })),
         );
-        if let Some(status) = self.pick_status.clone() {
-            bar = bar.action(
-                div()
-                    .text_xs()
-                    .text_color(cx.theme().muted_foreground)
-                    .child(status),
-            );
-        }
         Some(bar)
     }
 
@@ -577,6 +570,7 @@ impl TableDelegate for GarageTable {
             .w_full()
             .flex()
             .justify_center()
+            .on_mouse_down(gpui_kit::MouseButton::Left, crate::ui::keep_clicks)
             .child(
                 crate::ui::pick_box("pick-all", is_all, t!(cx, "picks-all")).on_click(cx.listener(
                     move |table, _: &bool, _, cx| {
@@ -617,6 +611,7 @@ impl TableDelegate for GarageTable {
                 .h_full()
                 .items_center()
                 .justify_center()
+                .on_mouse_down(gpui_kit::MouseButton::Left, crate::ui::keep_clicks)
                 .child(
                     crate::ui::pick_box(("pick", row_ix), self.picks.contains(&id), label)
                         .on_click(cx.listener(move |table, _: &bool, _, cx| {
