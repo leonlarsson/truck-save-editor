@@ -37,6 +37,8 @@ pub struct OverviewPage {
     coach_experience: Option<Entity<AmountField>>,
     /// The company's name (the profile's); `None` when the profile file couldn't be read.
     company: Option<Entity<InputState>>,
+    /// The profile's name (in the profile file, like the company's).
+    profile: Option<Entity<InputState>>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -103,12 +105,31 @@ impl OverviewPage {
             ));
         }
 
+        let profile = session
+            .read(cx)
+            .profile_name()
+            .map(|name| cx.new(|cx| InputState::new(window, cx).default_value(name)));
+        if let Some(input) = &profile {
+            _subscriptions.push(cx.subscribe_in(
+                input,
+                window,
+                |this, input, event: &InputEvent, _, cx| {
+                    if matches!(event, InputEvent::PressEnter { .. } | InputEvent::Blur) {
+                        let name = input.read(cx).value().to_string();
+                        this.session
+                            .update(cx, |session, cx| session.set_profile_name(name, cx));
+                    }
+                },
+            ));
+        }
+
         Self {
             session,
             money,
             experience,
             coach_experience,
             company,
+            profile,
             _subscriptions,
         }
     }
@@ -128,6 +149,11 @@ impl OverviewPage {
             }
         }
         if let (Some(input), Some(name)) = (&self.company, self.session.read(cx).company_name())
+            && input.read(cx).value().as_ref() != name
+        {
+            input.update(cx, |input, cx| input.set_value(name, window, cx));
+        }
+        if let (Some(input), Some(name)) = (&self.profile, self.session.read(cx).profile_name())
             && input.read(cx).value().as_ref() != name
         {
             input.update(cx, |input, cx| input.set_value(name, window, cx));
@@ -479,11 +505,23 @@ impl Render for OverviewPage {
                         .description(t!(cx, "company-name-description"))
                         .action(self.quick_start_button(cx))
                         .child(
-                            v_flex()
-                                .gap_1p5()
-                                .max_w(rems(24.))
-                                .child(div().text_sm().child(t!(cx, "company-name")))
-                                .child(Input::new(&input)),
+                            h_flex()
+                                .gap_4()
+                                .flex_wrap()
+                                .child(
+                                    v_flex()
+                                        .gap_1p5()
+                                        .w(rems(20.))
+                                        .child(div().text_sm().child(t!(cx, "company-name")))
+                                        .child(Input::new(&input)),
+                                )
+                                .children(self.profile.clone().map(|profile| {
+                                    v_flex()
+                                        .gap_1p5()
+                                        .w(rems(20.))
+                                        .child(div().text_sm().child(t!(cx, "profile-name")))
+                                        .child(Input::new(&profile))
+                                })),
                         )
                         .into_any_element(),
                     None => h_flex()

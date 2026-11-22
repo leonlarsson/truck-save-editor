@@ -1,5 +1,6 @@
 //! The profile file (`profile.sii`, one `user_profile` unit): the editor reads and changes the
-//! company name, and keeps `cached_experience` (what the profile list shows) in step with the
+//! company name and the profile's name (`profile_name`, what the game's profile list shows), and
+//! keeps `cached_experience` (what the profile list shows) in step with the
 //! career.
 //!
 //! The same unit holds the World of Trucks login (`online_user_name`, an encrypted
@@ -10,6 +11,7 @@ use sii::{Document, Value, value};
 
 /// The fields the editor may read or write. Everything else is left exactly as it is.
 const COMPANY_NAME: &str = "company_name";
+const PROFILE_NAME: &str = "profile_name";
 const CACHED_EXPERIENCE: &str = "cached_experience";
 
 fn user_profile_id(document: &Document) -> Option<String> {
@@ -24,9 +26,25 @@ pub fn company_name(document: &Document) -> Option<String> {
     Some(value::parse_string(unit.single(COMPANY_NAME)?).to_string())
 }
 
+/// The profile's name, as the game's profile list shows it.
+pub fn profile_name(document: &Document) -> Option<String> {
+    let unit = document.first_of_kind("user_profile")?;
+    Some(value::parse_string(unit.single(PROFILE_NAME)?).to_string())
+}
+
+/// Changes the profile's name (see `set_company_name` for what's left out). The profile's folder
+/// keeps its name: Steam Cloud only knows the files under it.
+pub fn set_profile_name(document: &mut Document, name: &str) -> bool {
+    set_text(document, PROFILE_NAME, name)
+}
+
 /// Changes the company's name. Quotes and backslashes are left out: the game's own name field
 /// doesn't take them either, and they'd need escaping the game may not undo.
 pub fn set_company_name(document: &mut Document, name: &str) -> bool {
+    set_text(document, COMPANY_NAME, name)
+}
+
+fn set_text(document: &mut Document, field: &str, name: &str) -> bool {
     let clean: String = name
         .chars()
         .filter(|c| *c != '"' && *c != '\\' && !c.is_control())
@@ -37,10 +55,10 @@ pub fn set_company_name(document: &mut Document, name: &str) -> bool {
     let Some(mut unit) = document.unit_mut(&id) else {
         return false;
     };
-    if unit.get(COMPANY_NAME).is_none() {
+    if unit.get(field).is_none() {
         return false;
     }
-    unit.set(COMPANY_NAME, Value::single(format!("\"{}\"", clean.trim())));
+    unit.set(field, Value::single(format!("\"{}\"", clean.trim())));
     true
 }
 

@@ -94,7 +94,14 @@ pub fn find_profiles(game: Game) -> Vec<Profile> {
                 continue;
             }
             let folder = entry.file_name().to_string_lossy().into_owned();
-            let name = decode_profile_folder(&folder).unwrap_or_else(|| folder.clone());
+            // The name in the profile file (it can be renamed), else the one the folder was named
+            // after (the game names a profile's folder by its name in hex).
+            let name = crate::load_profile_file(&dir)
+                .ok()
+                .and_then(|document| crate::profile_name(&document))
+                .filter(|name| !name.is_empty())
+                .or_else(|| decode_profile_folder(&folder))
+                .unwrap_or_else(|| folder.clone());
             let last_saved = slot_dirs(&dir)
                 .iter()
                 .filter_map(|slot| modified(&slot.join("game.sii")))

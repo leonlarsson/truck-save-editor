@@ -320,8 +320,9 @@ restore-failed = Couldn't restore “{ $name }”
 
 amount-hint = Try 2.5m, 10k, +1m or -500k.
 company-section = Your company
+profile-name = Profile name
 company-name = Company name
-company-name-description = Your company's name, for the whole profile: every save in it. It's kept in the profile file, which is backed up before it's written.
+company-name-description = Your company's name and your profile's, for the whole profile: every save in it. They're kept in the profile file, which is backed up before it's written.
 money = Money
 money-description = Your company's bank balance.
 money-label = Bank balance

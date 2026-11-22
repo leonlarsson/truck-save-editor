@@ -320,8 +320,9 @@ restore-failed = Kunde inte återställa ”{ $name }”
 
 amount-hint = Prova 2,5m, 10k, +1m eller -500k.
 company-section = Ditt företag
+profile-name = Profilnamn
 company-name = Företagsnamn
-company-name-description = Ditt företags namn, för hela profilen: varje sparfil i den. Det ligger i profilfilen, som säkerhetskopieras innan den skrivs.
+company-name-description = Ditt företags och din profils namn, för hela profilen: varje sparfil i den. De ligger i profilfilen, som säkerhetskopieras innan den skrivs.
 money = Pengar
 money-description = Företagets saldo på banken.
 money-label = Banksaldo

@@ -67,6 +67,8 @@ struct Pending {
     keep_offers: bool,
     /// The company's new name (in the profile, so for every save in it).
     company_name: Option<String>,
+    /// The profile's new name (in the profile file, like the company's).
+    profile_name: Option<String>,
     /// Cities whose truck dealer to unlock when saving.
     unlock_dealers: BTreeSet<String>,
     /// Cities whose recruitment agency to unlock when saving.
@@ -100,6 +102,7 @@ impl Pending {
             raw_edits: BTreeMap::new(),
             keep_offers: false,
             company_name: None,
+            profile_name: None,
             unlock_dealers: BTreeSet::new(),
             unlock_recruitments: BTreeSet::new(),
             garage_moves: Vec::new(),
@@ -427,11 +430,38 @@ impl Session {
         });
     }
 
-    /// The profile file as it would be written, if the company's name changed.
+    /// The profile's name as it'll be saved (`None` if the profile couldn't be read).
+    pub fn profile_name(&self) -> Option<String> {
+        self.pending
+            .profile_name
+            .clone()
+            .or_else(|| self.profile_file.as_ref().and_then(save::profile_name))
+    }
+
+    /// Renames the profile. Back to the name on disk removes the change.
+    pub fn set_profile_name(&mut self, name: String, cx: &mut Context<Self>) {
+        let saved = self.profile_file.as_ref().and_then(save::profile_name);
+        let name = name.trim().to_string();
+        if name.is_empty() || self.profile_file.is_none() {
+            return;
+        }
+        self.change(cx, |pending, _| {
+            pending.profile_name = (saved.as_deref() != Some(name.as_str())).then_some(name);
+        });
+    }
+
+    /// The profile file as it would be written, if the company's or the profile's name changed.
     pub fn prepared_profile(&self) -> Option<sii::Document> {
-        let name = self.pending.company_name.as_ref()?;
+        if self.pending.company_name.is_none() && self.pending.profile_name.is_none() {
+            return None;
+        }
         let mut document = self.profile_file.clone()?;
-        save::set_company_name(&mut document, name);
+        if let Some(name) = &self.pending.company_name {
+            save::set_company_name(&mut document, name);
+        }
+        if let Some(name) = &self.pending.profile_name {
+            save::set_profile_name(&mut document, name);
+        }
         save::set_cached_experience(&mut document, self.pending.career.experience);
         Some(document)
     }
@@ -464,6 +494,7 @@ impl Session {
             + usize::from(self.pending.visit_all_cities)
             + usize::from(self.pending.keep_offers)
             + usize::from(self.pending.company_name.is_some())
+            + usize::from(self.pending.profile_name.is_some())
             + usize::from(!self.pending.unlock_dealers.is_empty())
             + usize::from(!self.pending.unlock_recruitments.is_empty())
             + self.moved().len()
@@ -980,6 +1011,14 @@ impl Session {
                 );
             }
         }
+        if let Some(name) = &self.pending.profile_name {
+            let before = self
+                .profile_file
+                .as_ref()
+                .and_then(save::profile_name)
+                .unwrap_or_default();
+            add(t!(cx, "profile-name"), before.into(), name.clone().into());
+        }
         if let Some(name) = &self.pending.company_name {
             let before = self
                 .profile_file
@@ -1099,16 +1138,19 @@ impl Session {
         self.loaded = written;
         self.forget_preview();
         self.saved_career = self.pending.career.clone();
-        let unwritten_company_name = if profile_written {
+        let unwritten_names = if profile_written {
             if let Some(profile) = self.prepared_profile() {
                 self.profile_file = Some(profile);
             }
-            None
+            (None, None)
         } else {
-            self.pending.company_name.clone()
+            (
+                self.pending.company_name.clone(),
+                self.pending.profile_name.clone(),
+            )
         };
         self.pending = Pending::none(self.saved_career.clone());
-        self.pending.company_name = unwritten_company_name;
+        (self.pending.company_name, self.pending.profile_name) = unwritten_names;
         // What's on disk changed under the history; undoing past a save would describe changes
         // against a save that no longer exists.
         self.undo.clear();
