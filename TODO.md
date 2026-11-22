@@ -106,7 +106,8 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [x] In game (2026-11-22): Discover every road gives 100.00 % explored, in every country. The scan finds more items than the game counts (335,623 vs about 179,000); the extra ids are ignored.
 - [x] Map → Road map: a dot for each road or junction (from the same scan's boxes), driven ones in the accent colour, and the player's truck (2026-11-22).
 - [x] Road map: zoom (wheel, + and −, Whole map) and drag to move; drawn sharp for the area shown (2026-11-22).
-- [ ] Road map: city names, garages; roads as lines (needs each road's ends, deeper in its item).
+- [x] Road map: city names (visited ones brighter, bigger cities first), the player's garages (2026-11-22).
+- [ ] Road map: click a city for its card (visited, dealer, agency, garage); find a city; roads as lines (needs each road's ends, deeper in its item).
 
 ## Later
 

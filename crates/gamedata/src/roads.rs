@@ -22,6 +22,15 @@ use save::Game;
 /// Item types that count as discovered roads.
 const ROAD: u32 = 3;
 const PREFAB: u32 = 4;
+/// A city's area (a city can have several: its centre, outskirts), and a garage, each naming its
+/// city.
+const CITY_AREA: u32 = 12;
+const GARAGE: u32 = 22;
+/// Where a city area or garage names its city: the city's token, this many bytes into the item
+/// (found in sector format 907: Berlin, Oslo, Paris and London at the same place).
+const CITY_TOKEN_AT: usize = 57;
+/// The largest a city's area gets, in metres.
+const LARGEST_CITY_AREA: f32 = 30_000.0;
 /// Where a `.base` file's items start.
 const HEADER_LENGTH: usize = 20;
 /// The header's item count.
@@ -50,6 +59,32 @@ pub struct MapRoad {
     pub z: f32,
 }
 
+/// A city's area or a garage on the map: which city (its token, `berlin`), where (the middle of
+/// its box, in the game's metres) and how big.
+#[derive(Clone, Debug, PartialEq)]
+pub struct MapPlace {
+    pub kind: MapPlaceKind,
+    pub city: String,
+    pub x: f32,
+    pub z: f32,
+    pub width: f32,
+    pub depth: f32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MapPlaceKind {
+    CityArea,
+    Garage,
+}
+
+/// What the map holds that the editor shows: every road and junction (by id, each once), and the
+/// cities' areas and garages.
+#[derive(Clone, Debug, Default)]
+pub struct MapContents {
+    pub roads: Vec<MapRoad>,
+    pub places: Vec<MapPlace>,
+}
+
 /// Every road and junction id on the map of the installed game and its map DLCs, sorted. Empty
 /// when the map can't be read (or its layout has changed so nothing is recognised).
 pub fn road_ids(game: Game, install_dir: &Path) -> Vec<u64> {
@@ -61,8 +96,14 @@ pub fn road_ids(game: Game, install_dir: &Path) -> Vec<u64> {
 
 /// Every road and junction on the map of the installed game and its map DLCs, by id, each once.
 pub fn map_roads(game: Game, install_dir: &Path) -> Vec<MapRoad> {
+    map_contents(game, install_dir).roads
+}
+
+/// The map of the installed game and its map DLCs: roads, junctions, city areas and garages.
+pub fn map_contents(game: Game, install_dir: &Path) -> MapContents {
     let folder = map_folder(game);
     let mut roads: Vec<MapRoad> = Vec::new();
+    let mut places: Vec<MapPlace> = Vec::new();
     for path in crate::archives_after(install_dir, "base_map.scs") {
         let Ok(mut archive) = hashfs::Archive::open(&path) else {
             continue;
@@ -72,38 +113,90 @@ pub fn map_roads(game: Game, install_dir: &Path) -> Vec<MapRoad> {
         };
         for file in listing.files.iter().filter(|name| name.ends_with(".base")) {
             if let Ok(Some(bytes)) = archive.read(&format!("{folder}/{file}")) {
-                roads.extend(sector_roads(&bytes));
+                let (sector_roads, sector_places) = sector_contents(&bytes);
+                roads.extend(sector_roads);
+                places.extend(sector_places);
             }
         }
     }
     roads.sort_unstable_by_key(|road| road.id);
     roads.dedup_by_key(|road| road.id);
-    roads
+    MapContents { roads, places }
 }
 
 /// The roads and junctions in one sector's `.base` file.
 pub fn sector_roads(bytes: &[u8]) -> Vec<MapRoad> {
+    sector_contents(bytes).0
+}
+
+/// The roads, junctions, city areas and garages in one sector's `.base` file.
+pub fn sector_contents(bytes: &[u8]) -> (Vec<MapRoad>, Vec<MapPlace>) {
     let item_count = read_u32(bytes, ITEM_COUNT_AT).unwrap_or(0) as usize;
     let mut seen: HashSet<u64> = HashSet::new();
-    let mut ids = Vec::new();
+    let mut seen_places: HashSet<u64> = HashSet::new();
+    let mut roads = Vec::new();
+    let mut places = Vec::new();
     let mut at = HEADER_LENGTH;
-    while at + ITEM_HEAD_LENGTH <= bytes.len() && ids.len() < item_count {
-        if let Some(road) = road_at(bytes, at)
-            && seen.insert(road.id)
+    // The header's count caps the roads found, as a guard against stray matches; places (which
+    // only label the map) don't use it up, so no road is missed for them.
+    while at + ITEM_HEAD_LENGTH <= bytes.len() && roads.len() < item_count {
+        // Roads and places apart: a stray match taken for a place mustn't hide a road.
+        if let Some(item) = item_at(bytes, at)
+            && (if matches!(item.kind, ROAD | PREFAB) {
+                seen.insert(item.id)
+            } else {
+                seen_places.insert(item.id)
+            })
         {
-            ids.push(road);
+            let middle = (
+                (item.low[0] + item.high[0]) / 2.0,
+                (item.low[2] + item.high[2]) / 2.0,
+            );
+            match item.kind {
+                ROAD | PREFAB => roads.push(MapRoad {
+                    id: item.id,
+                    x: middle.0,
+                    z: middle.1,
+                }),
+                kind => {
+                    if let Some(city) = read_u64(bytes, at + CITY_TOKEN_AT).and_then(decode_token) {
+                        places.push(MapPlace {
+                            kind: if kind == GARAGE {
+                                MapPlaceKind::Garage
+                            } else {
+                                MapPlaceKind::CityArea
+                            },
+                            city,
+                            x: middle.0,
+                            z: middle.1,
+                            width: item.high[0] - item.low[0],
+                            depth: item.high[2] - item.low[2],
+                        });
+                    }
+                }
+            }
         }
         at += 1;
     }
-    ids
+    (roads, places)
 }
 
-/// The road or junction starting at `at`, if one does.
-fn road_at(bytes: &[u8], at: usize) -> Option<MapRoad> {
+/// The start of an item the editor reads.
+struct Item {
+    kind: u32,
+    id: u64,
+    low: [f32; 3],
+    high: [f32; 3],
+}
+
+/// The road, junction, city area or garage starting at `at`, if one does.
+fn item_at(bytes: &[u8], at: usize) -> Option<Item> {
     let kind = read_u32(bytes, at)?;
-    if kind != ROAD && kind != PREFAB {
-        return None;
-    }
+    let largest = match kind {
+        ROAD | PREFAB | GARAGE => LARGEST_ITEM,
+        CITY_AREA => LARGEST_CITY_AREA,
+        _ => return None,
+    };
     let id = read_u64(bytes, at + 4)?;
     if id == 0 {
         return None;
@@ -115,15 +208,32 @@ fn road_at(bytes: &[u8], at: usize) -> Option<MapRoad> {
         .iter()
         .chain(high.iter())
         .all(|value| value.is_finite() && value.abs() < FARTHEST);
-    let is_box =
-        (0..3).all(|axis| low[axis] <= high[axis] && high[axis] - low[axis] < LARGEST_ITEM);
+    let is_box = (0..3).all(|axis| low[axis] <= high[axis] && high[axis] - low[axis] < largest);
     // Some extent on the ground: a box of a single point is no road.
     let has_area = (high[0] - low[0]) + (high[2] - low[2]) > 0.5;
-    (plausible && is_box && has_area).then(|| MapRoad {
+    (plausible && is_box && has_area).then_some(Item {
+        kind,
         id,
-        x: (low[0] + high[0]) / 2.0,
-        z: (low[2] + high[2]) / 2.0,
+        low,
+        high,
     })
+}
+
+/// The game's tokens: short names (`berlin`) packed into a number, a character per place in base
+/// 38 (`0`–`9`, `a`–`z`, `_`), the first character lowest. `None` for a number that isn't one.
+pub fn decode_token(mut value: u64) -> Option<String> {
+    const CHARACTERS: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyz_";
+    let mut text = String::new();
+    while value > 0 {
+        let index = (value % 38) as usize;
+        value /= 38;
+        // 0 is no character: only past the end.
+        if index == 0 {
+            return None;
+        }
+        text.push(CHARACTERS[index - 1] as char);
+    }
+    (!text.is_empty()).then_some(text)
 }
 
 fn read_u32(bytes: &[u8], at: usize) -> Option<u32> {
@@ -181,6 +291,22 @@ mod tests {
             .map(|road| (road.id, road.x, road.z))
             .collect();
         assert_eq!(found, [(101, -90.0, 70.0), (103, 22.5, 17.5)]);
+    }
+
+    #[test]
+    fn decodes_the_games_tokens() {
+        let token = |text: &str| -> u64 {
+            const CHARACTERS: &str = "0123456789abcdefghijklmnopqrstuvwxyz_";
+            text.chars().rev().fold(0, |value, c| {
+                value * 38 + CHARACTERS.find(c).expect("a token character") as u64 + 1
+            })
+        };
+        assert_eq!(decode_token(token("berlin")).as_deref(), Some("berlin"));
+        assert_eq!(
+            decode_token(token("la_rochelle")).as_deref(),
+            Some("la_rochelle")
+        );
+        assert_eq!(decode_token(0), None);
     }
 
     #[test]

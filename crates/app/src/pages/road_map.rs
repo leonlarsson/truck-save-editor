@@ -17,12 +17,14 @@ use std::sync::Arc;
 use gpui_kit::component::{
     ActiveTheme as _, Sizable as _,
     button::{Button, ButtonGroup},
+    checkbox::Checkbox,
     h_flex, v_flex,
 };
 use gpui_kit::{
-    AppContext as _, BorderStyle, Bounds, Context, Corners, Entity, Hsla, InteractiveElement as _,
-    IntoElement, MouseButton, ParentElement as _, Pixels, Point, Render, RenderImage, Rgba,
-    Styled as _, Task, Window, canvas, div, point, px, quad, rems, size,
+    App, AppContext as _, BorderStyle, Bounds, Context, Corners, Entity, Hsla,
+    InteractiveElement as _, IntoElement, MouseButton, ParentElement as _, Pixels, Point, Render,
+    RenderImage, Rgba, SharedString, Styled as _, Task, Window, canvas, div, point, px, quad, rems,
+    size,
 };
 
 use crate::game_data;
@@ -51,6 +53,12 @@ const MARKER: f32 = 6.0;
 const CLOSEST: f32 = 1.5;
 /// One button press's zoom.
 const STEP: f32 = 1.6;
+/// A garage's square on the map, in pixels (the headquarters' a little bigger).
+const GARAGE: f32 = 7.0;
+/// Room a city's name takes, roughly, per character and in height, in pixels: names that would
+/// overlap a bigger city's aren't shown.
+const NAME_CHARACTER: f32 = 6.5;
+const NAME_HEIGHT: f32 = 16.0;
 
 /// What the map shows: the point in the middle (in the game's metres, `x` east and `z` south)
 /// and how many metres one screen pixel covers.
@@ -139,6 +147,57 @@ fn cell_of(x: f32, z: f32) -> (i32, i32) {
     ((x / CELL).floor() as i32, (z / CELL).floor() as i32)
 }
 
+/// The map's cities and garages, by city: where each city's name goes (the middle of its biggest
+/// area) and its size, and where the city's garage is.
+struct Places {
+    cities: Vec<MapCity>,
+    garages: HashMap<String, (f32, f32)>,
+}
+
+struct MapCity {
+    token: String,
+    x: f32,
+    z: f32,
+    /// Its biggest area, in square metres: bigger cities' names win where names would overlap.
+    size: f32,
+}
+
+impl Places {
+    fn new(places: &[gamedata::MapPlace]) -> Self {
+        let mut cities: HashMap<&str, MapCity> = HashMap::new();
+        let mut garages = HashMap::new();
+        for place in places {
+            match place.kind {
+                gamedata::MapPlaceKind::CityArea => {
+                    let size = place.width * place.depth;
+                    let city = cities.entry(&place.city).or_insert(MapCity {
+                        token: place.city.clone(),
+                        x: place.x,
+                        z: place.z,
+                        size: 0.0,
+                    });
+                    if size > city.size {
+                        *city = MapCity {
+                            token: place.city.clone(),
+                            x: place.x,
+                            z: place.z,
+                            size,
+                        };
+                    }
+                }
+                gamedata::MapPlaceKind::Garage => {
+                    garages
+                        .entry(place.city.clone())
+                        .or_insert((place.x, place.z));
+                }
+            }
+        }
+        let mut cities: Vec<MapCity> = cities.into_values().collect();
+        cities.sort_by(|a, b| b.size.total_cmp(&a.size));
+        Self { cities, garages }
+    }
+}
+
 /// One tile: its zoom level and place in that level's grid.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 struct TileKey {
@@ -195,6 +254,8 @@ pub struct RoadMap {
     frame: u64,
     /// Dragging: where the pointer went down, and the view then.
     drag: Option<(Point<Pixels>, View)>,
+    places: Option<Arc<Places>>,
+    shows_names: bool,
     _work: Vec<Task<()>>,
 }
 
@@ -213,6 +274,8 @@ impl RoadMap {
             drawing: HashSet::new(),
             frame: 0,
             drag: None,
+            places: None,
+            shows_names: true,
             _work: Vec::new(),
         }
     }
@@ -301,6 +364,12 @@ impl RoadMap {
             }
             return;
         };
+
+        if self.places.is_none()
+            && let Some(places) = game_data::map_places(cx)
+        {
+            self.places = Some(Arc::new(Places::new(&places)));
+        }
 
         // A new look (roads driven, light or dark, screen resolution): tiles drawn again.
         let document = self.session.read(cx).preview();
@@ -429,6 +498,69 @@ impl RoadMap {
         }
     }
 
+    /// The cities' names to show, where, and whether the player has been there: the save's
+    /// cities in view, biggest first, each only where it doesn't overlap one already placed.
+    fn names(&self, cx: &App) -> Vec<(Point<Pixels>, SharedString, bool)> {
+        let (Some(places), Some(view), Some(area)) = (&self.places, self.view, self.area.get())
+        else {
+            return Vec::new();
+        };
+        if !self.shows_names {
+            return Vec::new();
+        }
+        let visits: HashMap<String, u32> = self
+            .session
+            .read(cx)
+            .cities()
+            .into_iter()
+            .map(|city| (city.token, city.visits))
+            .collect();
+        let mut taken: Vec<Bounds<Pixels>> = Vec::new();
+        let mut names = Vec::new();
+        for city in &places.cities {
+            // Only the game's cities (the map holds other areas named like them).
+            let Some(&visited) = visits.get(&city.token) else {
+                continue;
+            };
+            let at = to_screen(view, area, city.x, city.z);
+            let name: SharedString = game_data::city_name(cx, &city.token).into();
+            let width = name.chars().count() as f32 * NAME_CHARACTER + 8.0;
+            let room = Bounds::new(
+                point(at.x - px(width / 2.0), at.y - px(NAME_HEIGHT / 2.0)),
+                size(px(width), px(NAME_HEIGHT)),
+            );
+            // Whole names only: one cut off at the edge reads as another word.
+            let fits = area.contains(&room.origin) && area.contains(&room.bottom_right());
+            if !fits || taken.iter().any(|other| other.intersects(&room)) {
+                continue;
+            }
+            taken.push(room);
+            names.push((room.origin, name, visited > 0));
+        }
+        names
+    }
+
+    /// The player's garages on screen, the headquarters marked.
+    fn garages(&self, cx: &App) -> Vec<(Point<Pixels>, bool)> {
+        let (Some(places), Some(view), Some(area)) = (&self.places, self.view, self.area.get())
+        else {
+            return Vec::new();
+        };
+        let session = self.session.read(cx);
+        let headquarters = session.career().hq_city.clone();
+        session
+            .garages()
+            .into_iter()
+            .filter(|garage| garage.is_owned)
+            .filter_map(|garage| {
+                let &(x, z) = places.garages.get(&garage.city)?;
+                let at = to_screen(view, area, x, z);
+                area.contains(&at)
+                    .then_some((at, garage.city == headquarters))
+            })
+            .collect()
+    }
+
     /// What to paint for each tile in view, marking the tiles used as shown: the tile itself
     /// once drawn, otherwise the closest coarser tile drawn, scaled up and cut to the missing
     /// tile's square (never underneath a tile that's ready, where it would show through the gaps
@@ -473,6 +605,14 @@ struct TilePaint {
     square: Bounds<Pixels>,
     placed: Bounds<Pixels>,
     image: Arc<RenderImage>,
+}
+
+/// Where a point of the map (in the game's metres) is on screen.
+fn to_screen(view: View, area: Bounds<Pixels>, x: f32, z: f32) -> Point<Pixels> {
+    point(
+        area.center().x + px((x - view.x) / view.metres_per_pixel),
+        area.center().y + px((z - view.z) / view.metres_per_pixel),
+    )
 }
 
 /// The tiles of a level that the view shows.
@@ -596,6 +736,8 @@ impl Render for RoadMap {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.prepare(window, cx);
         let paint = self.tiles_to_paint();
+        let names = self.names(cx);
+        let garages = self.garages(cx);
         let theme = cx.theme();
         let swatch = |color: Hsla, label: gpui_kit::SharedString| {
             h_flex()
@@ -616,6 +758,29 @@ impl Render for RoadMap {
                 t!(cx, "road-map-not-driven"),
             ))
             .child(swatch(theme.danger, t!(cx, "road-map-truck")))
+            .child(
+                h_flex()
+                    .gap_1p5()
+                    .items_center()
+                    .child(
+                        div()
+                            .size(rems(0.6))
+                            .bg(theme.foreground)
+                            .border_1()
+                            .border_color(theme.background),
+                    )
+                    .child(t!(cx, "road-map-garages")),
+            )
+            .child(
+                Checkbox::new("road-map-names")
+                    .small()
+                    .label(t!(cx, "road-map-names"))
+                    .checked(self.shows_names)
+                    .on_click(cx.listener(|this, checked: &bool, _, cx| {
+                        this.shows_names = *checked;
+                        cx.notify();
+                    })),
+            )
             .child(div().flex_1())
             .child(t!(cx, "road-map-hint"))
             .child(
@@ -662,6 +827,7 @@ impl Render for RoadMap {
             .and_then(|position| placement_xz(&position.placement));
         let view = self.view;
         let marker = (theme.danger, theme.background);
+        let garage_colors = (theme.foreground, theme.background, theme.primary);
         let area = self.area.clone();
         let entity = cx.entity().downgrade();
         let map = canvas(
@@ -683,6 +849,29 @@ impl Render for RoadMap {
                         0,
                         false,
                     );
+                }
+                // The player's garages: squares, the headquarters bigger and ringed.
+                for (at, is_headquarters) in garages {
+                    let side = if is_headquarters {
+                        px(GARAGE + 3.0)
+                    } else {
+                        px(GARAGE)
+                    };
+                    window.paint_quad(quad(
+                        Bounds::new(
+                            point(at.x - side / 2.0, at.y - side / 2.0),
+                            size(side, side),
+                        ),
+                        px(1.0),
+                        garage_colors.0,
+                        px(if is_headquarters { 2.0 } else { 1.0 }),
+                        if is_headquarters {
+                            garage_colors.2
+                        } else {
+                            garage_colors.1
+                        },
+                        BorderStyle::Solid,
+                    ));
                 }
                 if let (Some((x, z)), Some(view)) = (truck, view) {
                     let middle = point(
@@ -758,6 +947,25 @@ impl Render for RoadMap {
                     cx.listener(|this, _: &gpui_kit::MouseUpEvent, _, _| this.drag = None),
                 )
                 .child(map)
+                // Cities' names over the map: the ones visited in full colour.
+                .children(names.into_iter().map(|(at, name, visited)| {
+                    let offset = self.area.get().map(|area| area.origin).unwrap_or_default();
+                    div()
+                        .absolute()
+                        .left(at.x - offset.x)
+                        .top(at.y - offset.y)
+                        .px_1()
+                        .rounded(theme.radius)
+                        .bg(theme.background.opacity(0.7))
+                        .text_xs()
+                        .whitespace_nowrap()
+                        .text_color(if visited {
+                            theme.foreground
+                        } else {
+                            theme.muted_foreground
+                        })
+                        .child(name)
+                }))
                 .children(message.map(|message| {
                     div()
                         .absolute()

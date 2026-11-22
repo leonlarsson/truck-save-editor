@@ -28,6 +28,8 @@ struct MapRoads(Option<RoadsRead>);
 struct RoadsRead {
     roads: Arc<Vec<gamedata::MapRoad>>,
     ids: Arc<Vec<u64>>,
+    /// The cities' areas and the garages, for names and garages on the road map.
+    places: Arc<Vec<gamedata::MapPlace>>,
 }
 
 impl Global for MapRoads {}
@@ -36,6 +38,12 @@ impl Global for MapRoads {}
 pub fn road_ids(cx: &App) -> Option<Arc<Vec<u64>>> {
     cx.try_global::<MapRoads>()
         .and_then(|read| read.0.as_ref().map(|read| read.ids.clone()))
+}
+
+/// The map's city areas and garages, once read.
+pub fn map_places(cx: &App) -> Option<Arc<Vec<gamedata::MapPlace>>> {
+    cx.try_global::<MapRoads>()
+        .and_then(|read| read.0.as_ref().map(|read| read.places.clone()))
 }
 
 /// The map's roads and junctions with where they are, once read.
@@ -93,11 +101,12 @@ pub fn reload(cx: &mut App) {
         // Then the map's roads: a second or two of reading, which only Discover every road needs.
         let roads = cx
             .background_spawn(async move {
-                let roads = gamedata::map_roads(Game::Ets2, roads_dir.as_deref()?);
-                let ids: Vec<u64> = roads.iter().map(|road| road.id).collect();
-                (!roads.is_empty()).then(|| RoadsRead {
-                    roads: Arc::new(roads),
+                let map = gamedata::map_contents(Game::Ets2, roads_dir.as_deref()?);
+                let ids: Vec<u64> = map.roads.iter().map(|road| road.id).collect();
+                (!map.roads.is_empty()).then(|| RoadsRead {
+                    roads: Arc::new(map.roads),
                     ids: Arc::new(ids),
+                    places: Arc::new(map.places),
                 })
             })
             .await;

@@ -23,7 +23,10 @@ use save::{Game, LevelTable};
 pub use content::{Installed, installed};
 pub use icon::{ALPHA, BLUE, GREEN, GameIcon, RED};
 pub use install::find_install;
-pub use roads::{MapRoad, map_roads, road_ids, sector_roads};
+pub use roads::{
+    MapContents, MapPlace, MapPlaceKind, MapRoad, decode_token, map_contents, map_roads, road_ids,
+    sector_contents, sector_roads,
+};
 pub use texture::{decode_rgba, distance_field_coverage};
 pub use vehicles::{Part, PartKind, model_parts};
 
