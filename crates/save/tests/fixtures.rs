@@ -203,3 +203,32 @@ fn real_trucks_move_between_garages() {
         );
     }
 }
+
+/// Every rotation (a four-number group) in real saves is written as the game reads it, with a
+/// semicolon after the first number: `(w; x, y, z)`. The game refuses `(w, x, y, z)`.
+#[test]
+fn real_saves_write_rotations_the_way_the_game_reads_them() {
+    for (index, dir) in slot_dirs().into_iter().enumerate() {
+        let slot = save::load(&dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display()));
+        let text = sii::to_text(&slot.game);
+        let mut rotations = 0;
+        for line in text.lines() {
+            let Some((_, value)) = line.split_once(": ") else {
+                continue;
+            };
+            for group in value.split('(').skip(1) {
+                let group = group.split(')').next().unwrap_or_default();
+                let numbers = group.split([',', ';']).count();
+                if numbers == 4 {
+                    rotations += 1;
+                    let first = group.split([',', ';']).next().unwrap_or_default();
+                    assert!(
+                        group[first.len()..].starts_with(';'),
+                        "slot {index}: a rotation written as ({group})"
+                    );
+                }
+            }
+        }
+        assert!(rotations > 0, "slot {index}: a real save has rotations");
+    }
+}

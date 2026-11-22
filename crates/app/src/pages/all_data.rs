@@ -520,11 +520,21 @@ fn check_shape(original: &str, text: &str) -> Result<(), Shape> {
     let same =
         expected == Shape::Unknown || actual == expected || (numeric(expected) && numeric(actual));
     let quotes_closed = actual != Shape::Text || (text.len() >= 2 && text.ends_with('"'));
-    if same && quotes_closed && !text.is_empty() {
+    // A vector keeps its punctuation: `(1, 2, 3)` stays three numbers, and a rotation keeps the
+    // semicolon the game needs after its first number (`(1; 0, 0, 0)`).
+    let same_punctuation = expected != Shape::Vector || punctuation(original) == punctuation(text);
+    if same && quotes_closed && same_punctuation && !text.is_empty() {
         Ok(())
     } else {
         Err(expected)
     }
+}
+
+/// A vector's brackets, commas and semicolons, without the numbers or spaces.
+fn punctuation(text: &str) -> String {
+    text.chars()
+        .filter(|c| matches!(c, '(' | ')' | ',' | ';'))
+        .collect()
 }
 
 fn shape_name(cx: &gpui_kit::App, shape: Shape) -> SharedString {
@@ -712,6 +722,11 @@ mod tests {
         assert!(check_shape("\"Name\"", "Bare").is_err());
         assert!(check_shape("true", "false").is_ok());
         assert!(check_shape("true", "1").is_err());
+        // Vectors keep their punctuation: the count of numbers, and a rotation's semicolon.
+        assert!(check_shape("(1, 2, 3)", "(4, 5, 6)").is_ok());
+        assert!(check_shape("(1, 2, 3)", "(4, 5)").is_err());
+        assert!(check_shape("(0, 0, 0) (1; 0, 0, 0)", "(5, 0, 5) (1; 0, 0, 0)").is_ok());
+        assert!(check_shape("(0, 0, 0) (1; 0, 0, 0)", "(5, 0, 5) (1, 0, 0, 0)").is_err());
         assert!(check_shape("(1, 2, 3)", "(4, 5, 6)").is_ok());
         assert!(check_shape("null", "_nameless.1.2").is_ok());
         assert!(check_shape("5", "").is_err());

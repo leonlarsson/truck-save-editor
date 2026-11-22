@@ -186,7 +186,7 @@ fn read_single(
             let (x, y, z) = (reader.i32()?, reader.i32()?, reader.i32()?);
             let _ = write!(out, "({x}, {y}, {z})");
         }
-        0x17 => write_floats(out, reader, 4)?,
+        0x17 => write_quaternion(out, reader)?,
         0x19 => write_placement(out, reader, version)?,
         0x25 => {
             let _ = write!(out, "{}", reader.i32()?);
@@ -225,7 +225,28 @@ fn write_floats(out: &mut String, reader: &mut Reader, count: usize) -> Result<(
     Ok(())
 }
 
-/// A position and rotation: `(x, y, z) (w, x, y, z)`.
+/// A rotation, as the game writes it in text: `(w; x, y, z)`, a semicolon after the first number.
+/// The game refuses `(w, x, y, z)` ("Expecting quaternion, found ','").
+fn write_quaternion(out: &mut String, reader: &mut Reader) -> Result<()> {
+    let rotation = [reader.f32()?, reader.f32()?, reader.f32()?, reader.f32()?];
+    write_rotation(out, rotation);
+    Ok(())
+}
+
+fn write_rotation(out: &mut String, rotation: [f32; 4]) {
+    out.push('(');
+    for (index, value) in rotation.iter().enumerate() {
+        match index {
+            0 => {}
+            1 => out.push_str("; "),
+            _ => out.push_str(", "),
+        }
+        write_f32(out, *value);
+    }
+    out.push(')');
+}
+
+/// A position and rotation: `(x, y, z) (w; x, y, z)`.
 ///
 /// Version 1 stores 7 floats. Version 2 and later store 8: the fourth holds the position's coarse
 /// part (the "bias"), which is added to x and z and isn't written in text.
@@ -244,14 +265,8 @@ fn write_placement(out: &mut String, reader: &mut Reader, version: u32) -> Resul
         }
         write_f32(out, *value);
     }
-    out.push_str(") (");
-    for (index, value) in rotation.iter().enumerate() {
-        if index > 0 {
-            out.push_str(", ");
-        }
-        write_f32(out, *value);
-    }
-    out.push(')');
+    out.push_str(") ");
+    write_rotation(out, rotation);
     Ok(())
 }
 
@@ -444,12 +459,17 @@ pub(crate) mod tests {
     }
 
     fn placement(version: u32, values: &[f32]) -> String {
+        one_value(version, 0x19, values)
+    }
+
+    /// One unit with one field of `value_type`, holding `values`, decoded to its text.
+    fn one_value(version: u32, value_type: u32, values: &[f32]) -> String {
         let mut b = Builder::new(version);
         b.u32(0)
             .u8(1)
             .u32(1)
             .string("thing")
-            .u32(0x19)
+            .u32(value_type)
             .string("placement")
             .u32(0);
         b.u32(1).token_id("thing");
@@ -467,17 +487,32 @@ pub(crate) mod tests {
         // Bias: x part 2049 (+512), z part 2047 (−512).
         let bias = ((2047 << 12) | 2049) as f32;
         let values = [10.0, 1.0, 20.0, bias, 1.0, 0.0, 0.0, 0.0];
-        assert_eq!(placement(3, &values), "(522, 1, -492) (1, 0, 0, 0)");
-        assert_eq!(placement(2, &values), "(522, 1, -492) (1, 0, 0, 0)");
+        assert_eq!(placement(3, &values), "(522, 1, -492) (1; 0, 0, 0)");
+        assert_eq!(placement(2, &values), "(522, 1, -492) (1; 0, 0, 0)");
         // The neutral bias (2048 in both parts) moves nothing.
         let neutral = ((2048 << 12) | 2048) as f32;
         let values = [10.0, 1.0, 20.0, neutral, 1.0, 0.0, 0.0, 0.0];
-        assert_eq!(placement(2, &values), "(10, 1, 20) (1, 0, 0, 0)");
+        assert_eq!(placement(2, &values), "(10, 1, 20) (1; 0, 0, 0)");
     }
 
     #[test]
     fn version_1_placements_have_seven_floats() {
         let values = [10.0, 1.0, 20.0, 1.0, 0.0, 0.0, 0.0];
-        assert_eq!(placement(1, &values), "(10, 1, 20) (1, 0, 0, 0)");
+        assert_eq!(placement(1, &values), "(10, 1, 20) (1; 0, 0, 0)");
+    }
+
+    /// The game's text form of a rotation has a semicolon after the first number; it refuses
+    /// commas there ("Expecting quaternion, found ','"), which an earlier version wrote.
+    #[test]
+    fn rotations_are_written_the_way_the_game_reads_them() {
+        assert_eq!(
+            one_value(3, 0x17, &[1.0, 0.5, 0.0, -0.5]),
+            "(1; &3f000000, 0, &bf000000)"
+        );
+        let values = [10.0, 1.0, 20.0, 0.5, 0.25, 0.0, 1.0];
+        assert_eq!(
+            placement(1, &values),
+            "(10, 1, 20) (&3f000000; &3e800000, 0, 1)"
+        );
     }
 }
