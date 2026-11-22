@@ -128,6 +128,9 @@ fn step_history(cx: &mut App, is_undo: bool) {
 
 pub struct Workspace {
     page: Page,
+    /// Looks for saves again when the window comes back to the front, so a save just made in
+    /// the game shows on the start screen.
+    _activation: Subscription,
     /// The window title last set, so it's only set again when it changes.
     window_title: String,
     focus_handle: FocusHandle,
@@ -193,7 +196,13 @@ impl Workspace {
                 .update(cx, |this, cx| this.may_close_window(window, cx))
                 .unwrap_or(true)
         });
+        let _activation = cx.observe_window_activation(window, |this, window, cx| {
+            if window.is_window_active() && this.opened.is_none() && this.opening.is_none() {
+                this.open_save.update(cx, |page, cx| page.refresh(cx));
+            }
+        });
         let mut workspace = Self {
+            _activation,
             window_title: String::new(),
             page: dev_start_page().unwrap_or(Page::Overview),
             focus_handle,

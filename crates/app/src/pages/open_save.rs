@@ -62,10 +62,28 @@ impl OpenSavePage {
         page
     }
 
-    /// Looks for profiles and their slots again, in the background.
+    /// Looks for profiles and their slots again, in the background, showing that it's looking.
     pub fn search(&mut self, cx: &mut Context<Self>) {
         self.found = None;
         cx.notify();
+        self.look(cx);
+    }
+
+    /// Looks again without clearing the list: what's shown stays until the new list arrives, on
+    /// the same profile. For coming back to the window after saving in the game.
+    pub fn refresh(&mut self, cx: &mut Context<Self>) {
+        if self.found.is_some() {
+            self.look(cx);
+        }
+    }
+
+    fn look(&mut self, cx: &mut Context<Self>) {
+        // The profile shown now, to stay on it when the list comes back.
+        let shown = self
+            .found
+            .as_ref()
+            .and_then(|found| found.get(self.selected_profile))
+            .map(|(profile, _)| profile.dir.clone());
         self._search = Some(cx.spawn(async move |this, cx| {
             let found = cx
                 .background_spawn(async move {
@@ -86,8 +104,10 @@ impl OpenSavePage {
                     .flat_map(|(_, slots)| slots.iter())
                     .map(|slot| (slot.dir.clone(), cx.focus_handle().tab_stop(true)))
                     .collect();
+                page.selected_profile = shown
+                    .and_then(|dir| found.iter().position(|(profile, _)| profile.dir == dir))
+                    .unwrap_or(0);
                 page.found = Some(found);
-                page.selected_profile = 0;
                 page.load_previews(cx);
                 cx.notify();
             });
