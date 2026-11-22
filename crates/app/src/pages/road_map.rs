@@ -16,15 +16,14 @@ use std::sync::Arc;
 
 use gpui_kit::component::{
     ActiveTheme as _, Sizable as _,
-    button::{Button, ButtonGroup},
-    checkbox::Checkbox,
+    button::{Button, ButtonGroup, ButtonVariants as _},
     h_flex, v_flex,
 };
 use gpui_kit::{
     App, AppContext as _, BorderStyle, Bounds, Context, Corners, Entity, Hsla,
     InteractiveElement as _, IntoElement, MouseButton, ParentElement as _, Pixels, Point, Render,
-    RenderImage, Rgba, SharedString, Styled as _, Task, Window, canvas, div, point, px, quad, rems,
-    size,
+    RenderImage, Rgba, SharedString, Styled as _, Task, Window, canvas, div, point,
+    prelude::FluentBuilder as _, px, quad, rems, size,
 };
 
 use crate::game_data;
@@ -206,19 +205,77 @@ struct TileKey {
     y: i32,
 }
 
+/// What the map shows: each of the legend's items, on or off.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Layers {
+    driven: bool,
+    not_driven: bool,
+    truck: bool,
+    garages: bool,
+    names: bool,
+}
+
+impl Default for Layers {
+    fn default() -> Self {
+        Self {
+            driven: true,
+            not_driven: true,
+            truck: true,
+            garages: true,
+            names: true,
+        }
+    }
+}
+
+/// One of the legend's items.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Layer {
+    Driven,
+    NotDriven,
+    Truck,
+    Garages,
+    Names,
+}
+
+impl Layers {
+    fn shows(&self, layer: Layer) -> bool {
+        match layer {
+            Layer::Driven => self.driven,
+            Layer::NotDriven => self.not_driven,
+            Layer::Truck => self.truck,
+            Layer::Garages => self.garages,
+            Layer::Names => self.names,
+        }
+    }
+
+    fn toggle(&mut self, layer: Layer) {
+        let shown = match layer {
+            Layer::Driven => &mut self.driven,
+            Layer::NotDriven => &mut self.not_driven,
+            Layer::Truck => &mut self.truck,
+            Layer::Garages => &mut self.garages,
+            Layer::Names => &mut self.names,
+        };
+        *shown = !*shown;
+    }
+}
+
 /// What tiles are drawn for: new tiles when any of it changes.
 #[derive(Clone, Debug, PartialEq)]
 struct Look {
     driven: usize,
     is_dark: bool,
     scale: f32,
+    /// Which roads are drawn: driven, not driven.
+    roads: (bool, bool),
 }
 
 /// The colours tiles are drawn in, as blue, green, red, alpha (GPUI's image order).
 #[derive(Clone, Copy)]
 struct Palette {
-    road: [u8; 4],
-    driven: [u8; 4],
+    /// `None` for roads not shown.
+    road: Option<[u8; 4]>,
+    driven: Option<[u8; 4]>,
 }
 
 fn bgra(color: Rgba, alpha: f32) -> [u8; 4] {
@@ -255,8 +312,8 @@ pub struct RoadMap {
     /// Dragging: where the pointer went down, and the view then.
     drag: Option<(Point<Pixels>, View)>,
     places: Option<Arc<Places>>,
-    shows_names: bool,
-    shows_garages: bool,
+    /// What the map shows; the legend turns each on and off.
+    layers: Layers,
     _work: Vec<Task<()>>,
 }
 
@@ -276,8 +333,7 @@ impl RoadMap {
             frame: 0,
             drag: None,
             places: None,
-            shows_names: true,
-            shows_garages: true,
+            layers: Layers::default(),
             _work: Vec::new(),
         }
     }
@@ -379,6 +435,7 @@ impl RoadMap {
             driven: save::discovered_roads(&document),
             is_dark: cx.theme().is_dark(),
             scale: window.scale_factor(),
+            roads: (self.layers.driven, self.layers.not_driven),
         };
         if self.look.as_ref() != Some(&look) {
             self.look = Some(look);
@@ -436,8 +493,11 @@ impl RoadMap {
         self.drawing.extend(missing.iter().copied());
         let theme = cx.theme();
         let palette = Palette {
-            road: bgra(theme.muted_foreground.into(), 0.4),
-            driven: bgra(theme.primary.into(), 1.0),
+            road: self
+                .layers
+                .not_driven
+                .then(|| bgra(theme.muted_foreground.into(), 0.4)),
+            driven: self.layers.driven.then(|| bgra(theme.primary.into(), 1.0)),
         };
         let look = self.look.clone();
         let scale = window.scale_factor();
@@ -507,7 +567,7 @@ impl RoadMap {
         else {
             return Vec::new();
         };
-        if !self.shows_names {
+        if !self.layers.names {
             return Vec::new();
         }
         let visits: HashMap<String, u32> = self
@@ -548,7 +608,7 @@ impl RoadMap {
         else {
             return Vec::new();
         };
-        if !self.shows_garages {
+        if !self.layers.garages {
             return Vec::new();
         }
         let session = self.session.read(cx);
@@ -713,6 +773,9 @@ fn draw_tile(
         } else {
             palette.road
         };
+        let Some(color) = color else {
+            continue;
+        };
         for road in roads
             .iter()
             .filter(|road| driven.contains(&road.id) == is_driven)
@@ -743,66 +806,103 @@ impl Render for RoadMap {
         let paint = self.tiles_to_paint();
         let names = self.names(cx);
         let garages = self.garages(cx);
-        let theme = cx.theme();
-        let swatch = |color: Hsla, label: gpui_kit::SharedString| {
-            h_flex()
-                .gap_1p5()
-                .items_center()
-                .child(div().size(rems(0.6)).rounded_full().bg(color))
-                .child(label)
+        // A copy: the legend's switches need the context while the theme is in use.
+        let theme = cx.theme().clone();
+        // The legend is the map's switches: each item shows or hides what it names, and a
+        // hidden one is dimmed and struck through (so it doesn't rest on colour alone).
+        let layers = self.layers;
+        let item = |id: &'static str,
+                    layer: Layer,
+                    mark: gpui_kit::AnyElement,
+                    label: SharedString,
+                    cx: &mut Context<Self>| {
+            let shown = layers.shows(layer);
+            Button::new(id)
+                .ghost()
+                .xsmall()
+                .tooltip(if shown {
+                    t!(cx, "road-map-hide")
+                } else {
+                    t!(cx, "road-map-show")
+                })
+                .child(
+                    h_flex()
+                        .gap_1p5()
+                        .items_center()
+                        .text_xs()
+                        .when(!shown, |this| this.opacity(0.45).line_through())
+                        .child(mark)
+                        .child(label),
+                )
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.layers.toggle(layer);
+                    cx.notify();
+                }))
         };
+        let dot = |color: Hsla| {
+            div()
+                .size(rems(0.6))
+                .rounded_full()
+                .bg(color)
+                .into_any_element()
+        };
+        let square = div()
+            .size(rems(0.6))
+            .bg(theme.foreground)
+            .border_1()
+            .border_color(theme.background)
+            .into_any_element();
+        let driven_label = t!(cx, "road-map-driven");
+        let not_driven_label = t!(cx, "road-map-not-driven");
+        let truck_label = t!(cx, "road-map-truck");
+        let garages_label = t!(cx, "road-map-garages");
+        let names_label = t!(cx, "road-map-names");
+        let (primary, muted, danger) = (theme.primary, theme.muted_foreground, theme.danger);
         let legend = h_flex()
-            .gap_4()
+            .gap_1()
             .flex_wrap()
             .items_center()
             .text_xs()
             .text_color(theme.muted_foreground)
-            .child(swatch(theme.primary, t!(cx, "road-map-driven")))
-            .child(swatch(
-                theme.muted_foreground.opacity(0.5),
-                t!(cx, "road-map-not-driven"),
+            .child(item(
+                "layer-driven",
+                Layer::Driven,
+                dot(primary),
+                driven_label,
+                cx,
             ))
-            .child(swatch(theme.danger, t!(cx, "road-map-truck")))
-            // What can be hidden: garages (with their square, to say which they are) and names.
-            .child(
-                h_flex()
-                    .gap_1p5()
-                    .items_center()
-                    .child(
-                        Checkbox::new("road-map-garages")
-                            .small()
-                            .checked(self.shows_garages)
-                            .accessibility_label(t!(cx, "road-map-garages"))
-                            .on_click(cx.listener(|this, checked: &bool, _, cx| {
-                                this.shows_garages = *checked;
-                                cx.notify();
-                            })),
-                    )
-                    .child(
-                        div()
-                            .size(rems(0.6))
-                            .bg(theme.foreground)
-                            .border_1()
-                            .border_color(theme.background),
-                    )
-                    .child(t!(cx, "road-map-garages")),
-            )
-            .child(
-                h_flex()
-                    .gap_1p5()
-                    .items_center()
-                    .child(
-                        Checkbox::new("road-map-names")
-                            .small()
-                            .checked(self.shows_names)
-                            .accessibility_label(t!(cx, "road-map-names"))
-                            .on_click(cx.listener(|this, checked: &bool, _, cx| {
-                                this.shows_names = *checked;
-                                cx.notify();
-                            })),
-                    )
-                    .child(t!(cx, "road-map-names")),
-            )
+            .child(item(
+                "layer-not-driven",
+                Layer::NotDriven,
+                dot(muted.opacity(0.5)),
+                not_driven_label,
+                cx,
+            ))
+            .child(item(
+                "layer-truck",
+                Layer::Truck,
+                dot(danger),
+                truck_label,
+                cx,
+            ))
+            .child(item(
+                "layer-garages",
+                Layer::Garages,
+                square,
+                garages_label,
+                cx,
+            ))
+            .child(item(
+                "layer-names",
+                Layer::Names,
+                div()
+                    .text_xs()
+                    .font_weight(gpui_kit::FontWeight::MEDIUM)
+                    .child("Aa")
+                    .into_any_element(),
+                names_label,
+                cx,
+            ))
             .child(div().flex_1())
             .child(t!(cx, "road-map-hint"))
             .child(
@@ -846,7 +946,8 @@ impl Render for RoadMap {
         };
         // The truck, drawn over the tiles at one size whatever the zoom.
         let truck = save::position(&self.session.read(cx).preview())
-            .and_then(|position| placement_xz(&position.placement));
+            .and_then(|position| placement_xz(&position.placement))
+            .filter(|_| self.layers.truck);
         let view = self.view;
         let marker = (theme.danger, theme.background);
         let garage_colors = (theme.foreground, theme.background, theme.primary);
@@ -1052,8 +1153,8 @@ mod tests {
     fn draws_a_tile_with_its_roads_and_skips_an_empty_one() {
         let index = Index::new(roads()).expect("an index");
         let palette = Palette {
-            road: [1, 1, 1, 255],
-            driven: [2, 2, 2, 255],
+            road: Some([1, 1, 1, 255]),
+            driven: Some([2, 2, 2, 255]),
         };
         let driven: HashSet<u64> = [2].into_iter().collect();
         let whole = TileKey {
