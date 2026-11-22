@@ -7,7 +7,7 @@ use gpui_kit::component::{
     table::{Column, TableDelegate, TableState},
 };
 use gpui_kit::{
-    App, Context, IntoElement, ParentElement as _, SharedString, Styled as _, Window, div,
+    App, Context, IntoElement, ParentElement as _, Pixels, SharedString, Styled as _, Window, div,
 };
 
 pub struct TextColumn {
@@ -34,6 +34,19 @@ pub struct TextRow {
 pub struct TextTable {
     pub columns: Vec<TextColumn>,
     pub rows: Vec<TextRow>,
+    /// The table's measured width (see `ui::fill_table`): every column grows into a wider table,
+    /// in proportion to its width.
+    table_width: Option<Pixels>,
+}
+
+impl super::FillsWidth for TextTable {
+    fn table_width(&self) -> Option<Pixels> {
+        self.table_width
+    }
+
+    fn set_table_width(&mut self, width: Pixels) {
+        self.table_width = Some(width);
+    }
 }
 
 impl TextTable {
@@ -41,6 +54,7 @@ impl TextTable {
         Self {
             columns,
             rows: Vec::new(),
+            table_width: None,
         }
     }
 
@@ -73,8 +87,15 @@ impl TableDelegate for TextTable {
     }
 
     fn column(&self, col_ix: usize, _: &App) -> Column {
+        let widths: Vec<(f32, bool)> = self
+            .columns
+            .iter()
+            .map(|column| (column.width, true))
+            .collect();
+        let widths = super::fill_widths(&widths, self.table_width);
         match self.columns.get(col_ix) {
-            Some(column) => Column::new(column.key, column.title.clone()).width(column.width),
+            Some(column) => Column::new(column.key, column.title.clone())
+                .width(widths.get(col_ix).copied().unwrap_or(column.width)),
             None => Column::new("missing", ""),
         }
     }

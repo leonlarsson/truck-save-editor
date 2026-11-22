@@ -616,12 +616,14 @@ impl Render for AllDataPage {
             )
             .when(is_searching, |this| {
                 this.child(
-                    div().flex_1().min_h_0().child(
+                    div().flex_1().min_h_0().child(crate::ui::fill_table(
+                        &self.results,
                         DataTable::new(&self.results)
                             .stripe(true)
                             .bordered(true)
-                            .accessibility_label(t!(cx, "all-data-results")),
-                    ),
+                            .accessibility_label(t!(cx, "all-data-results"))
+                            .into_any_element(),
+                    )),
                 )
             })
             .when(!is_searching, |this| {
@@ -654,10 +656,13 @@ impl Render for AllDataPage {
                         ))
                         .child(pane(
                             t!(cx, "all-data-values"),
-                            DataTable::new(&self.fields)
-                                .stripe(true)
-                                .bordered(true)
-                                .into_any_element(),
+                            crate::ui::fill_table(
+                                &self.fields,
+                                DataTable::new(&self.fields)
+                                    .stripe(true)
+                                    .bordered(true)
+                                    .into_any_element(),
+                            ),
                             None,
                         )),
                 )

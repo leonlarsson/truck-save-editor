@@ -156,6 +156,55 @@ pub fn save_as_new_slot(game: Game, slot: &LoadedSlot, name: &str) -> Result<Pat
     Ok(dir)
 }
 
+/// Writes a slot's save over another slot of the same profile (`target`, a folder the game
+/// already has), after backing that one up, leaving the original untouched. The target keeps its
+/// name in the game's list; the original's pictures replace its own, so the list shows the right
+/// truck. For Steam Cloud profiles this is how to keep an edited copy: the game lists only files
+/// Steam knows, and a slot the game made is one.
+pub fn save_over(
+    game: Game,
+    slot: &LoadedSlot,
+    target: &Path,
+    backups_root: &Path,
+    profile: &str,
+) -> Result<Backup> {
+    if is_game_running(game) {
+        return Err(Error::GameRunning);
+    }
+    if !target.join("game.sii").is_file() {
+        return Err(Error::NotASlot(target.to_path_buf()));
+    }
+    // The target's name, so the slot the player picked is still found by it.
+    let target_name = load(target)
+        .ok()
+        .and_then(|loaded| loaded.info)
+        .and_then(|info| crate::info::SlotInfo::read(&info).name);
+    let backup = back_up(target, backups_root, profile)?;
+
+    let entries = std::fs::read_dir(&slot.dir).map_err(io("couldn't read", &slot.dir))?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let file_name = entry.file_name();
+        if path.is_file() && file_name != "game.sii" && file_name != "info.sii" {
+            std::fs::copy(&path, target.join(&file_name)).map_err(io("couldn't copy", &path))?;
+        }
+    }
+    let info = slot.info.clone().map(|mut info| {
+        if let Some(name) = &target_name {
+            crate::info::set_name(&mut info, name);
+        }
+        info
+    });
+    let written = write_slot(target, &slot.game, info.as_ref())
+        .and_then(|()| verify(target, &slot.game, info.as_ref()));
+    if let Err(error) = written {
+        // Put the target back as it was; the backup is still there either way.
+        copy_files(&backup.dir, target)?;
+        return Err(error);
+    }
+    Ok(backup)
+}
+
 /// Copies a slot's files into a new, timestamped backup folder.
 pub fn back_up(slot_dir: &Path, backups_root: &Path, profile: &str) -> Result<Backup> {
     let slot_name = slot_dir
@@ -350,6 +399,51 @@ mod tests {
         let info = crate::info::SlotInfo::read(copy.info.as_ref().expect("has a summary"));
         assert_eq!(info.name.as_deref(), Some("Old (edited)"));
         assert!(dir.join("preview.tga").is_file());
+    }
+
+    #[test]
+    fn saves_over_another_slot_keeping_its_name() {
+        let scratch = Scratch::new("save-over");
+        let saves = scratch.0.join("profile/save");
+        let (original, target) = (saves.join("3"), saves.join("5"));
+        let summary = |name: &str| {
+            format!(
+                "SiiNunit\r\n{{\r\nsave_container : _nameless.9 {{\r\n name: \"{name}\"\r\n}}\r\n\r\n}}\r\n"
+            )
+        };
+        for (dir, name) in [(&original, "Main"), (&target, "Spare")] {
+            std::fs::create_dir_all(dir).expect("creates the slot");
+            std::fs::write(dir.join("game.sii"), SAVE).expect("writes the save");
+            std::fs::write(dir.join("info.sii"), summary(name)).expect("writes the summary");
+        }
+        std::fs::write(original.join("preview.tga"), b"main picture").expect("writes the preview");
+        std::fs::write(target.join("preview.tga"), b"spare picture").expect("writes the preview");
+
+        let mut slot = load(&original).expect("loads");
+        let mut career = Career::read(&slot.game).expect("reads");
+        career.money = 7_000;
+        career.write(&mut slot.game).expect("changes it");
+        let backups_root = scratch.0.join("backups");
+        save_over(Game::Ets2, &slot, &target, &backups_root, "John").expect("saves");
+
+        assert_eq!(
+            std::fs::read_to_string(original.join("game.sii")).expect("original"),
+            SAVE,
+            "the original is untouched"
+        );
+        let written = load(&target).expect("loads the target");
+        assert_eq!(Career::read(&written.game).expect("reads").money, 7_000);
+        let info = crate::info::SlotInfo::read(written.info.as_ref().expect("has a summary"));
+        assert_eq!(info.name.as_deref(), Some("Spare"), "it keeps its name");
+        assert_eq!(
+            std::fs::read(target.join("preview.tga")).expect("reads"),
+            b"main picture"
+        );
+        assert_eq!(
+            backups(&backups_root, "John", "5").len(),
+            1,
+            "the target was backed up"
+        );
     }
 
     #[test]

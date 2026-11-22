@@ -360,11 +360,14 @@ impl Render for MapPage {
             .child(
                 div().flex_1().min_h_0().child(crate::ui::table_or_empty(
                     &self.filter,
-                    DataTable::new(&self.table)
-                        .stripe(true)
-                        .bordered(true)
-                        .accessibility_label(t!(cx, "map-table"))
-                        .into_any_element(),
+                    crate::ui::fill_table(
+                        &self.table,
+                        DataTable::new(&self.table)
+                            .stripe(true)
+                            .bordered(true)
+                            .accessibility_label(t!(cx, "map-table"))
+                            .into_any_element(),
+                    ),
                     None,
                     cx,
                 )),
