@@ -9,10 +9,47 @@
 start-choose = Choose a save to edit
 start-looking = Looking for your saves…
 start-none-title = No saves found
-start-none-body = Saves are looked for in Steam Cloud and in Documents\Euro Truck Simulator 2\profiles. Save once in the game, then look again.
+start-none-body = None of the places below has a profile of the game. If you play on this PC, start the game and save once: the list updates when you come back to this window. If your saves are somewhere else, such as a backup or another drive, add that folder.
 start-look-again = Look again
 start-your-saves = Your saves
 start-game-saves = Saved by the game
+start-game-saves-hint = Autosaves and quicksaves. The game replaces them as you play.
+start-game-saves-more = { $count ->
+    [one] Show one more
+   *[other] Show { $count } more
+}
+start-game-saves-fewer = Show fewer
+start-showing-cloud = { $count ->
+    [one] One save in “{ $name }”, kept in Steam Cloud, so it's the same on every PC you play on.
+   *[other] { $count } saves in “{ $name }”, kept in Steam Cloud, so they're the same on every PC you play on.
+}
+start-showing-local = { $count ->
+    [one] One save in “{ $name }”, kept on this PC only.
+   *[other] { $count } saves in “{ $name }”, kept on this PC only.
+}
+start-profile-empty-title = No saves in “{ $name }” yet
+start-profile-empty-body = Save once in the game and it shows here. The list updates when you come back to this window.
+start-folders = Where saves are looked for
+start-folders-description = The game keeps each profile in Steam Cloud or on this PC, whichever its profile settings in the game say.
+start-folders-missing = { $count ->
+    [one] Also looked in one folder that isn't on this PC
+   *[other] Also looked in { $count } folders that aren't on this PC
+}
+start-folders-missing-hide = Hide the folders that aren't there
+start-folder-added = Added by you
+start-folder-profiles = { $count ->
+    [one] One profile
+   *[other] { $count } profiles
+}
+start-folder-empty = No profiles
+start-folder-missing = Not there
+start-folder-no-steam = Steam wasn't found on this PC
+start-folder-show = Show the folder
+start-folder-remove = Stop looking here
+start-folder-add = Add a folder…
+start-folder-drop = Or drop a save or profile folder on this window.
+start-folder-choose = Choose a folder with saves
+start-folder-not-saves = No saves or profiles in { $path }. Choose the game's profiles folder, one profile's folder, or one save's.
 start-slot-missing = { $count ->
     [one] Needs a DLC or mod that isn't installed
    *[other] Needs { $count } DLCs or mods that aren't installed
@@ -310,6 +347,10 @@ palette-buy-all-garages = Buy every garage, all large
 palette-upgrade-owned-garages = Upgrade owned garages to large
 palette-discard = Discard changes
 palette-theme = Switch light or dark mode
+report-problem = Report a problem…
+report-this = Report this problem
+report-description = Opens a new issue on GitHub in your browser, with the editor's version filled in. Nothing is sent until you post it.
+palette-report = Report a problem on GitHub
 
 ## Backups
 
@@ -347,10 +388,6 @@ coach-experience = Coach experience
 coach-experience-description = Coaching is a career of its own.
 coach-experience-label = Coach experience points
 experience-unit = XP
-report-problem = Report a problem…
-report-this = Report this problem
-report-description = Opens a new issue on GitHub in your browser, with the editor's version filled in. Nothing is sent until you post it.
-palette-report = Report a problem on GitHub
 experience-amount = { $amount } XP
 skills = Truck skills
 level-number = Level { $level }

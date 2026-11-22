@@ -13,10 +13,47 @@
 start-choose = Wybierz zapis gry do edycji
 start-looking = Szukam twoich zapisów…
 start-none-title = Nie znaleziono zapisów
-start-none-body = Zapisy są wyszukiwane w Steam Cloud i w folderze Dokumenty\Euro Truck Simulator 2\profiles. Zapisz raz grę, a potem poszukaj ponownie.
+start-none-body = W żadnym z miejsc poniżej nie ma profilu gry. Jeśli grasz na tym komputerze, uruchom grę i zapisz ją raz: lista odświeży się, gdy wrócisz do tego okna. Jeśli twoje zapisy są gdzie indziej, na przykład w kopii zapasowej lub na innym dysku, dodaj ten folder.
 start-look-again = Szukaj ponownie
 start-your-saves = Twoje zapisy
 start-game-saves = Zapisane przez grę
+start-game-saves-hint = Autozapisy i szybkie zapisy. Gra zastępuje je w trakcie gry.
+start-game-saves-more = { $count ->
+    [one] Pokaż jeszcze 1
+    [few] Pokaż jeszcze { $count }
+    [many] Pokaż jeszcze { $count }
+   *[other] Pokaż jeszcze { $count }
+}
+start-game-saves-fewer = Pokaż mniej
+start-showing-cloud = Profil: { $name } · zapisy: { $count }. Są w Steam Cloud, więc są takie same na każdym komputerze, na którym grasz.
+start-showing-local = Profil: { $name } · zapisy: { $count }. Są tylko na tym komputerze.
+start-profile-empty-title = Brak zapisów w profilu: { $name }
+start-profile-empty-body = Zapisz raz grę, a zapis pojawi się tutaj. Lista odświeża się, gdy wracasz do tego okna.
+start-folders = Gdzie szukane są zapisy
+start-folders-description = Gra trzyma każdy profil w Steam Cloud albo na tym komputerze, zależnie od ustawień profilu w grze.
+start-folders-missing = { $count ->
+    [one] Sprawdzono też 1 folder, którego nie ma na tym komputerze
+    [few] Sprawdzono też { $count } foldery, których nie ma na tym komputerze
+    [many] Sprawdzono też { $count } folderów, których nie ma na tym komputerze
+   *[other] Sprawdzono też { $count } folderu, których nie ma na tym komputerze
+}
+start-folders-missing-hide = Ukryj foldery, których nie ma
+start-folder-added = Dodany przez ciebie
+start-folder-profiles = { $count ->
+    [one] 1 profil
+    [few] { $count } profile
+    [many] { $count } profili
+   *[other] { $count } profilu
+}
+start-folder-empty = Brak profili
+start-folder-missing = Nie istnieje
+start-folder-no-steam = Nie znaleziono Steam na tym komputerze
+start-folder-show = Pokaż folder
+start-folder-remove = Przestań tu szukać
+start-folder-add = Dodaj folder…
+start-folder-drop = Albo upuść folder zapisu lub profilu na to okno.
+start-folder-choose = Wybierz folder z zapisami
+start-folder-not-saves = Brak zapisów lub profili w folderze: { $path }. Wybierz folder „profiles” gry, folder profilu albo zapisu.
 start-slot-missing = { $count ->
     [one] Wymaga DLC lub modyfikacji, której nie zainstalowano
     [few] Wymaga DLC lub modyfikacji, których nie zainstalowano: { $count }
@@ -327,6 +364,10 @@ palette-buy-all-garages = Kup każdy garaż, wszystkie duże
 palette-upgrade-owned-garages = Rozbuduj posiadane garaże do dużych
 palette-discard = Odrzuć zmiany
 palette-theme = Przełącz tryb jasny lub ciemny
+report-problem = Zgłoś problem…
+report-this = Zgłoś ten problem
+report-description = Otwiera nowe zgłoszenie na GitHubie w przeglądarce, z już wpisaną wersją edytora. Nic nie zostanie wysłane, dopóki go nie opublikujesz.
+palette-report = Zgłoś problem na GitHubie
 
 ## Backups
 
@@ -364,10 +405,6 @@ experience-label = Punkty doświadczenia kierowcy ciężarówki
 coach-experience = Doświadczenie kierowcy autokaru
 coach-experience-description = Autokary to osobna kariera.
 coach-experience-label = Punkty doświadczenia kierowcy autokaru
-report-problem = Zgłoś problem…
-report-this = Zgłoś ten problem
-report-description = Otwiera nowe zgłoszenie na GitHubie w przeglądarce, z już wpisaną wersją edytora. Nic nie zostanie wysłane, dopóki go nie opublikujesz.
-palette-report = Zgłoś problem na GitHubie
 experience-unit = XP
 experience-amount = { $amount } XP
 skills = Zdolności kierowcy ciężarówki

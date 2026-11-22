@@ -1,6 +1,10 @@
 //! The start screen: every save on this computer, to pick one to edit. The player's own saves come
 //! first; the game's autosaves follow. Finding them reads only the small `info.sii` of each slot, in
 //! the background.
+//!
+//! It says what it shows and where from: the profile's saves and the folder they're in, and every
+//! place it looked, with what each held. When saves are somewhere else (a backup, another drive),
+//! a folder can be added, by choosing it or dropping it on the window; it's kept in the settings.
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::{
@@ -16,17 +20,20 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use gpui_kit::{
-    AppContext as _, Context, EventEmitter, FocusHandle, InteractiveElement as _, IntoElement,
-    KeyDownEvent, ObjectFit, ParentElement as _, Render, RenderImage, SharedString,
-    StatefulInteractiveElement as _, Styled as _, StyledImage as _, Task, Window, div, img,
-    prelude::FluentBuilder as _, rems,
+    AppContext as _, Context, EventEmitter, ExternalPaths, FocusHandle, InteractiveElement as _,
+    IntoElement, KeyDownEvent, ObjectFit, ParentElement as _, PathPromptOptions, Render,
+    RenderImage, SharedString, StatefulInteractiveElement as _, Styled as _, StyledImage as _,
+    Task, Window, div, img, prelude::FluentBuilder as _, rems,
 };
-use save::{Game, Profile, Slot};
+use save::{Game, Profile, SearchedFolder, Slot, Source};
 
 use crate::APP_NAME;
 use crate::format::thousands;
 use crate::i18n::t;
 use crate::labels;
+
+/// How many of the game's own saves show before "Show more".
+const GAME_SAVES_SHOWN: usize = 3;
 
 /// Asks the workspace to open a slot.
 #[derive(Clone)]
@@ -35,9 +42,28 @@ pub struct OpenSlot {
     pub slot: Slot,
 }
 
+/// What the last look found, and where it looked.
+struct Found {
+    /// Each profile with its slots: the most recently saved first, ones without saves last.
+    profiles: Vec<(Profile, Vec<Slot>)>,
+    /// Every folder looked in.
+    folders: Vec<SearchedFolder>,
+    /// Whether Steam is on this PC (no Steam Cloud folders to look in otherwise).
+    has_steam: bool,
+}
+
 pub struct OpenSavePage {
-    found: Option<Vec<(Profile, Vec<Slot>)>>,
+    found: Option<Found>,
     selected_profile: usize,
+    /// A folder just added: the next look lands on the profile in it.
+    select_after: Option<PathBuf>,
+    /// Whether the folders looked in that aren't there are listed one by one (when saves were
+    /// found, they're one line saying how many).
+    shows_missing_folders: bool,
+    /// Whether every save the game made is shown, rather than the newest few.
+    shows_all_game_saves: bool,
+    /// Why the last folder chosen or dropped wasn't added, if it wasn't.
+    add_problem: Option<SharedString>,
     /// Each slot's preview picture, by slot folder, as they load.
     previews: HashMap<PathBuf, Arc<RenderImage>>,
     /// Each slot row's focus, by slot folder, so Tab reaches the rows and Enter opens one.
@@ -53,6 +79,10 @@ impl OpenSavePage {
         let mut page = Self {
             found: None,
             selected_profile: 0,
+            select_after: None,
+            shows_all_game_saves: false,
+            shows_missing_folders: false,
+            add_problem: None,
             previews: HashMap::new(),
             row_focus: HashMap::new(),
             _search: None,
@@ -78,34 +108,84 @@ impl OpenSavePage {
     }
 
     fn look(&mut self, cx: &mut Context<Self>) {
-        // The profile shown now, to stay on it when the list comes back.
+        // The profile shown now, to stay on it when the list comes back (or the one in a folder
+        // just added).
         let shown = self
             .found
             .as_ref()
-            .and_then(|found| found.get(self.selected_profile))
+            .and_then(|found| found.profiles.get(self.selected_profile))
             .map(|(profile, _)| profile.dir.clone());
+        let select_after = self.select_after.take();
+        let added = crate::settings::get(cx).profile_dirs;
         self._search = Some(cx.spawn(async move |this, cx| {
             let found = cx
                 .background_spawn(async move {
-                    Game::ALL
-                        .into_iter()
-                        .flat_map(save::find_profiles)
-                        .map(|profile| {
+                    let mut profiles = Vec::new();
+                    let mut folders = Vec::new();
+                    let mut has_steam = false;
+                    for game in Game::ALL {
+                        let search = save::search(game, &added);
+                        has_steam |= !search.steam_dirs.is_empty();
+                        // The other game's usual folders only when it's played here: an ETS2
+                        // player doesn't need to read that ATS isn't installed.
+                        folders.extend(
+                            search
+                                .folders
+                                .into_iter()
+                                .filter(|folder| game == Game::Ets2 || folder.is_there),
+                        );
+                        profiles.extend(search.profiles.into_iter().map(|profile| {
                             let slots = save::profile_slots(&profile.dir);
                             (profile, slots)
-                        })
-                        .filter(|(_, slots)| !slots.is_empty())
-                        .collect::<Vec<_>>()
+                        }));
+                    }
+                    // Both games together, most recently saved first; profiles without saves
+                    // (never saved) come last.
+                    profiles.sort_by_key(|(profile, _)| std::cmp::Reverse(profile.last_saved));
+                    // Steam's, then Documents, then the folders added.
+                    folders.sort_by_key(|folder| match folder.source {
+                        Source::Steam => 0,
+                        Source::Documents => 1,
+                        Source::Added => 2,
+                    });
+                    Found {
+                        profiles,
+                        folders,
+                        has_steam,
+                    }
                 })
                 .await;
             let _ = this.update(cx, |page, cx| {
                 page.row_focus = found
+                    .profiles
                     .iter()
                     .flat_map(|(_, slots)| slots.iter())
                     .map(|slot| (slot.dir.clone(), cx.focus_handle().tab_stop(true)))
                     .collect();
-                page.selected_profile = shown
-                    .and_then(|dir| found.iter().position(|(profile, _)| profile.dir == dir))
+                let position = |dir: &PathBuf| {
+                    found
+                        .profiles
+                        .iter()
+                        .position(|(profile, _)| &profile.dir == dir)
+                };
+                // A folder just added: the profile it is or holds (a save or profile chosen),
+                // else the first profile in it.
+                let in_added = select_after.and_then(|chosen| {
+                    found
+                        .profiles
+                        .iter()
+                        .position(|(profile, _)| chosen.starts_with(&profile.dir))
+                        .or_else(|| {
+                            found.profiles.iter().position(|(profile, _)| {
+                                profile
+                                    .dir
+                                    .parent()
+                                    .is_some_and(|root| root.starts_with(&chosen))
+                            })
+                        })
+                });
+                page.selected_profile = in_added
+                    .or_else(|| shown.as_ref().and_then(position))
                     .unwrap_or(0);
                 page.found = Some(found);
                 page.load_previews(cx);
@@ -114,12 +194,90 @@ impl OpenSavePage {
         }));
     }
 
+    /// Asks for a folder with saves in it, and adds it.
+    fn choose_folder(&mut self, cx: &mut Context<Self>) {
+        let prompt = cx.prompt_for_paths(PathPromptOptions {
+            files: false,
+            directories: true,
+            multiple: false,
+            prompt: Some(t!(cx, "start-folder-choose")),
+        });
+        cx.spawn(async move |this, cx| {
+            let Ok(Ok(Some(paths))) = prompt.await else {
+                return;
+            };
+            let _ = this.update(cx, |this, cx| this.add_folders(paths, cx));
+        })
+        .detach();
+    }
+
+    /// Adds the folders of profiles the chosen or dropped paths mean (a profiles folder, a
+    /// profile, one save, or the game's folder in Documents), and looks again; or says why not.
+    fn add_folders(&mut self, paths: Vec<PathBuf>, cx: &mut Context<Self>) {
+        let Some(chosen) = paths.into_iter().next() else {
+            return;
+        };
+        cx.spawn(async move |this, cx| {
+            let (chosen, roots) = cx
+                .background_spawn(async move {
+                    // A dropped file (a `game.sii`, say): the folder it's in.
+                    let dir = if chosen.is_file() {
+                        chosen.parent().map(PathBuf::from).unwrap_or(chosen)
+                    } else {
+                        chosen
+                    };
+                    let roots = save::profile_folders_at(&dir);
+                    (dir, roots)
+                })
+                .await;
+            let _ = this.update(cx, |this, cx| {
+                if roots.is_empty() {
+                    this.add_problem = Some(t!(
+                        cx,
+                        "start-folder-not-saves",
+                        path = chosen.to_string_lossy().into_owned()
+                    ));
+                    cx.notify();
+                    return;
+                }
+                this.add_problem = None;
+                // Only the ones not looked in already.
+                let looked_in: Vec<PathBuf> = this
+                    .found
+                    .iter()
+                    .flat_map(|found| found.folders.iter().map(|folder| folder.dir.clone()))
+                    .collect();
+                let new: Vec<PathBuf> = roots
+                    .into_iter()
+                    .filter(|root| !looked_in.contains(root))
+                    .collect();
+                if !new.is_empty() {
+                    crate::settings::update(cx, |settings| {
+                        settings.profile_dirs.extend(new);
+                    });
+                }
+                this.select_after = Some(chosen);
+                this.look(cx);
+            });
+        })
+        .detach();
+    }
+
+    /// Stops looking in a folder that was added.
+    fn remove_folder(&mut self, dir: PathBuf, cx: &mut Context<Self>) {
+        crate::settings::update(cx, |settings| {
+            settings.profile_dirs.retain(|added| added != &dir);
+        });
+        self.add_problem = None;
+        self.look(cx);
+    }
+
     /// Reads every slot's preview picture in the background; rows show them as they arrive.
     fn load_previews(&mut self, cx: &mut Context<Self>) {
         let dirs: Vec<PathBuf> = self
             .found
             .iter()
-            .flatten()
+            .flat_map(|found| found.profiles.iter())
             .flat_map(|(_, slots)| slots.iter().map(|slot| slot.dir.clone()))
             .collect();
         self._previews = Some(cx.spawn(async move |this, cx| {
@@ -160,13 +318,6 @@ impl OpenSavePage {
             }
         };
 
-        if profiles.len() == 1 {
-            return div()
-                .text_sm()
-                .text_color(cx.theme().muted_foreground)
-                .child(describe(&profiles[0].0))
-                .into_any_element();
-        }
         ButtonGroup::new("profiles")
             .outline()
             .small()
@@ -181,7 +332,223 @@ impl OpenSavePage {
                     cx.notify();
                 }
             }))
-            .into_any_element()
+    }
+
+    /// What's shown and where it's from: how many saves, the profile, where it's kept, and its
+    /// folder.
+    fn render_summary(
+        &self,
+        profile: &Profile,
+        slots: &[Slot],
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        let text = match profile.location {
+            save::Location::SteamCloud => t!(
+                cx,
+                "start-showing-cloud",
+                count = slots.len(),
+                name = &profile.name
+            ),
+            save::Location::Local => t!(
+                cx,
+                "start-showing-local",
+                count = slots.len(),
+                name = &profile.name
+            ),
+        };
+        let folder = profile.dir.join("save");
+        v_flex()
+            .gap_1()
+            .items_start()
+            .child(div().text_sm().child(text))
+            // The folder itself, named in full in the tooltip and in the list of places below.
+            .child(
+                Button::new("show-profile-folder")
+                    .ghost()
+                    .xsmall()
+                    .icon(Icon::new(IconName::FolderOpen))
+                    .label(t!(cx, "start-folder-show"))
+                    .tooltip(SharedString::from(folder.to_string_lossy().into_owned()))
+                    .on_click(move |_, _, cx| cx.reveal_path(&folder)),
+            )
+    }
+
+    /// A profile without saves: how to make one.
+    fn render_empty_profile(&self, profile: &Profile, cx: &mut Context<Self>) -> impl IntoElement {
+        v_flex()
+            .gap_2()
+            .child(div().font_medium().child(t!(
+                cx,
+                "start-profile-empty-title",
+                name = &profile.name
+            )))
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(cx.theme().muted_foreground)
+                    .child(t!(cx, "start-profile-empty-body")),
+            )
+    }
+
+    /// Every folder looked in and what it held, a way to look again, and to add a folder.
+    fn render_folders(&self, found: &Found, cx: &mut Context<Self>) -> impl IntoElement {
+        let muted = cx.theme().muted_foreground;
+        // Only the ones added here can be removed here (not ones from `TSE_PROFILE_DIRS`).
+        let added = crate::settings::get(cx).profile_dirs;
+        let row = |index: usize, folder: &SearchedFolder, cx: &mut Context<Self>| {
+            let name = match folder.source {
+                Source::Added => t!(cx, "start-folder-added"),
+                Source::Steam | Source::Documents => labels::location(cx, folder.location),
+            };
+            let (status, has_profiles) = if !folder.is_there {
+                (t!(cx, "start-folder-missing"), false)
+            } else if folder.profiles == 0 {
+                (t!(cx, "start-folder-empty"), false)
+            } else {
+                (
+                    t!(cx, "start-folder-profiles", count = folder.profiles),
+                    true,
+                )
+            };
+            let dir = folder.dir.clone();
+            folder_row(
+                has_profiles,
+                name,
+                status,
+                Some(path_text(&folder.dir, cx).into_any_element()),
+                cx,
+            )
+            .when(folder.is_there, |row| {
+                row.child(show_folder_button(("show-folder", index), dir.clone(), cx))
+            })
+            .when(added.contains(&folder.dir), |row| {
+                let dir = dir.clone();
+                row.child(
+                    Button::new(("remove-folder", index))
+                        .ghost()
+                        .xsmall()
+                        .icon(Icon::new(IconName::Close))
+                        .tooltip(t!(cx, "start-folder-remove"))
+                        .accessibility_label(t!(cx, "start-folder-remove"))
+                        .on_click(
+                            cx.listener(move |this, _, _, cx| this.remove_folder(dir.clone(), cx)),
+                        ),
+                )
+            })
+        };
+        let mut rows: Vec<gpui_kit::AnyElement> = Vec::new();
+        if !found.has_steam {
+            rows.push(
+                folder_row(
+                    false,
+                    t!(cx, "location-steam-cloud"),
+                    t!(cx, "start-folder-no-steam"),
+                    None,
+                    cx,
+                )
+                .into_any_element(),
+            );
+        }
+        // With saves found, folders that aren't there are only noise (another Steam account on
+        // this PC, say), so they fold into one line; with none found, each one is part of the
+        // answer.
+        let folds_missing = !found.profiles.is_empty() && !self.shows_missing_folders;
+        let mut missing = 0;
+        for (index, folder) in found.folders.iter().enumerate() {
+            if folds_missing && !folder.is_there && !added.contains(&folder.dir) {
+                missing += 1;
+                continue;
+            }
+            rows.push(row(index, folder, cx).into_any_element());
+        }
+        if missing > 0 || (self.shows_missing_folders && !found.profiles.is_empty()) {
+            let label = if missing > 0 {
+                t!(cx, "start-folders-missing", count = missing)
+            } else {
+                t!(cx, "start-folders-missing-hide")
+            };
+            rows.push(
+                h_flex()
+                    .px_1()
+                    .child(
+                        Button::new("missing-folders")
+                            .ghost()
+                            .xsmall()
+                            .icon(Icon::new(if missing > 0 {
+                                IconName::ChevronDown
+                            } else {
+                                IconName::ChevronUp
+                            }))
+                            .label(label)
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.shows_missing_folders = !this.shows_missing_folders;
+                                cx.notify();
+                            })),
+                    )
+                    .into_any_element(),
+            );
+        }
+
+        v_flex()
+            .gap_3()
+            .child(
+                h_flex()
+                    .px_3()
+                    .gap_2()
+                    .justify_between()
+                    .items_center()
+                    .child(
+                        div()
+                            .text_xs()
+                            .font_medium()
+                            .text_color(muted)
+                            .child(t!(cx, "start-folders")),
+                    )
+                    .child(
+                        Button::new("look-again")
+                            .ghost()
+                            .xsmall()
+                            .icon(Icon::new(IconName::RefreshCw))
+                            .label(t!(cx, "start-look-again"))
+                            .on_click(cx.listener(|this, _, _, cx| this.search(cx))),
+                    ),
+            )
+            .child(
+                div()
+                    .px_3()
+                    .text_xs()
+                    .text_color(muted)
+                    .child(t!(cx, "start-folders-description")),
+            )
+            .child(v_flex().gap_1().children(rows))
+            .child(
+                h_flex()
+                    .px_3()
+                    .gap_3()
+                    .flex_wrap()
+                    .items_center()
+                    .child(
+                        Button::new("add-folder")
+                            .outline()
+                            .small()
+                            .icon(Icon::new(IconName::FolderOpen))
+                            .label(t!(cx, "start-folder-add"))
+                            .on_click(cx.listener(|this, _, _, cx| this.choose_folder(cx))),
+                    )
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(muted)
+                            .child(t!(cx, "start-folder-drop")),
+                    ),
+            )
+            .children(self.add_problem.clone().map(|problem| {
+                div()
+                    .px_3()
+                    .text_sm()
+                    .text_color(cx.theme().danger)
+                    .child(problem)
+            }))
     }
 
     fn render_slots(
@@ -190,21 +557,35 @@ impl OpenSavePage {
         slots: &[Slot],
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
-        let (own, game_made): (Vec<&Slot>, Vec<&Slot>) =
+        let (own, mut game_made): (Vec<&Slot>, Vec<&Slot>) =
             slots.iter().partition(|slot| slot.kind.is_manual());
+        // The game keeps dozens of autosaves; the newest few are the ones worth going back to,
+        // and the rest would push everything after them far down.
+        let hidden = if self.shows_all_game_saves {
+            0
+        } else {
+            game_made.len().saturating_sub(GAME_SAVES_SHOWN)
+        };
+        game_made.truncate(game_made.len() - hidden);
+        let can_fold = self.shows_all_game_saves && game_made.len() > GAME_SAVES_SHOWN;
         let currency = profile.game.currency_symbol();
 
-        let group = |title: SharedString, slots: Vec<&Slot>, cx: &mut Context<Self>| {
+        let group = |title: SharedString,
+                     hint: Option<SharedString>,
+                     slots: Vec<&Slot>,
+                     cx: &mut Context<Self>| {
             v_flex()
                 .gap_1()
                 .child(
-                    div()
+                    h_flex()
                         .px_3()
                         .pb_1()
+                        .gap_2()
+                        .flex_wrap()
                         .text_xs()
-                        .font_medium()
                         .text_color(cx.theme().muted_foreground)
-                        .child(title),
+                        .child(div().font_medium().child(title))
+                        .children(hint),
                 )
                 .children(slots.into_iter().map(|slot| {
                     let detail = {
@@ -321,10 +702,39 @@ impl OpenSavePage {
         v_flex()
             .gap_6()
             .when(!own.is_empty(), |this| {
-                this.child(group(t!(cx, "start-your-saves"), own, cx))
+                this.child(group(t!(cx, "start-your-saves"), None, own, cx))
             })
             .when(!game_made.is_empty(), |this| {
-                this.child(group(t!(cx, "start-game-saves"), game_made, cx))
+                this.child(group(
+                    t!(cx, "start-game-saves"),
+                    Some(t!(cx, "start-game-saves-hint")),
+                    game_made,
+                    cx,
+                ))
+            })
+            .when(hidden > 0 || can_fold, |this| {
+                let label = if hidden > 0 {
+                    t!(cx, "start-game-saves-more", count = hidden)
+                } else {
+                    t!(cx, "start-game-saves-fewer")
+                };
+                this.child(
+                    h_flex().px_1().mt(rems(-1.)).child(
+                        Button::new("more-game-saves")
+                            .ghost()
+                            .small()
+                            .icon(Icon::new(if hidden > 0 {
+                                IconName::ChevronDown
+                            } else {
+                                IconName::ChevronUp
+                            }))
+                            .label(label)
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.shows_all_game_saves = !this.shows_all_game_saves;
+                                cx.notify();
+                            })),
+                    ),
+                )
             })
     }
 }
@@ -369,31 +779,42 @@ impl Render for OpenSavePage {
 
         let body = match &self.found {
             None => h_flex()
+                .px_3()
                 .gap_2()
                 .text_sm()
                 .text_color(cx.theme().muted_foreground)
                 .child(Spinner::new().small())
                 .child(t!(cx, "start-looking"))
                 .into_any_element(),
-            Some(profiles) if profiles.is_empty() => v_flex()
-                .px_3()
-                .gap_3()
-                .items_start()
-                .child(div().font_medium().child(t!(cx, "start-none-title")))
+            Some(found) if found.profiles.is_empty() => v_flex()
+                .gap_8()
                 .child(
-                    div()
-                        .text_sm()
-                        .text_color(cx.theme().muted_foreground)
-                        .child(t!(cx, "start-none-body")),
+                    v_flex()
+                        .px_3()
+                        .gap_2()
+                        .child(div().font_medium().child(t!(cx, "start-none-title")))
+                        .child(
+                            div()
+                                .text_sm()
+                                .text_color(cx.theme().muted_foreground)
+                                .child(t!(cx, "start-none-body")),
+                        )
+                        // Still stuck: a way to say so.
+                        .child(
+                            h_flex().child(
+                                Button::new("start-report")
+                                    .ghost()
+                                    .small()
+                                    .icon(Icon::new(IconName::ExternalLink))
+                                    .label(t!(cx, "report-problem"))
+                                    .on_click(|_, _, cx| crate::report::open(cx, None)),
+                            ),
+                        ),
                 )
-                .child(
-                    Button::new("search-again")
-                        .outline()
-                        .label(t!(cx, "start-look-again"))
-                        .on_click(cx.listener(|this, _, _, cx| this.search(cx))),
-                )
+                .child(self.render_folders(found, cx))
                 .into_any_element(),
-            Some(profiles) => {
+            Some(found) => {
+                let profiles = &found.profiles;
                 let selected = self.selected_profile.min(profiles.len() - 1);
                 let (profile, slots) = &profiles[selected];
                 let tools_profile = profile.clone();
@@ -402,34 +823,45 @@ impl Render for OpenSavePage {
                     .map(|(profile, _)| profile.clone())
                     .collect();
                 let start = cx.entity().downgrade();
+                let tools = Button::new("profile-tools")
+                    .ghost()
+                    .small()
+                    .icon(Icon::new(IconName::User))
+                    .label(t!(cx, "profile-tools-open"))
+                    .on_click(move |_, window, cx| {
+                        crate::pages::profile_tools::open(
+                            tools_profile.clone(),
+                            all_profiles.clone(),
+                            start.clone(),
+                            window,
+                            cx,
+                        )
+                    });
+                // What's shown (or that there's nothing yet), with the tools for that profile.
+                let about = if slots.is_empty() {
+                    self.render_empty_profile(profile, cx).into_any_element()
+                } else {
+                    self.render_summary(profile, slots, cx).into_any_element()
+                };
                 v_flex()
                     .gap_6()
+                    .when(profiles.len() > 1, |this| {
+                        this.child(div().px_3().child(self.render_profiles(profiles, cx)))
+                    })
                     .child(
                         h_flex()
                             .px_3()
-                            .gap_3()
-                            .flex_wrap()
+                            .gap_4()
                             .justify_between()
-                            .items_center()
-                            .child(self.render_profiles(profiles, cx))
-                            .child(
-                                Button::new("profile-tools")
-                                    .ghost()
-                                    .small()
-                                    .icon(Icon::new(IconName::User))
-                                    .label(t!(cx, "profile-tools-open"))
-                                    .on_click(move |_, window, cx| {
-                                        crate::pages::profile_tools::open(
-                                            tools_profile.clone(),
-                                            all_profiles.clone(),
-                                            start.clone(),
-                                            window,
-                                            cx,
-                                        )
-                                    }),
-                            ),
+                            .items_start()
+                            .child(div().flex_1().min_w_0().child(about))
+                            .child(tools),
                     )
-                    .child(self.render_slots(profile, slots, cx))
+                    .when(!slots.is_empty(), |this| {
+                        this.child(self.render_slots(profile, slots, cx))
+                    })
+                    .child(div().mx_3().h_px().bg(cx.theme().border))
+                    .child(self.render_folders(found, cx))
                     .into_any_element()
             }
         };
@@ -437,6 +869,11 @@ impl Render for OpenSavePage {
         div()
             .id("open-save-scroll")
             .size_full()
+            // A folder with saves dropped anywhere on the window is added.
+            .drag_over::<ExternalPaths>(|style, _, _, cx| style.bg(cx.theme().secondary))
+            .on_drop(cx.listener(|this, paths: &ExternalPaths, _, cx| {
+                this.add_folders(paths.paths().to_vec(), cx)
+            }))
             .overflow_y_scroll()
             .bg(cx.theme().background)
             .text_color(cx.theme().foreground)
@@ -499,5 +936,147 @@ fn thumbnail(preview: Option<Arc<RenderImage>>, cx: &Context<OpenSavePage>) -> i
             .justify_center()
             .text_color(cx.theme().muted_foreground)
             .child(Icon::new(IconName::Truck).small()),
+    }
+}
+
+/// A path as the start screen shows it: small, in the code font, wrapping where it must.
+fn path_text(path: &std::path::Path, cx: &Context<OpenSavePage>) -> impl IntoElement {
+    div()
+        .min_w_0()
+        .text_xs()
+        .font_family(cx.theme().mono_font_family.clone())
+        .text_color(cx.theme().muted_foreground)
+        .child(path.to_string_lossy().into_owned())
+}
+
+/// Opens a folder in the system's file manager.
+fn show_folder_button(
+    id: impl Into<gpui_kit::ElementId>,
+    dir: PathBuf,
+    cx: &Context<OpenSavePage>,
+) -> Button {
+    Button::new(id)
+        .ghost()
+        .xsmall()
+        .icon(Icon::new(IconName::FolderOpen))
+        .tooltip(t!(cx, "start-folder-show"))
+        .accessibility_label(t!(cx, "start-folder-show"))
+        .on_click(move |_, _, cx| cx.reveal_path(&dir))
+}
+
+/// One place looked in: whether it held profiles (a check, or a dash), its name, what was there,
+/// and its path. Buttons go after, as children.
+fn folder_row(
+    has_profiles: bool,
+    name: SharedString,
+    status: SharedString,
+    path: Option<gpui_kit::AnyElement>,
+    cx: &Context<OpenSavePage>,
+) -> gpui_kit::Div {
+    let muted = cx.theme().muted_foreground;
+    h_flex()
+        .px_3()
+        .py_1()
+        .gap_3()
+        .items_start()
+        .child(
+            div().pt(rems(0.125)).child(
+                Icon::new(if has_profiles {
+                    IconName::CircleCheck
+                } else {
+                    IconName::Dash
+                })
+                .small()
+                .text_color(if has_profiles {
+                    cx.theme().success
+                } else {
+                    muted
+                }),
+            ),
+        )
+        .child(
+            v_flex()
+                .flex_1()
+                .min_w_0()
+                .child(
+                    h_flex()
+                        .gap_2()
+                        .flex_wrap()
+                        .text_sm()
+                        .child(div().font_medium().child(name))
+                        .child(div().text_color(muted).child(status)),
+                )
+                .children(path),
+        )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gpui_kit::TestAppContext;
+
+    /// A made-up profile folder with one save, in the system's temporary folder.
+    struct Scratch(PathBuf);
+
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[gpui_kit::test]
+    fn adds_the_folder_a_save_is_in_and_lands_on_its_profile(cx: &mut TestAppContext) {
+        let scratch =
+            Scratch(std::env::temp_dir().join(format!("tse-start-{}", std::process::id())));
+        let root = scratch.0.join("profiles");
+        let profile = root.join("416E6E61");
+        let slot = profile.join("save").join("2");
+        std::fs::create_dir_all(&slot).expect("makes the slot");
+        std::fs::write(slot.join("game.sii"), "").expect("writes a save");
+
+        cx.update(|cx| {
+            gpui_kit::init(cx);
+            crate::i18n::init(cx);
+        });
+        let page = cx.update(|cx| cx.new(OpenSavePage::new));
+        cx.run_until_parked();
+
+        // Something that isn't saves: said so, nothing added.
+        let elsewhere = scratch.0.join("elsewhere");
+        std::fs::create_dir_all(&elsewhere).expect("makes a folder");
+        page.update(cx, |page, cx| page.add_folders(vec![elsewhere], cx));
+        cx.run_until_parked();
+        cx.update(|cx| {
+            assert!(page.read(cx).add_problem.is_some());
+            assert!(crate::settings::get(cx).profile_dirs.is_empty());
+        });
+
+        // One save, chosen: its profiles folder is added, and its profile shown.
+        page.update(cx, |page, cx| page.add_folders(vec![slot.clone()], cx));
+        cx.run_until_parked();
+        cx.update(|cx| {
+            assert_eq!(
+                crate::settings::get(cx).profile_dirs,
+                std::slice::from_ref(&root)
+            );
+            let page = page.read(cx);
+            assert!(page.add_problem.is_none());
+            let found = page.found.as_ref().expect("looked");
+            let (shown, slots) = &found.profiles[page.selected_profile];
+            assert_eq!(shown.name, "Anna");
+            assert_eq!(slots.len(), 1);
+            assert!(found.folders.iter().any(|folder| folder.dir == root
+                && folder.source == Source::Added
+                && folder.profiles == 1));
+        });
+
+        // Removed again: no longer looked in.
+        page.update(cx, |page, cx| page.remove_folder(root.clone(), cx));
+        cx.run_until_parked();
+        cx.update(|cx| {
+            assert!(crate::settings::get(cx).profile_dirs.is_empty());
+            let found = page.read(cx).found.as_ref().expect("looked");
+            assert!(!found.folders.iter().any(|folder| folder.dir == root));
+        });
     }
 }

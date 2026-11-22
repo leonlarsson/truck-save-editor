@@ -43,6 +43,9 @@ pub struct Settings {
     pub appearance: Appearance,
     /// The game's folder, when the player picked it (otherwise it's found through Steam).
     pub game_dir: Option<PathBuf>,
+    /// Folders of profiles the player added on the start screen, looked in as well as the usual
+    /// places.
+    pub profile_dirs: Vec<PathBuf>,
     /// Whether to ask GitHub for the latest version when the editor starts (`updates.rs`).
     pub check_for_updates: bool,
 }
@@ -53,6 +56,7 @@ impl Default for Settings {
             language: Language::default(),
             appearance: Appearance::default(),
             game_dir: None,
+            profile_dirs: Vec::new(),
             // On unless turned off: a game update can need a new version of the editor.
             check_for_updates: true,
         }
@@ -82,6 +86,10 @@ impl Settings {
                     }
                 }
                 "game_dir" if !value.is_empty() => settings.game_dir = Some(PathBuf::from(value)),
+                // One line for each folder (a path can hold any separator a list would use).
+                "profile_dir" if !value.is_empty() => {
+                    settings.profile_dirs.push(PathBuf::from(value))
+                }
                 "check_for_updates" => settings.check_for_updates = value != "false",
                 _ => {}
             }
@@ -95,8 +103,13 @@ impl Settings {
             .as_ref()
             .map(|dir| dir.to_string_lossy().into_owned())
             .unwrap_or_default();
+        let profile_dirs: String = self
+            .profile_dirs
+            .iter()
+            .map(|dir| format!("profile_dir = {}\n", dir.to_string_lossy()))
+            .collect();
         format!(
-            "language = {}\nappearance = {}\ngame_dir = {game_dir}\ncheck_for_updates = {}\n",
+            "language = {}\nappearance = {}\ngame_dir = {game_dir}\n{profile_dirs}check_for_updates = {}\n",
             self.language.code(),
             self.appearance.code(),
             self.check_for_updates
@@ -105,6 +118,10 @@ impl Settings {
 }
 
 fn file() -> Option<PathBuf> {
+    // Tests keep their settings in memory, never touching the developer's own.
+    if cfg!(test) {
+        return None;
+    }
     Some(dirs::config_dir()?.join(APP_NAME).join("settings.txt"))
 }
 
@@ -148,6 +165,10 @@ mod tests {
             language: Language::Swedish,
             appearance: Appearance::Dark,
             game_dir: Some(PathBuf::from("/games/ets2")),
+            profile_dirs: vec![
+                PathBuf::from("D:/saves; and more/profiles"),
+                PathBuf::from("/backup/profiles"),
+            ],
             check_for_updates: false,
         };
         assert_eq!(Settings::parse(&settings.to_text()), settings);

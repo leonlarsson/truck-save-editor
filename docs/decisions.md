@@ -220,3 +220,19 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** researching how to make a new save the game loads: a local profile lists any slot folder on disk, but a Steam Cloud profile lists only files Steam knows (`remotecache.vdf`), and Steam learns of files only when the game writes them. So in the cloud the editor can't create a save, but it can fill one the game made: the player saves to a new slot in the game (or uses one they don't need), then saves over it here. A local copy of the whole profile (Profile tools) is the other way.
 
 **Considered:** adding entries to `remotecache.vdf` (Steam's own bookkeeping, undocumented, and a wrong entry could make Steam delete or overwrite saves); building a save from nothing (a new career needs the game's own starting state, which only the game writes).
+
+## 2026-11-22: The start screen says where saves come from; folders can be added
+
+**Decided:** the start screen says which profile's saves it shows, how many, and where they're kept (Steam Cloud or this PC), with Show the folder. Below the saves, it lists every folder it looked in (Steam's cloud folder for each Steam account, the game's folders in Documents, folders added) and what each held; with saves found, folders that aren't there fold into one line. Profiles without saves are listed and say how to make one. A folder can be added by choosing it or dropping it on the window: a profiles folder, a profile, one save or the game's folder in Documents all work out to the profiles folder around them. Added folders are kept in `settings.txt` (one `profile_dir =` line each) and searched for ETS2 unless their path names ATS. The game's own saves show the newest three, with Show more.
+
+**Why:** a list alone doesn't help when it's empty or missing a save: the player can't tell whether the editor looked in the wrong place, the game keeps the profile somewhere else, or there's nothing yet. Saying where it looked turns "No saves found" into something to act on, and adding a folder covers backups, other drives and unusual setups without a settings page. Dozens of autosaves pushed everything else far down.
+
+**Considered:** a settings section for folders (the start screen is where the problem shows); asking for a single save file to open (the editor works on profiles: backups, Save as and Profile tools need the folders around a save).
+
+## 2026-11-22: Reporting a problem opens a filled-in GitHub issue
+
+**Decided:** Report a problem (Settings → About, the palette, the no-saves screen) and Report this problem (on error messages the player can't fix) open a new GitHub issue in the browser, with a short template, the editor's version, the system, the language and, from an error message, the error. Nothing is sent from the editor. The issue text is English and lives in `report.rs`, not the locale files, since it's written for the people fixing it.
+
+**Why:** the editor already uses no account and sends nothing; a prefilled link keeps that, and puts what's needed to reproduce a problem in front of the player to check (an error can name a file) before they post it.
+
+**Considered:** sending reports from the editor (needs a server and consent, and would send data); an issue form template (its fields can't be filled from a link the same way).

@@ -13,10 +13,47 @@
 start-choose = Wähle einen Spielstand zum Bearbeiten
 start-looking = Suche nach deinen Spielständen…
 start-none-title = Keine Spielstände gefunden
-start-none-body = Gesucht wird in Steam Cloud und in Dokumente\Euro Truck Simulator 2\profiles. Speichere einmal im Spiel und suche dann erneut.
+start-none-body = An keinem der Orte unten gibt es ein Profil des Spiels. Wenn du auf diesem PC spielst, starte das Spiel und speichere einmal: Die Liste wird aktualisiert, wenn du zu diesem Fenster zurückkehrst. Liegen deine Spielstände woanders, etwa in einer Sicherung oder auf einem anderen Laufwerk, füge diesen Ordner hinzu.
 start-look-again = Erneut suchen
 start-your-saves = Deine Spielstände
 start-game-saves = Vom Spiel gespeichert
+start-game-saves-hint = Automatische und Schnellspeicherungen. Das Spiel ersetzt sie beim Spielen.
+start-game-saves-more = { $count ->
+    [one] Einen weiteren anzeigen
+   *[other] { $count } weitere anzeigen
+}
+start-game-saves-fewer = Weniger anzeigen
+start-showing-cloud = { $count ->
+    [one] Ein Spielstand in „{ $name }“, in Steam Cloud gespeichert und damit auf jedem PC gleich, auf dem du spielst.
+   *[other] { $count } Spielstände in „{ $name }“, in Steam Cloud gespeichert und damit auf jedem PC gleich, auf dem du spielst.
+}
+start-showing-local = { $count ->
+    [one] Ein Spielstand in „{ $name }“, nur auf diesem PC.
+   *[other] { $count } Spielstände in „{ $name }“, nur auf diesem PC.
+}
+start-profile-empty-title = Noch keine Spielstände in „{ $name }“
+start-profile-empty-body = Speichere einmal im Spiel, dann erscheint der Spielstand hier. Die Liste wird aktualisiert, wenn du zu diesem Fenster zurückkehrst.
+start-folders = Wo nach Spielständen gesucht wird
+start-folders-description = Das Spiel speichert jedes Profil in Steam Cloud oder auf diesem PC, je nach den Profileinstellungen im Spiel.
+start-folders-missing = { $count ->
+    [one] Auch in einem Ordner gesucht, den es auf diesem PC nicht gibt
+   *[other] Auch in { $count } Ordnern gesucht, die es auf diesem PC nicht gibt
+}
+start-folders-missing-hide = Nicht vorhandene Ordner ausblenden
+start-folder-added = Von dir hinzugefügt
+start-folder-profiles = { $count ->
+    [one] Ein Profil
+   *[other] { $count } Profile
+}
+start-folder-empty = Keine Profile
+start-folder-missing = Nicht vorhanden
+start-folder-no-steam = Steam wurde auf diesem PC nicht gefunden
+start-folder-show = Ordner anzeigen
+start-folder-remove = Hier nicht mehr suchen
+start-folder-add = Ordner hinzufügen…
+start-folder-drop = Oder zieh einen Spielstand- oder Profilordner auf dieses Fenster.
+start-folder-choose = Wähle einen Ordner mit Spielständen
+start-folder-not-saves = Keine Spielstände oder Profile in { $path }. Wähle den Ordner „profiles“ des Spiels, den Ordner eines Profils oder eines Spielstands.
 start-slot-missing = { $count ->
     [one] Braucht einen DLC oder Mod, der nicht installiert ist
    *[other] Braucht { $count } DLCs oder Mods, die nicht installiert sind
@@ -314,6 +351,10 @@ palette-buy-all-garages = Alle Garagen kaufen, alle groß
 palette-upgrade-owned-garages = Eigene Garagen groß ausbauen
 palette-discard = Änderungen verwerfen
 palette-theme = Hellen oder dunklen Modus wechseln
+report-problem = Problem melden…
+report-this = Dieses Problem melden
+report-description = Öffnet ein neues Issue auf GitHub in deinem Browser, mit der Version des Editors schon ausgefüllt. Gesendet wird erst, wenn du es veröffentlichst.
+palette-report = Problem auf GitHub melden
 
 ## Backups
 
@@ -351,10 +392,6 @@ coach-experience = Reisebus-Erfahrung
 coach-experience-description = Reisebusfahren ist eine eigene Karriere.
 coach-experience-label = Reisebus-Erfahrungspunkte
 experience-unit = XP
-report-problem = Problem melden…
-report-this = Dieses Problem melden
-report-description = Öffnet ein neues Issue auf GitHub in deinem Browser, mit der Version des Editors schon ausgefüllt. Gesendet wird erst, wenn du es veröffentlichst.
-palette-report = Problem auf GitHub melden
 experience-amount = { $amount } XP
 skills = Lkw-Fähigkeiten
 level-number = Level { $level }

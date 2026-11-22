@@ -26,12 +26,16 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [ ] In game: Drive it yourself, Take me to a city, Take me to headquarters, another save's spot. The trips rely on schedule_quick_travel and schedule_transfer_to_hq doing what their names say.
 - [x] Make another trailer your own (Pull it yourself, 2026-11-22; not tried in game yet).
 - [ ] In game: Your day (Rest, Clear the record, Repair the cargo, the clock buttons), Pull it yourself (2026-11-22, not tried in game yet).
+- [ ] Report a problem: Settings → About, the palette, the no-saves screen, and the button on error messages open a filled-in GitHub issue (2026-11-22, check on Windows that the browser opens with the text).
 - [ ] In game: picked rows (bulk Repair, Fill the tanks, Move to garage, Remove, Max their skills, Make them large) and Save over another… on a Steam Cloud profile (2026-11-22, not tried in game yet).
 
 ## 4. Picking a save
 
 - [x] Find Steam Cloud and local profiles; decode profile names; list slots with preview image, date, money and level from `info.sii`.
 - [x] Load in the background with progress.
+- [x] Say what's shown and where from: the profile's saves, where they're kept and their folder; every folder looked in and what it held; the game's own saves folded to the newest three (2026-11-22).
+- [x] No saves, or a profile without saves: say what to do. Add a folder (chosen or dropped on the window: a profiles folder, a profile, one save, or the game's folder in Documents), kept in the settings (2026-11-22).
+- [ ] On Windows: Add a folder… and dropping a folder on the window (the dialog and drag and drop only run for real there), and Show the folder opening Explorer.
 
 ## 5. Overview
 

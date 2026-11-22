@@ -78,8 +78,9 @@ pub use profile_tools::{
 pub use profiles::documents_dirs;
 #[cfg(feature = "native")]
 pub use profiles::{
-    Location, PROFILE_DIRS_VARIABLE, Profile, Slot, SlotKind, decode_profile_folder, find_profiles,
-    profile_slots,
+    Location, PROFILE_DIRS_ONLY_VARIABLE, PROFILE_DIRS_VARIABLE, Profile, Search, SearchedFolder,
+    Slot, SlotKind, Source, decode_profile_folder, find_profiles, profile_folders_at,
+    profile_slots, search,
 };
 pub use removals::{Removal, RemoveProblem, can_remove, discovered_roads, forget_roads, remove};
 pub use requirements::{Requirement, RequirementKind, parse_requirement, requirements};

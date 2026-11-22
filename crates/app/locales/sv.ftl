@@ -9,10 +9,47 @@
 start-choose = Välj en sparfil att redigera
 start-looking = Letar efter dina sparfiler…
 start-none-title = Inga sparfiler hittades
-start-none-body = Sparfiler letas efter i Steam Cloud och i Dokument\Euro Truck Simulator 2\profiles. Spara en gång i spelet och leta sedan igen.
+start-none-body = Ingen av platserna nedan har en profil för spelet. Om du spelar på den här datorn: starta spelet och spara en gång, så uppdateras listan när du kommer tillbaka till fönstret. Om dina sparfiler ligger någon annanstans, till exempel i en säkerhetskopia eller på en annan disk, lägg till den mappen.
 start-look-again = Leta igen
 start-your-saves = Dina sparfiler
 start-game-saves = Sparade av spelet
+start-game-saves-hint = Autosparningar och snabbsparningar. Spelet ersätter dem medan du spelar.
+start-game-saves-more = { $count ->
+    [one] Visa en till
+   *[other] Visa { $count } till
+}
+start-game-saves-fewer = Visa färre
+start-showing-cloud = { $count ->
+    [one] En sparfil i ”{ $name }”, i Steam Cloud, så den är likadan på alla datorer du spelar på.
+   *[other] { $count } sparfiler i ”{ $name }”, i Steam Cloud, så de är likadana på alla datorer du spelar på.
+}
+start-showing-local = { $count ->
+    [one] En sparfil i ”{ $name }”, bara på den här datorn.
+   *[other] { $count } sparfiler i ”{ $name }”, bara på den här datorn.
+}
+start-profile-empty-title = Inga sparfiler i ”{ $name }” än
+start-profile-empty-body = Spara en gång i spelet så syns det här. Listan uppdateras när du kommer tillbaka till det här fönstret.
+start-folders = Var sparfiler letas efter
+start-folders-description = Spelet lägger varje profil i Steam Cloud eller på den här datorn, enligt profilens inställningar i spelet.
+start-folders-missing = { $count ->
+    [one] Letade också i en mapp som inte finns på den här datorn
+   *[other] Letade också i { $count } mappar som inte finns på den här datorn
+}
+start-folders-missing-hide = Dölj mapparna som inte finns
+start-folder-added = Tillagd av dig
+start-folder-profiles = { $count ->
+    [one] En profil
+   *[other] { $count } profiler
+}
+start-folder-empty = Inga profiler
+start-folder-missing = Finns inte
+start-folder-no-steam = Steam hittades inte på den här datorn
+start-folder-show = Visa mappen
+start-folder-remove = Sluta leta här
+start-folder-add = Lägg till en mapp…
+start-folder-drop = Eller släpp en sparfils- eller profilmapp på fönstret.
+start-folder-choose = Välj en mapp med sparfiler
+start-folder-not-saves = Inga sparfiler eller profiler i { $path }. Välj spelets profiles-mapp, en profils mapp eller en sparfils.
 start-slot-missing = { $count ->
     [one] Behöver en DLC eller modd som inte är installerad
    *[other] Behöver { $count } DLC:er eller moddar som inte är installerade
@@ -310,6 +347,10 @@ palette-buy-all-garages = Köp alla garage, alla stora
 palette-upgrade-owned-garages = Gör egna garage stora
 palette-discard = Kasta bort ändringarna
 palette-theme = Byt mellan ljust och mörkt läge
+report-problem = Rapportera ett problem…
+report-this = Rapportera problemet
+report-description = Öppnar ett nytt ärende på GitHub i webbläsaren, med redigerarens version ifylld. Inget skickas förrän du publicerar det.
+palette-report = Rapportera ett problem på GitHub
 
 ## Backups
 
@@ -347,10 +388,6 @@ coach-experience = Busserfarenhet
 coach-experience-description = Bussarna är en egen karriär.
 coach-experience-label = Erfarenhetspoäng som busschaufför
 experience-unit = XP
-report-problem = Rapportera ett problem…
-report-this = Rapportera problemet
-report-description = Öppnar ett nytt ärende på GitHub i webbläsaren, med redigerarens version ifylld. Inget skickas förrän du publicerar det.
-palette-report = Rapportera ett problem på GitHub
 experience-amount = { $amount } XP
 skills = Lastbilsfärdigheter
 level-number = Nivå { $level }
