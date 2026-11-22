@@ -50,6 +50,7 @@ start-folder-add = Add a folder…
 start-folder-drop = Or drop a save or profile folder on this window.
 start-folder-choose = Choose a folder with saves
 start-folder-not-saves = No saves or profiles in { $path }. Choose the game's profiles folder, one profile's folder, or one save's.
+start-folder-loose-save = { $path } is a save on its own, outside a profile. The editor works on saves in a profile (for backups and Save as): put the folder in a profile's save folder, or add the whole profile.
 start-slot-missing = { $count ->
     [one] Needs a DLC or mod that isn't installed
    *[other] Needs { $count } DLCs or mods that aren't installed

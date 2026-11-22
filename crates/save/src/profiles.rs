@@ -199,17 +199,21 @@ fn is_profile(dir: &Path) -> bool {
 /// one around it when it's a profile or one save in a profile, or the `profiles` folders in it
 /// when it's the game's own folder in Documents. Empty when there are no profiles there.
 pub fn profile_folders_at(chosen: &Path) -> Vec<PathBuf> {
-    // One save (`…\profiles\<profile>\save\<slot>`): three folders up.
-    if chosen.join("game.sii").is_file()
-        && let Some(root) = chosen
+    // One save in a profile (`…\profiles\<profile>\save\<slot>`): three folders up. A save
+    // on its own (copied to the desktop, say) is no profile's (`is_loose_save`).
+    if chosen.join("game.sii").is_file() {
+        let profile = chosen
             .parent()
+            .filter(|save| is_save_folder(save))
             .and_then(Path::parent)
+            .filter(|profile| is_profile(profile));
+        return profile
             .and_then(Path::parent)
-    {
-        return vec![root.to_path_buf()];
+            .map(|root| vec![root.to_path_buf()])
+            .unwrap_or_default();
     }
     // A profile's `save` folder.
-    if chosen.file_name().is_some_and(|name| name == "save")
+    if is_save_folder(chosen)
         && let Some(profile) = chosen.parent()
         && is_profile(profile)
         && let Some(root) = profile.parent()
@@ -237,6 +241,36 @@ pub fn profile_folders_at(chosen: &Path) -> Vec<PathBuf> {
                 .is_ok_and(|entries| entries.flatten().any(|entry| is_profile(&entry.path())))
         })
         .collect()
+}
+
+/// Whether a chosen folder is one save on its own, outside a profile's `save` folder: the editor
+/// works on profiles (backups, Save as, the company name), so it can't be added.
+pub fn is_loose_save(chosen: &Path) -> bool {
+    chosen.join("game.sii").is_file() && profile_folders_at(chosen).is_empty()
+}
+
+fn is_save_folder(dir: &Path) -> bool {
+    dir.file_name()
+        .is_some_and(|name| name.eq_ignore_ascii_case("save"))
+}
+
+/// A path as Windows writes it, for showing and for Explorer: Steam's registry entry says
+/// `c:/program files (x86)/steam`, which Explorer won't open. Resolved on disk (so in the folders'
+/// own case, with backslashes), without the `\\?\` prefix that resolving adds. Elsewhere, as it
+/// is.
+pub fn plain_path(path: &Path) -> PathBuf {
+    if !cfg!(windows) {
+        return path.to_path_buf();
+    }
+    let Ok(resolved) = std::fs::canonicalize(path) else {
+        return PathBuf::from(path.to_string_lossy().replace('/', "\\"));
+    };
+    let text = resolved.to_string_lossy();
+    match text.strip_prefix(r"\\?\") {
+        // Only a plain drive path (`C:\…`); a network one (`UNC\…`) needs the prefix.
+        Some(rest) if rest.as_bytes().get(1) == Some(&b':') => PathBuf::from(rest),
+        _ => resolved,
+    }
 }
 
 /// Which game a folder of profiles is for, by its path: under `American Truck Simulator` (in
@@ -430,6 +464,7 @@ fn steam_dirs() -> Vec<PathBuf> {
         }
     }
     dirs.retain(|dir| dir.is_dir());
+    let mut dirs: Vec<PathBuf> = dirs.iter().map(|dir| plain_path(dir)).collect();
     dirs.sort_by_key(|dir| same_place_key(dir));
     dirs.dedup_by(|a, b| same_place_key(a) == same_place_key(b));
     dirs
@@ -530,6 +565,13 @@ mod tests {
             );
         }
         assert!(profile_folders_at(&scratch.0).is_empty());
+        assert!(!is_loose_save(&slot));
+        // A save copied out on its own (to the desktop, say): no profile around it.
+        let loose = scratch.0.join("desktop").join("13");
+        std::fs::create_dir_all(&loose).expect("makes the loose save");
+        std::fs::write(loose.join("game.sii"), "").expect("writes a save");
+        assert!(profile_folders_at(&loose).is_empty());
+        assert!(is_loose_save(&loose));
         assert!(profile_folders_at(&scratch.0.join("not there")).is_empty());
 
         let mut found = profiles_in(Game::Ets2, &root, Location::Local);

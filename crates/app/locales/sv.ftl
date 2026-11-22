@@ -50,6 +50,7 @@ start-folder-add = Lägg till en mapp…
 start-folder-drop = Eller släpp en sparfils- eller profilmapp på fönstret.
 start-folder-choose = Välj en mapp med sparfiler
 start-folder-not-saves = Inga sparfiler eller profiler i { $path }. Välj spelets profiles-mapp, en profils mapp eller en sparfils.
+start-folder-loose-save = { $path } är en ensam sparfil, utanför en profil. Redigeraren arbetar med sparfiler i en profil (för säkerhetskopior och Spara som): lägg mappen i en profils save-mapp, eller lägg till hela profilen.
 start-slot-missing = { $count ->
     [one] Behöver en DLC eller modd som inte är installerad
    *[other] Behöver { $count } DLC:er eller moddar som inte är installerade

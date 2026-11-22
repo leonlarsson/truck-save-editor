@@ -80,7 +80,8 @@ fn steam_dirs() -> Vec<PathBuf> {
         }
     }
     dirs.retain(|dir| dir.is_dir());
-    dirs
+    // Steam's registry entry is written `c:/program files (x86)/steam`: as Windows writes paths.
+    dirs.iter().map(|dir| save::plain_path(dir)).collect()
 }
 
 #[cfg(test)]

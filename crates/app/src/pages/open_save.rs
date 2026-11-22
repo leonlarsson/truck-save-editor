@@ -219,7 +219,7 @@ impl OpenSavePage {
             return;
         };
         cx.spawn(async move |this, cx| {
-            let (chosen, roots) = cx
+            let (chosen, roots, is_loose) = cx
                 .background_spawn(async move {
                     // A dropped file (a `game.sii`, say): the folder it's in.
                     let dir = if chosen.is_file() {
@@ -228,16 +228,18 @@ impl OpenSavePage {
                         chosen
                     };
                     let roots = save::profile_folders_at(&dir);
-                    (dir, roots)
+                    let is_loose = save::is_loose_save(&dir);
+                    (dir, roots, is_loose)
                 })
                 .await;
             let _ = this.update(cx, |this, cx| {
                 if roots.is_empty() {
-                    this.add_problem = Some(t!(
-                        cx,
-                        "start-folder-not-saves",
-                        path = chosen.to_string_lossy().into_owned()
-                    ));
+                    let path = chosen.to_string_lossy().into_owned();
+                    this.add_problem = Some(if is_loose {
+                        t!(cx, "start-folder-loose-save", path = path)
+                    } else {
+                        t!(cx, "start-folder-not-saves", path = path)
+                    });
                     cx.notify();
                     return;
                 }
@@ -1057,6 +1059,18 @@ mod tests {
         let elsewhere = scratch.0.join("elsewhere");
         std::fs::create_dir_all(&elsewhere).expect("makes a folder");
         page.update(cx, |page, cx| page.add_folders(vec![elsewhere], cx));
+        cx.run_until_parked();
+        cx.update(|cx| {
+            assert!(page.read(cx).add_problem.is_some());
+            assert!(crate::settings::get(cx).profile_dirs.is_empty());
+        });
+
+        // A save on its own (copied to the desktop): said so, nothing added (not the folders
+        // around it).
+        let loose = scratch.0.join("desktop").join("13");
+        std::fs::create_dir_all(&loose).expect("makes the loose save");
+        std::fs::write(loose.join("game.sii"), "").expect("writes a save");
+        page.update(cx, |page, cx| page.add_folders(vec![loose], cx));
         cx.run_until_parked();
         cx.update(|cx| {
             assert!(page.read(cx).add_problem.is_some());

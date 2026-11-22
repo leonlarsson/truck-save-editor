@@ -54,6 +54,7 @@ start-folder-add = Dodaj folder…
 start-folder-drop = Albo upuść folder zapisu lub profilu na to okno.
 start-folder-choose = Wybierz folder z zapisami
 start-folder-not-saves = Brak zapisów lub profili w folderze: { $path }. Wybierz folder „profiles” gry, folder profilu albo zapisu.
+start-folder-loose-save = Ten folder to pojedynczy zapis poza profilem: { $path }. Edytor pracuje na zapisach w profilu (dla kopii zapasowych i zapisu w nowym slocie): przenieś folder do folderu save profilu albo dodaj cały profil.
 start-slot-missing = { $count ->
     [one] Wymaga DLC lub modyfikacji, której nie zainstalowano
     [few] Wymaga DLC lub modyfikacji, których nie zainstalowano: { $count }

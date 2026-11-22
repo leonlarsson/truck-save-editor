@@ -54,6 +54,7 @@ start-folder-add = Ordner hinzufügen…
 start-folder-drop = Oder zieh einen Spielstand- oder Profilordner auf dieses Fenster.
 start-folder-choose = Wähle einen Ordner mit Spielständen
 start-folder-not-saves = Keine Spielstände oder Profile in { $path }. Wähle den Ordner „profiles“ des Spiels, den Ordner eines Profils oder eines Spielstands.
+start-folder-loose-save = { $path } ist ein einzelner Spielstand außerhalb eines Profils. Der Editor arbeitet mit Spielständen in einem Profil (für Sicherungen und „Als neuen Speicherplatz speichern“): Lege den Ordner in den save-Ordner eines Profils oder füge das ganze Profil hinzu.
 start-slot-missing = { $count ->
     [one] Braucht einen DLC oder Mod, der nicht installiert ist
    *[other] Braucht { $count } DLCs oder Mods, die nicht installiert sind
