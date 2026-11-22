@@ -710,9 +710,12 @@ impl Workspace {
                                 .on_click(|_, window, cx| window.close_dialog(cx)),
                         )
                         .child(
+                            // Off for Steam Cloud: the game lists only saves Steam knows, and
+                            // Steam only knows the ones the game made (the dialog says so).
                             Button::new("save-as-new")
                                 .outline()
                                 .label(t!(cx, "save-as-new-slot"))
+                                .disabled(is_cloud)
                                 .tooltip(t!(cx, "save-as-new-slot-tooltip"))
                                 .on_click(move |_, window, cx| {
                                     window.close_dialog(cx);

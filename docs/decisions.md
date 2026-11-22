@@ -156,3 +156,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** a save editor is a single program with its settings in the user's folder, so an installer adds nothing but a step. The CI build needed `VCRUNTIME140.dll`, which not every PC has. Attestations and checksums are free and let anyone check a download came from this repository, which matters while the .exe is unsigned. Signing isn't free for an individual in Sweden (Microsoft's service takes individuals only in the USA and Canada); SignPath Foundation's free signing for open source is the next step once there's a release to show them.
 
 **Considered:** an MSI or MSIX installer (Start menu entry, winget; possible later, winget also takes portable zips); the bare .exe as the download (the license and notices should travel with it); GitHub's generated notes (they list pull requests, and work here lands on `main` directly); buying a certificate (a few hundred euros a year, and since 2024 even EV certificates build SmartScreen reputation over time like the rest).
+
+## 2026-11-22: Steam Cloud profiles are saved over existing slots only
+
+**Decided:** for a profile in Steam Cloud, the save dialog turns Save as new slot off and says why; saving over an existing slot (backed up first) is the way. To keep a save as it is, the player makes a new save in the game and edits that one.
+
+**Why:** the first in-game check showed the game lists only the save files Steam knows (Steam's `remotecache.vdf`), and Steam only learns of files the game writes. A slot folder the editor made was written correctly but never appeared in the game. Files Steam already knows (an existing slot, `profile.sii`) are picked up when changed and uploaded.
+
+**Considered:** registering new files with Steam through its API (would mean running as the game); telling the player to turn Steam Cloud off for the profile (works, but moves their saves; a choice for them, not a requirement of the editor).

@@ -2,7 +2,7 @@
 
 A save editor for **Euro Truck Simulator 2** and **American Truck Simulator**: fast, safe and pleasant to use.
 
-> **Early development.** It works on real saves, but writing saves hasn't been checked in the game yet. Try it on a copy (Save as new slot) and keep the backups.
+> **Early development.** Saves it writes load in the game (checked with money and experience on game 1.62), but most features haven't been tried in game yet. Try it on a save you made for testing, and keep the backups.
 
 ## What it does
 
@@ -12,7 +12,7 @@ A save editor for **Euro Truck Simulator 2** and **American Truck Simulator**: f
 - **Your company**: every truck and coach (repair them all), every garage (buy them all, upgrade to large), your headquarters, every hired driver (max them all), and moving a truck and its driver to another garage.
 - **Jobs**: the job you're driving (cancel it with no fee, or remove its deadline) and every offer on the market (keep them all a week).
 - **Everything else**: All data shows every unit and value in the save, editable, with checks so a typo can't break the save.
-- **Never lose a save**: every change listed before saving, a backup of the slot before every write (kept outside the game's folders), Save as new slot to leave the original untouched, and no writing while the game is running.
+- **Never lose a save**: every change listed before saving, a backup of the slot before every write (kept outside the game's folders), Save as new slot to leave the original untouched (local profiles; Steam Cloud only shows saves the game made), and no writing while the game is running.
 - **Uses the game's own data** from your install: level tables, rank names, skill limits, city names (Malmö, Kraków), and the skill icons and ADR placards, so it stays right when the game changes.
 - **In English and Swedish**, with the game's own names (cities, cargo, ranks) in the same language, and a Settings page for the language, light or dark, and the game's folder.
 - **Undo and redo** (Ctrl+Z, Ctrl+Shift+Z) for every change, Discard included, Ctrl+S to review and save, a **command palette** (Ctrl+K) for every page and bulk action, and the whole app usable from the keyboard (Ctrl+1…8 for pages, Enter to open a row).

@@ -15,7 +15,8 @@ Agreed work, in order. Each step should end with something the owner can see or 
 
 ## 3. The in-game check
 
-- [ ] Write a decoded save back unchanged, as text, into a backed-up slot; the owner loads it in game. Then the same with money changed (and `info.sii` updated). Confirms the plan in `docs/sii-format.md` → *Writing saves back*.
+- [x] Write a save back as text and load it in game (2026-11-22: money and XP changed, Steam Cloud profile; the first try found the rotation format, now fixed and tested).
+- [ ] In game: a truck moved to another garage, a cancelled job, a save on a local (non-cloud) profile written as a new slot.
 
 ## 4. Picking a save
 

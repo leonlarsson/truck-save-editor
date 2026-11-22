@@ -108,12 +108,14 @@ unit_type : unit_id {
 
 - Strings are written bare when they only contain token characters, otherwise in quotes.
 - The game writes some floats as `&3e98ae14` (the raw IEEE-754 bits in hex). The parser must accept both that and decimals.
+- A rotation (quaternion, binary type 0x17, and the second half of a placement, 0x19) has a **semicolon after its first number**: `(w; x, y, z)`, and a placement is `(x, y, z) (w; x, y, z)`. The game refuses commas there ("Expecting quaternion, found ','"); found in the first in-game check, 2026-11-22. Vectors of 2 or 3 numbers use commas only.
 
 ## Writing saves back
 
 The plan is to write `game.sii` as **plain text SII**, with no re-encryption or binary encoding (see `decisions.md`).
 
-- **Not yet checked:** that game 1.62 loads a plain-text `game.sii` in place of the encrypted binary one, and accepts decimal floats. It's widely reported to work (guides and tools from 2026), never officially confirmed. The game's own setting `g_save_format` (in `config.cfg`) chooses what it writes; sources disagree on the values (most say 2 = text). Check by decoding a save, writing it back unchanged into a backed-up slot and loading it in game.
+- **Checked in game 1.62 (2026-11-22):** the game loads a plain-text `game.sii` and `info.sii` written by the editor in place of its encrypted binary ones (money and XP changed, Steam Cloud profile), and a plain-text `profile.sii` (company name). The game's own setting `g_save_format` (in `config.cfg`) chooses what it writes itself.
+- **Steam Cloud:** the game lists only the save files Steam knows (`remotecache.vdf`). Steam picks up changes to files it knows (an existing slot, `profile.sii`) and uploads them, but a slot folder made outside the game stays invisible. So for Steam Cloud profiles the editor saves over existing slots only.
 - **Not yet checked:** whether `info.sii` needs updating to match, or whether the game recomputes it. Until known, update the fields it mirrors.
 
 ## What's in a save
