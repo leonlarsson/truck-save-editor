@@ -556,8 +556,10 @@ impl TableDelegate for DriverTable {
         cx: &mut Context<TableState<Self>>,
     ) -> impl IntoElement {
         if DriverColumn::ALL.get(col_ix) != Some(&DriverColumn::Pick) {
+            // One line, ending in "…" when a long heading (in German, say) doesn't fit.
             return div()
                 .w_full()
+                .truncate()
                 .child(self.column(col_ix, cx).name)
                 .into_any_element();
         }

@@ -20,6 +20,8 @@ use unic_langid::LanguageIdentifier;
 /// The messages, compiled in.
 const ENGLISH: &str = include_str!("../locales/en.ftl");
 const SWEDISH: &str = include_str!("../locales/sv.ftl");
+const GERMAN: &str = include_str!("../locales/de.ftl");
+const POLISH: &str = include_str!("../locales/pl.ftl");
 
 /// A language the app speaks.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -27,16 +29,25 @@ pub enum Language {
     #[default]
     English,
     Swedish,
+    German,
+    Polish,
 }
 
 impl Language {
-    pub const ALL: [Language; 2] = [Language::English, Language::Swedish];
+    pub const ALL: [Language; 4] = [
+        Language::English,
+        Language::German,
+        Language::Polish,
+        Language::Swedish,
+    ];
 
     /// The code in the settings file and for Fluent (`en`, `sv`).
     pub fn code(self) -> &'static str {
         match self {
             Language::English => "en",
             Language::Swedish => "sv",
+            Language::German => "de",
+            Language::Polish => "pl",
         }
     }
 
@@ -51,6 +62,8 @@ impl Language {
         match self {
             Language::English => "en_us",
             Language::Swedish => "sv_se",
+            Language::German => "de_de",
+            Language::Polish => "pl_pl",
         }
     }
 
@@ -59,6 +72,8 @@ impl Language {
         match self {
             Language::English => "English",
             Language::Swedish => "Svenska",
+            Language::German => "Deutsch",
+            Language::Polish => "Polski",
         }
     }
 
@@ -66,7 +81,8 @@ impl Language {
     pub fn number_style(self) -> crate::format::NumberStyle {
         match self {
             Language::English => crate::format::NumberStyle::Comma,
-            Language::Swedish => crate::format::NumberStyle::Space,
+            Language::Swedish | Language::Polish => crate::format::NumberStyle::Space,
+            Language::German => crate::format::NumberStyle::Dot,
         }
     }
 
@@ -74,6 +90,8 @@ impl Language {
         match self {
             Language::English => ENGLISH,
             Language::Swedish => SWEDISH,
+            Language::German => GERMAN,
+            Language::Polish => POLISH,
         }
     }
 }
@@ -243,9 +261,11 @@ mod tests {
     }
 
     #[test]
-    fn the_swedish_file_parses() {
-        if let Err((_, errors)) = FluentResource::try_new(SWEDISH.to_string()) {
-            panic!("locales/sv.ftl has errors: {errors:?}");
+    fn every_file_parses() {
+        for language in Language::ALL {
+            if let Err((_, errors)) = FluentResource::try_new(language.messages().to_string()) {
+                panic!("locales/{}.ftl has errors: {errors:?}", language.code());
+            }
         }
     }
 
@@ -287,31 +307,34 @@ mod tests {
         messages
     }
 
-    /// Swedish has every message English has, using the same variables: nothing falls back to
-    /// English, and no number or name goes missing in translation.
+    /// Every language has every message English has, using the same variables: nothing falls
+    /// back to English, and no number or name goes missing in translation.
     #[test]
-    fn swedish_is_complete() {
+    fn every_language_is_complete() {
         let english = messages(ENGLISH);
-        let swedish = messages(SWEDISH);
-        let missing: Vec<&String> = english
-            .keys()
-            .filter(|key| !swedish.contains_key(*key))
-            .collect();
-        assert!(missing.is_empty(), "missing in sv.ftl: {missing:?}");
-        let extra: Vec<&String> = swedish
-            .keys()
-            .filter(|key| !english.contains_key(*key))
-            .collect();
-        assert!(extra.is_empty(), "in sv.ftl but not en.ftl: {extra:?}");
-        let different: Vec<&String> = english
-            .iter()
-            .filter(|(key, variables)| swedish.get(*key) != Some(variables))
-            .map(|(key, _)| key)
-            .collect();
-        assert!(
-            different.is_empty(),
-            "different variables in sv.ftl: {different:?}"
-        );
+        for language in Language::ALL {
+            let code = language.code();
+            let translated = messages(language.messages());
+            let missing: Vec<&String> = english
+                .keys()
+                .filter(|key| !translated.contains_key(*key))
+                .collect();
+            assert!(missing.is_empty(), "missing in {code}.ftl: {missing:?}");
+            let extra: Vec<&String> = translated
+                .keys()
+                .filter(|key| !english.contains_key(*key))
+                .collect();
+            assert!(extra.is_empty(), "in {code}.ftl but not en.ftl: {extra:?}");
+            let different: Vec<&String> = english
+                .iter()
+                .filter(|(key, variables)| translated.get(*key) != Some(variables))
+                .map(|(key, _)| key)
+                .collect();
+            assert!(
+                different.is_empty(),
+                "different variables in {code}.ftl: {different:?}"
+            );
+        }
     }
 
     #[test]

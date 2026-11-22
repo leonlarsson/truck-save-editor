@@ -148,7 +148,7 @@ impl Render for FilterBar {
             .flex_wrap()
             .items_center()
             .child(
-                div().w(rems(16.)).child(
+                div().w(rems(20.)).child(
                     Input::new(&self.search)
                         .id("filter-search")
                         .small()

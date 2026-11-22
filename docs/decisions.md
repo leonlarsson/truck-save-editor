@@ -204,3 +204,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** a position is an exact placement on a road (`(x, y, z) (w; x, y, z)`), which only the game knows how to choose; the map's road data is in its binary sector files. The game's own travel picks the spot itself, and another save's spot is one the game made. Both are untested in game as of this entry: the quick-travel fields are understood from their names and where they sit.
 
 **Considered:** a map to click on (needs the road network from the binary map files); coordinates typed by hand (no way to know a valid one).
+
+## 2026-11-22: German and Polish, drafted by machine and marked for review
+
+**Decided:** the app speaks German and Polish as well as English and Swedish. Both files were drafted by machine translation, with the terms checked against the game's own German and Polish text (its `locale.scs`: Auflieger, Frachtaufträge, Rynek przesyłek, the skill names), and say at the top that they need a native speaker's review. German writes numbers `2.480.350`; an amount typed with points reads them as thousands when they group by three, otherwise as a decimal point (`2.5m`). In Polish, a name that would follow a preposition goes after a colon instead (`Garaż: Kraków`), because Polish would decline it and a template can't.
+
+**Why:** they're two of the game's largest player languages, and a draft that uses the game's words is more useful than English while a native review is pending.
+
+**Considered:** waiting for native translators (no one to ask yet); leaving the game's terms to the translation (the first draft guessed several wrong, such as Anhänger for Auflieger).

@@ -10,6 +10,8 @@ pub enum NumberStyle {
     Comma,
     /// `2 480 350` (a no-break space, so a number never wraps) and `2,5`.
     Space,
+    /// `2.480.350` and `2,5` (German).
+    Dot,
 }
 
 impl NumberStyle {
@@ -17,6 +19,7 @@ impl NumberStyle {
         match self {
             NumberStyle::Comma => ',',
             NumberStyle::Space => '\u{a0}',
+            NumberStyle::Dot => '.',
         }
     }
 }
@@ -33,6 +36,7 @@ pub fn set_style(style: NumberStyle) {
 fn style() -> NumberStyle {
     match STYLE.load(Ordering::Relaxed) {
         1 => NumberStyle::Space,
+        2 => NumberStyle::Dot,
         _ => NumberStyle::Comma,
     }
 }
@@ -75,7 +79,7 @@ fn decimal_with(value: f64, places: usize, style: NumberStyle) -> String {
     if fraction > 0 {
         out.push(match style {
             NumberStyle::Comma => '.',
-            NumberStyle::Space => ',',
+            NumberStyle::Space | NumberStyle::Dot => ',',
         });
         out.push_str(&format!("{fraction:0places$}"));
     }
@@ -108,12 +112,21 @@ pub fn parse_amount(text: &str, current: i64) -> Option<i64> {
 /// spaces group thousands; in `Comma` style commas group thousands. A point is a decimal mark in
 /// both, since that's what people type for `2.5m` whatever their language.
 fn parse_amount_with(text: &str, current: i64, style: NumberStyle) -> Option<i64> {
+    // In `Dot` style, points group thousands when they do (`2.480.350`, or any text with a
+    // decimal comma); otherwise a point is still the decimal mark people type (`2.5m`).
+    let without_dots;
+    let text = if style == NumberStyle::Dot && dots_group_thousands(text) {
+        without_dots = text.replace('.', "");
+        without_dots.as_str()
+    } else {
+        text
+    };
     let cleaned: String = text
         .chars()
         .filter(|c| {
             let grouping = match style {
                 NumberStyle::Comma => matches!(c, ','),
-                NumberStyle::Space => false,
+                NumberStyle::Space | NumberStyle::Dot => false,
             };
             !grouping && !c.is_whitespace() && !matches!(c, '_' | '€' | '$')
         })
@@ -151,9 +164,44 @@ fn parse_amount_with(text: &str, current: i64, style: NumberStyle) -> Option<i64
     }
 }
 
+/// Whether the points in a number group thousands: there's a decimal comma, or every point is
+/// followed by exactly three digits (`2.480.350`, `12.000`).
+fn dots_group_thousands(text: &str) -> bool {
+    if !text.contains('.') {
+        return false;
+    }
+    if text.contains(',') {
+        return true;
+    }
+    let digits_only: String = text
+        .chars()
+        .filter(|c| c.is_ascii_digit() || *c == '.')
+        .collect();
+    digits_only.split('.').skip(1).all(|group| group.len() == 3)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn writes_and_reads_the_german_way() {
+        assert_eq!(thousands_with(2_480_350, NumberStyle::Dot), "2.480.350");
+        assert_eq!(decimal_with(20.45, 1, NumberStyle::Dot), "20,5");
+        for (text, amount) in [
+            ("2.480.350", 2_480_350),
+            ("12.000", 12_000),
+            ("2,5m", 2_500_000),
+            ("2.5m", 2_500_000),
+            ("1.250,5k", 1_250_500),
+        ] {
+            assert_eq!(
+                parse_amount_with(text, 0, NumberStyle::Dot),
+                Some(amount),
+                "{text}"
+            );
+        }
+    }
 
     #[test]
     fn writes_and_reads_the_swedish_way() {

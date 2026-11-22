@@ -235,9 +235,13 @@ impl OverviewPage {
                 v_flex()
                     .gap_2()
                     .child(
+                        // A long rank name (in German, say) pushes the progress onto a line of
+                        // its own rather than into it.
                         h_flex()
                             .justify_between()
                             .items_end()
+                            .flex_wrap()
+                            .gap_x_4()
                             .child(
                                 v_flex()
                                     .child(div().text_2xl().font_semibold().child(t!(
@@ -255,6 +259,7 @@ impl OverviewPage {
                             .child(
                                 div()
                                     .text_sm()
+                                    .whitespace_nowrap()
                                     .text_color(cx.theme().muted_foreground)
                                     .child(t!(
                                         cx,
