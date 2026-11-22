@@ -334,6 +334,9 @@ settings-reset-confirm = Reset
 settings-about = About
 settings-version = Version { $version }
 settings-source = Source code on GitHub
+licences-open = Open-source licences
+licences-title = Open-source licences
+licences-description = The editor is built with code from other projects, under their licences. First the code adapted for it, then every library inside the editor, with its licence (open one to read it).
 settings-not-affiliated = Not affiliated with or endorsed by SCS Software.
 
 ## Command palette

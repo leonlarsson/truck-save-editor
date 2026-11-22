@@ -1,0 +1,21 @@
+# Which licences cargo-about accepts when listing the crates built into the app (`mise run
+# licenses`); a crate under any other licence stops the list, to be looked at first.
+accepted = [
+    "MIT",
+    "Apache-2.0",
+    "Unicode-3.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "0BSD",
+    "CC0-1.0",
+    "CDLA-Permissive-2.0",
+    # Only `option-ext` (through `dirs`), used unmodified; its source is on crates.io.
+    "MPL-2.0",
+]
+# The Windows app is what's shipped.
+targets = ["x86_64-pc-windows-msvc"]
+# Not shipped: tests and build tools.
+ignore-dev-dependencies = true
+ignore-build-dependencies = true

@@ -59,18 +59,14 @@ jobs:
       - name: Package
         shell: pwsh
         run: |
-          $name = "truck-save-editor-${{ steps.version.outputs.version }}-windows-x64"
-          New-Item -ItemType Directory "dist/$name" | Out-Null
-          Copy-Item target/release/truck-save-editor.exe, LICENSE, THIRD_PARTY_NOTICES.md, README.md "dist/$name/"
-          Compress-Archive -Path "dist/$name/*" -DestinationPath "dist/$name.zip"
-          # The .exe on its own too: it's attested, so the one inside the zip can be checked.
-          Copy-Item target/release/truck-save-editor.exe dist/
+          # The .exe alone: everything it needs is inside it, the licences of what's built into
+          # it too (Settings → About → Open-source licences), so they go wherever it's copied.
+          New-Item -ItemType Directory dist | Out-Null
+          Copy-Item target/release/truck-save-editor.exe "dist/truck-save-editor-${{ steps.version.outputs.version }}-windows-x64.exe"
       - uses: actions/upload-artifact@v4
         with:
           name: windows
-          path: |
-            dist/*.zip
-            dist/truck-save-editor.exe
+          path: dist/*.exe
           if-no-files-found: error
 
   draft:
@@ -96,7 +92,7 @@ jobs:
           path: dist
       - name: Checksums
         working-directory: dist
-        run: sha256sum *.zip truck-save-editor.exe > SHA256SUMS.txt
+        run: sha256sum *.exe > SHA256SUMS.txt
       - name: Notes
         run: |
           # This tag's commits for a release; everything not yet tagged for a rehearsal.
@@ -108,9 +104,7 @@ jobs:
         if: github.ref_type == 'tag'
         uses: actions/attest-build-provenance@v4
         with:
-          subject-path: |
-            dist/*.zip
-            dist/truck-save-editor.exe
+          subject-path: dist/*.exe
       - name: Draft release
         if: github.ref_type == 'tag'
         env:
@@ -119,7 +113,7 @@ jobs:
           # A version with a dash (0.2.0-beta.1) is a pre-release.
           prerelease=""
           case "$VERSION" in *-*) prerelease="--prerelease" ;; esac
-          gh release create "$GITHUB_REF_NAME" dist/*.zip dist/SHA256SUMS.txt \
+          gh release create "$GITHUB_REF_NAME" dist/*.exe dist/SHA256SUMS.txt \
             --draft $prerelease --verify-tag --title "$GITHUB_REF_NAME" --notes-file notes.md
       - name: Keep the rehearsal
         if: github.ref_type != 'tag'
@@ -127,6 +121,6 @@ jobs:
         with:
           name: rehearsal
           path: |
-            dist/*.zip
+            dist/*.exe
             dist/SHA256SUMS.txt
             notes.md

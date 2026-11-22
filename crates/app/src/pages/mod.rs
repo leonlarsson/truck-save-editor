@@ -6,6 +6,7 @@ pub mod drivers;
 pub mod fleet;
 pub mod garages;
 pub mod jobs;
+pub mod licences;
 pub mod map;
 pub mod open_save;
 pub mod overview;

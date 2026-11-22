@@ -3,6 +3,8 @@
 rust = { version = "1.100.0", components = "clippy,rustfmt" }
 # Release notes from the commits (cliff.toml); the release workflow uses the same version.
 git-cliff = "2.14.2"
+# The licences of every crate built into the app (about.toml), shown in Settings → About.
+"ubi:EmbarkStudios/cargo-about" = "0.9.3"
 
 [env]
 # Real save files used as test fixtures (personal data, never commit)
@@ -15,6 +17,10 @@ run = [
   "cargo clippy --workspace --all-targets -- -D warnings",
   "cargo test --workspace",
 ]
+
+[tasks.licenses]
+description = "List the licence of every crate built into the app (crates/app/assets/licenses.txt, shown in Settings → About)"
+run = "cargo about generate --manifest-path crates/app/Cargo.toml about.hbs -o crates/app/assets/licenses.txt"
 
 [tasks.test]
 description = "Run all tests"

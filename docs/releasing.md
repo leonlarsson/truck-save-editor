@@ -1,12 +1,12 @@
 # Releasing
 
-A release is a version tag. Pushing `v0.1.0` runs `.github/workflows/release.yml`, which builds the Windows app, and makes a **draft** release with the zip, checksums and notes. Nothing is public until the owner publishes the draft. Releases are the owner's call.
+A release is a version tag. Pushing `v0.1.0` runs `.github/workflows/release.yml`, which builds the Windows app, and makes a **draft** release with the .exe, its checksum and notes. Nothing is public until the owner publishes the draft. Releases are the owner's call.
 
 ## What a release holds
 
-- `truck-save-editor-<version>-windows-x64.zip`: the portable app (`truck-save-editor.exe`, no installer) with `LICENSE`, `THIRD_PARTY_NOTICES.md` and `README.md`.
-- `SHA256SUMS.txt`: checksums of the zip and of the .exe inside it.
-- A build provenance attestation for both (GitHub's, signed with Sigstore): `gh attestation verify <file> --repo leonlarsson/truck-save-editor` proves the file came from this repository's release workflow, at the tagged commit.
+- `truck-save-editor-<version>-windows-x64.exe`: the app, on its own (no installer, nothing to unzip). Everything it needs is inside it, the licences of the crates built into it too (Settings → About → Open-source licences; `crates/app/assets/licenses.txt`, made by `mise run licenses` with cargo-about, and checked by CI to match the crates).
+- `SHA256SUMS.txt`: the .exe's checksum.
+- A build provenance attestation for it (GitHub's, signed with Sigstore): `gh attestation verify <file> --repo leonlarsson/truck-save-editor` proves the file came from this repository's release workflow, at the tagged commit.
 - Notes: drafted from the commit messages by git-cliff (`cliff.toml`: `feat`, `fix` and `polish` commits), with the download text from `.github/release-footer.md`. Edit them into something a player wants to read before publishing.
 
 The .exe carries its version, product name and copyright in its file details (`crates/app/build.rs`), and the C runtime inside it (`.cargo/config.toml`), so it starts on any Windows 10 or 11.
@@ -17,7 +17,7 @@ The .exe carries its version, product name and copyright in its file details (`c
 2. **Bump the version** in the root `Cargo.toml` (`[workspace.package] version`), then run `cargo check` so `Cargo.lock` follows. The release builds with `--locked`, and fails if the lock file is behind.
 3. **Preview the notes**: `mise run release-notes`.
 4. **Commit and tag**: `git commit -am "chore: release 0.1.0"`, `git tag v0.1.0`, `git push origin main v0.1.0`. The workflow refuses a tag that doesn't match the version.
-5. **Try the draft**: when the workflow finishes, download the zip from the draft release on a Windows PC, unzip it, open a save and look around.
+5. **Try the draft**: when the workflow finishes, download the .exe from the draft release on a Windows PC, run it, open a save and look around.
 6. **Edit the notes and publish.** Hand-written notes for a version go in `docs/release-notes/<version>.md`, to paste over the drafted ones (the download and checksum sections stay). A version with a dash (`0.2.0-beta.1`) is marked as a pre-release.
 
 Once published, a release reaches people through the editor: it asks GitHub for the latest release when it starts (`crates/app/src/updates.rs`) and offers the download. GitHub's "latest release" leaves out drafts and pre-releases, so only a full release is announced.

@@ -23,6 +23,18 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy -p sii -p save --all-targets -- -D warnings
       - run: cargo test -p sii -p save
+      # The app shows every crate's licence (Settings → About); the list it's built with must
+      # match the crates it's built from.
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about@0.9.3 # as in mise.toml
+      - name: The licence list is up to date (mise run licenses)
+        run: |
+          cargo about generate --manifest-path crates/app/Cargo.toml about.hbs -o crates/app/assets/licenses.txt
+          git diff --exit-code crates/app/assets/licenses.txt || {
+            echo "::error::crates/app/assets/licenses.txt is out of date: run mise run licenses and commit it."
+            exit 1
+          }
 
   app:
     # GPUI compiles its DirectX shaders with the Windows SDK, so the app is built on Windows.

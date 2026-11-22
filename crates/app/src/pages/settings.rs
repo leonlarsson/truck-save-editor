@@ -255,12 +255,22 @@ impl Render for SettingsPage {
                             .child(
                                 h_flex()
                                     .gap_2()
+                                    .flex_wrap()
                                     .child(
                                         Button::new("report")
                                             .small()
                                             .outline()
                                             .label(t!(cx, "report-problem"))
                                             .on_click(|_, _, cx| crate::report::open(cx, None)),
+                                    )
+                                    .child(
+                                        Button::new("licences")
+                                            .small()
+                                            .ghost()
+                                            .label(t!(cx, "licences-open"))
+                                            .on_click(|_, window, cx| {
+                                                crate::pages::licences::open(window, cx)
+                                            }),
                                     )
                                     .child(
                                         Button::new("source")

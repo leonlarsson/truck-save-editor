@@ -276,3 +276,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** a crash on someone else's PC otherwise ends with the window gone and nothing learned. The report is sent only by the user, through GitHub, like any other report.
 
 **Considered:** sending crash reports automatically (needs a server and consent, and sends data without asking).
+
+## 2026-11-22: The release is the .exe alone, with every licence inside it
+
+**Decided:** a release ships `truck-save-editor-<version>-windows-x64.exe` on its own (with its checksum and attestation), not a zip. The licences of everything built into it go inside it: cargo-about (from Embark Studios, pinned in `mise.toml`) lists every crate's licence for the Windows build into `crates/app/assets/licenses.txt` (`mise run licenses`, from `about.toml` and `about.hbs`), the app embeds it with `THIRD_PARTY_NOTICES.md`, and Settings → About → Open-source licences shows them. CI regenerates the list on every push and fails if the committed one is out of date. Accepted licences are the permissive ones in `about.toml` and MPL-2.0 (only `option-ext`, unmodified).
+
+**Why:** one file to download and run is simplest for players, and licences inside the .exe go wherever it's copied; the zip held only the editor's own and the adapted code's notices, not the crates' (MIT and Apache-2.0 both ask for their notices with binary copies).
+
+**Considered:** keeping the zip with a generated licences file next to the .exe (the licences only travel with the zip); writing our own licence collector over `cargo metadata` (more to maintain, and easy to get subtly wrong).

@@ -5,7 +5,7 @@
 //! This is the only time the editor uses the network: one request to GitHub's API, which sees the
 //! computer's address like any download does, and an agent string with the editor's name and
 //! version. Nothing about the player or their saves is sent. Updating is still downloading the
-//! new zip and replacing the .exe; settings and backups live elsewhere and stay.
+//! new .exe and using it in place of the old one; settings and backups live elsewhere and stay.
 
 use std::time::Duration;
 

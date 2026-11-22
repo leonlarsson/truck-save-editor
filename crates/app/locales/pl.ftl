@@ -351,6 +351,9 @@ settings-reset-confirm = Resetuj
 settings-about = Informacje
 settings-version = Wersja { $version }
 settings-source = Kod źródłowy na GitHubie
+licences-open = Licencje open source
+licences-title = Licencje open source
+licences-description = Edytor jest zbudowany z kodu innych projektów, na ich licencjach. Najpierw kod do niego dostosowany, potem każda biblioteka w edytorze z jej licencją (otwórz jedną, aby ją przeczytać).
 settings-not-affiliated = Niepowiązany z SCS Software ani przez nią niepopierany.
 
 ## Command palette

@@ -334,6 +334,9 @@ settings-reset-confirm = Återställ
 settings-about = Om
 settings-version = Version { $version }
 settings-source = Källkod på GitHub
+licences-open = Licenser för öppen källkod
+licences-title = Licenser för öppen källkod
+licences-description = Redigeraren är byggd med kod från andra projekt, under deras licenser. Först koden som anpassats för den, sedan varje bibliotek i redigeraren med sin licens (öppna en för att läsa den).
 settings-not-affiliated = Inte knuten till eller godkänd av SCS Software.
 
 ## Command palette

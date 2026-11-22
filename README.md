@@ -11,7 +11,7 @@ A save editor for **Euro Truck Simulator 2**: fast, safe and pleasant to use. Ch
 
 ## Download
 
-Get the latest version from [Releases](https://github.com/leonlarsson/truck-save-editor/releases): unzip it and run `truck-save-editor.exe` (Windows 10 or 11, nothing to install). It isn't code-signed yet, so Windows may show "Windows protected your PC" at first: choose **More info**, then **Run anyway**. Each release lists checksums, and its files can be checked with `gh attestation verify` (see the release notes).
+Get the latest version from [Releases](https://github.com/leonlarsson/truck-save-editor/releases): download the `.exe` and run it (Windows 10 or 11, nothing to install). It isn't code-signed yet, so Windows may show "Windows protected your PC" at first: choose **More info**, then **Run anyway**. Each release lists checksums, and its files can be checked with `gh attestation verify` (see the release notes).
 
 The editor tells you when a newer version is out: when it starts, it asks GitHub for the latest release (turn that off in Settings). That is the only time it uses the internet, and nothing about you or your saves is sent.
 
@@ -122,7 +122,7 @@ The editor tells you when a newer version is out: when it starts, it asks GitHub
 
 ## Staying compatible
 
-Game updates have broken other editors. This one keeps every part of a save it doesn't understand exactly as it was, stops instead of guessing at anything new, and checks every week whether the game has updated. How, and why, is in [`docs/compatibility.md`](docs/compatibility.md).
+Game updates change the save format now and then. The editor keeps every part of a save it doesn't understand exactly as it was, stops instead of guessing at anything new, and checks every week whether the game has updated. How, and why, is in [`docs/compatibility.md`](docs/compatibility.md).
 
 ## Contributing
 
