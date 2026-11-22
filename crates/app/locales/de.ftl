@@ -698,6 +698,8 @@ map-forget-roads-tooltip = Die entdeckten Straßen der Karte beginnen von vorn, 
 map-discover-roads = Alle Straßen entdecken
 map-discover-roads-tooltip = Markiert jede Straße und Kreuzung der Karte als befahren, auch in deinen Karten-DLCs, gelesen aus der Karte des Spiels. Städte, in denen du nicht warst, bleiben unbesucht.
 map-discover-roads-needs-game = Braucht das auf diesem PC installierte Spiel: Seine Karte sagt, wo die Straßen sind.
+map-discover-roads-confirm-title = Alle Straßen entdecken?
+map-discover-roads-confirm-body = Jede Straße und Kreuzung der Karte, auch in deinen Karten-DLCs, wird als befahren markiert. Das Spiel rechnet diese Straßen vielleicht auf seine Erfolge an, etwa Pathfinder (40.000 km entdeckte Straßen), aber ob und wann, ist nicht bekannt. Rückgängig nimmt es bis zum Speichern zurück, und der Spielstand wird vorher gesichert.
 
 # Truck and trailer details
 plate-colours = Kennzeichenfarben

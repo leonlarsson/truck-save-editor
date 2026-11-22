@@ -5,7 +5,7 @@
 use std::collections::BTreeSet;
 
 use gpui_kit::component::{
-    ActiveTheme as _, Disableable as _, Sizable as _,
+    ActiveTheme as _, Disableable as _, Sizable as _, WindowExt as _,
     button::Button,
     h_flex,
     table::{DataTable, TableState},
@@ -191,6 +191,32 @@ impl MapPage {
     }
 }
 
+/// Asks before marking every road as driven: it may count toward the game's road achievements, and
+/// nobody knows for sure whether it does.
+fn confirm_discover_roads(
+    session: Entity<Session>,
+    ids: std::sync::Arc<Vec<u64>>,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    window.open_alert_dialog(cx, move |alert, _, cx| {
+        let session = session.clone();
+        let ids = ids.clone();
+        alert
+            .title(t!(cx, "map-discover-roads-confirm-title"))
+            .description(t!(cx, "map-discover-roads-confirm-body"))
+            .confirm()
+            // The kit's own Cancel is English; ours follows the app's language.
+            .cancel_text(t!(cx, "cancel"))
+            .ok_text(t!(cx, "map-discover-roads"))
+            .on_ok(move |_, _, cx| {
+                let ids = ids.clone();
+                session.update(cx, |session, cx| session.discover_roads(ids, cx));
+                true
+            })
+    });
+}
+
 /// Unlocked ones count only where the game says there's one (the save can hold leftovers from
 /// older maps).
 fn count(unlocked: &BTreeSet<String>, cities: Option<&BTreeSet<String>>) -> PlaceCount {
@@ -309,11 +335,14 @@ impl Render for MapPage {
                                         t!(cx, "map-discover-roads-needs-game")
                                     })
                                     .disabled(roads.is_none() || is_all)
-                                    .on_click(cx.listener(move |this, _, _, cx| {
+                                    .on_click(cx.listener(move |this, _, window, cx| {
                                         if let Some(ids) = roads.clone() {
-                                            this.session.update(cx, |session, cx| {
-                                                session.discover_roads(ids, cx)
-                                            });
+                                            confirm_discover_roads(
+                                                this.session.clone(),
+                                                ids,
+                                                window,
+                                                cx,
+                                            );
                                         }
                                     }))
                             })
