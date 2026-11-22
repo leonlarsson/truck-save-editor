@@ -31,6 +31,12 @@ use crate::workspace::Workspace;
 /// hard-code it anywhere else.
 pub const APP_NAME: &str = env!("APP_NAME");
 
+/// The window's title: the product's name and its version, `Truck Save Editor (0.1.0)`, so which
+/// version is running shows at a glance (in screenshots and reports too).
+pub fn app_title() -> String {
+    format!("{APP_NAME} ({})", env!("CARGO_PKG_VERSION"))
+}
+
 /// Every keyboard shortcut, in one place, and the app-wide handlers for the ones that work
 /// everywhere (Undo, Redo).
 pub fn bind_keys(cx: &mut gpui_kit::App) {
@@ -94,7 +100,7 @@ fn main() {
                 ))),
                 window_min_size: Some(size(px(880.), px(560.))),
                 titlebar: Some(TitlebarOptions {
-                    title: Some(APP_NAME.into()),
+                    title: Some(app_title().into()),
                     ..Default::default()
                 }),
                 ..Default::default()

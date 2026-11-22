@@ -605,7 +605,8 @@ impl Workspace {
         false
     }
 
-    /// The window's title: the open save, with • while it has unsaved changes.
+    /// The window's title: the open save, with • while it has unsaved changes, then the editor and
+    /// its version.
     fn update_window_title(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let (title, is_edited) = match &self.opened {
             Some(opened) => {
@@ -613,9 +614,9 @@ impl Workspace {
                 let name = labels::slot_name(cx, session.slot());
                 let is_edited = session.change_count() > 0;
                 let mark = if is_edited { " •" } else { "" };
-                (format!("{name}{mark} — {APP_NAME}"), is_edited)
+                (format!("{name}{mark} — {}", crate::app_title()), is_edited)
             }
-            None => (APP_NAME.to_string(), false),
+            None => (crate::app_title(), false),
         };
         if title != self.window_title {
             window.set_window_title(&title);
