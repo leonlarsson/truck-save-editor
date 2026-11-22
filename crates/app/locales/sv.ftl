@@ -787,3 +787,23 @@ column-when = När
 column-income = Inkomst
 column-xp = XP
 column-damage = Skada
+
+## What the save needs
+needs = DLC och moddar
+needs-description = { $mods ->
+    [0] Det här sparet gjordes med { $dlcs } DLC:er. Spelet laddar det bara om de som behövs är installerade.
+   *[other] Det här sparet gjordes med { $dlcs } DLC:er och { $mods } moddar. Spelet laddar det bara om de som behövs är installerade.
+}
+needs-unknown = Går inte att kontrollera utan spelet. Välj dess mapp i Inställningar.
+needs-all-here = Allt det gjordes med är installerat.
+needs-missing = { $count ->
+    [one] En saknas som sparet behöver. Installera den, annars laddar spelet inte sparet:
+   *[other] { $count } saknas som sparet behöver. Installera dem, annars laddar spelet inte sparet:
+}
+needs-missing-extras = { $count ->
+    [one] Ett tillägg saknas (sparet laddar utan det):
+   *[other] { $count } tillägg saknas (sparet laddar utan dem):
+}
+needs-mods = Moddar
+needs-installed = Installerad
+needs-not-installed = Inte installerad

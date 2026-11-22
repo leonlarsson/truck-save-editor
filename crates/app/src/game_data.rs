@@ -11,6 +11,8 @@ use save::{Game, LevelTable};
 #[derive(Default)]
 struct Loaded {
     data: Option<Arc<GameData>>,
+    /// The DLCs and mods installed (`None` without the game).
+    installed: Option<Arc<gamedata::Installed>>,
     /// A load is under way (at startup, or after the language or the game's folder changed).
     is_loading: bool,
 }
@@ -40,17 +42,22 @@ pub fn reload(cx: &mut App) {
     let dir = install_dir(cx);
     let language = crate::settings::get(cx).language.game_code();
     cx.spawn(async move |cx| {
-        let data = cx
+        let (data, installed) = cx
             .background_spawn(async move {
                 let game = Game::Ets2;
-                let dir = dir?;
+                let Some(dir) = dir else {
+                    return (None, None);
+                };
                 // The game's text in the app's language, else English (`load` falls back).
-                GameData::load(game, &dir, language).ok()
+                let data = GameData::load(game, &dir, language).ok();
+                let installed = data.is_some().then(|| gamedata::installed(game, &dir));
+                (data, installed)
             })
             .await;
         cx.update(|cx| {
             cx.set_global(Loaded {
                 data: data.map(Arc::new),
+                installed: installed.map(Arc::new),
                 is_loading: false,
             });
             cx.refresh_windows();
@@ -62,6 +69,12 @@ pub fn reload(cx: &mut App) {
 fn data(cx: &App) -> Option<Arc<GameData>> {
     cx.try_global::<Loaded>()
         .and_then(|loaded| loaded.data.clone())
+}
+
+/// The DLCs and mods installed, once the game's data is read (`None` without the game).
+pub fn installed(cx: &App) -> Option<Arc<gamedata::Installed>> {
+    cx.try_global::<Loaded>()
+        .and_then(|loaded| loaded.installed.clone())
 }
 
 /// Whether the game's data is being read right now.

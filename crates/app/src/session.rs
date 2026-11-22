@@ -236,6 +236,15 @@ impl Session {
     }
 
     /// The save as it would be written, every change in it (see `preview`).
+    /// The DLCs and mods the save was made with (from its `info.sii`; none if it has none).
+    pub fn requirements(&self) -> Vec<save::Requirement> {
+        self.loaded
+            .info
+            .as_ref()
+            .map(save::requirements)
+            .unwrap_or_default()
+    }
+
     pub fn preview(&self) -> Arc<sii::Document> {
         if let Some(preview) = self.preview.borrow().as_ref() {
             return preview.clone();

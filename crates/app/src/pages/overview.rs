@@ -391,6 +391,138 @@ impl OverviewPage {
     }
 
     /// The player's day: tiredness, the police record and the clock, each with what resets it.
+    /// What the save was made with (DLCs and mods), and whether this PC has them: a save that
+    /// needs something missing doesn't load in the game.
+    fn render_requirements(&self, cx: &mut Context<Self>) -> Option<Section> {
+        use save::RequirementKind;
+        let requirements = self.session.read(cx).requirements();
+        if requirements.is_empty() {
+            return None;
+        }
+        let installed = game_data::installed(cx);
+        let dlcs = requirements
+            .iter()
+            .filter(|r| r.kind != RequirementKind::Mod)
+            .count();
+        let mods: Vec<&save::Requirement> = requirements
+            .iter()
+            .filter(|r| r.kind == RequirementKind::Mod)
+            .collect();
+        let theme = cx.theme();
+        let (muted, danger, success) = (theme.muted_foreground, theme.danger, theme.success);
+        let line = |text: SharedString, icon: IconName, color: gpui_kit::Hsla| {
+            h_flex()
+                .gap_2()
+                .items_start()
+                .text_sm()
+                .child(
+                    div()
+                        .pt(rems(0.15))
+                        .child(Icon::new(icon).small().text_color(color)),
+                )
+                .child(text)
+        };
+        let names = |missing: &[&save::Requirement]| -> SharedString {
+            missing
+                .iter()
+                .map(|r| r.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+                .into()
+        };
+        let mut section = Section::new(t!(cx, "needs")).description(t!(
+            cx,
+            "needs-description",
+            dlcs = dlcs,
+            mods = mods.len()
+        ));
+        let Some(installed) = installed else {
+            return Some(
+                section.child(
+                    div()
+                        .text_sm()
+                        .text_color(muted)
+                        .child(t!(cx, "needs-unknown")),
+                ),
+            );
+        };
+        let missing: Vec<&save::Requirement> = requirements
+            .iter()
+            .filter(|r| r.kind != RequirementKind::RemovableDlc && !installed.has(r))
+            .collect();
+        let missing_extras: Vec<&save::Requirement> = requirements
+            .iter()
+            .filter(|r| r.kind == RequirementKind::RemovableDlc && !installed.has(r))
+            .collect();
+        let mut lines: Vec<AnyElement> = Vec::new();
+        if missing.is_empty() && missing_extras.is_empty() {
+            lines.push(
+                line(t!(cx, "needs-all-here"), IconName::CircleCheck, success).into_any_element(),
+            );
+        }
+        if !missing.is_empty() {
+            lines.push(
+                v_flex()
+                    .gap_1()
+                    .child(line(
+                        t!(cx, "needs-missing", count = missing.len()),
+                        IconName::TriangleAlert,
+                        danger,
+                    ))
+                    .child(
+                        div()
+                            .pl(rems(1.5))
+                            .text_sm()
+                            .text_color(muted)
+                            .child(names(&missing)),
+                    )
+                    .into_any_element(),
+            );
+        }
+        if !missing_extras.is_empty() {
+            lines.push(
+                v_flex()
+                    .gap_1()
+                    .child(line(
+                        t!(cx, "needs-missing-extras", count = missing_extras.len()),
+                        IconName::Info,
+                        muted,
+                    ))
+                    .child(
+                        div()
+                            .pl(rems(1.5))
+                            .text_sm()
+                            .text_color(muted)
+                            .child(names(&missing_extras)),
+                    )
+                    .into_any_element(),
+            );
+        }
+        // Mods by name, each saying whether it's here (in words, not only by colour).
+        if !mods.is_empty() {
+            lines.push(
+                v_flex()
+                    .gap_1()
+                    .child(div().text_sm().font_medium().child(t!(cx, "needs-mods")))
+                    .children(mods.iter().map(|r| {
+                        let is_here = installed.has(r);
+                        h_flex().gap_2().text_sm().child(r.name.clone()).child(
+                            div()
+                                .text_color(if is_here { muted } else { danger })
+                                .child(if is_here {
+                                    t!(cx, "needs-installed")
+                                } else {
+                                    t!(cx, "needs-not-installed")
+                                }),
+                        )
+                    }))
+                    .into_any_element(),
+            );
+        }
+        section = section.child(v_flex().gap_3().children(lines));
+        Some(section)
+    }
+
     fn render_day(&self, cx: &mut Context<Self>) -> Section {
         let preview = self.session.read(cx).preview();
         let muted = cx.theme().muted_foreground;
@@ -664,7 +796,8 @@ impl Render for OverviewPage {
                 .child(self.render_skills(cx))
                 .child(self.render_adr(cx))
                 .children(self.render_coach_skills(cx))
-                .child(self.render_day(cx)),
+                .child(self.render_day(cx))
+                .children(self.render_requirements(cx)),
         )
     }
 }

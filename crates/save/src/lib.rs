@@ -25,6 +25,7 @@ mod profile_tools;
 #[cfg(feature = "native")]
 mod profiles;
 mod removals;
+mod requirements;
 mod statistics;
 #[cfg(feature = "native")]
 mod store;
@@ -74,11 +75,14 @@ pub use profile_tools::{
     copy_profile_settings, profile_folder_name,
 };
 #[cfg(feature = "native")]
+pub use profiles::documents_dirs;
+#[cfg(feature = "native")]
 pub use profiles::{
     Location, PROFILE_DIRS_VARIABLE, Profile, Slot, SlotKind, decode_profile_folder, find_profiles,
     profile_slots,
 };
 pub use removals::{Removal, RemoveProblem, can_remove, discovered_roads, forget_roads, remove};
+pub use requirements::{Requirement, RequirementKind, requirements};
 pub use statistics::{
     Delivery, DeliveryKind, Earnings, Totals, deliveries, driver_earnings, earnings, totals,
     truck_earnings,

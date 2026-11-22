@@ -6,6 +6,7 @@
 //! Everything here is read-only. When the game isn't found, the app falls back to built-in values.
 
 mod cities;
+mod content;
 mod icon;
 mod install;
 mod recruitment;
@@ -18,6 +19,7 @@ use std::sync::Arc;
 
 use save::{Game, LevelTable};
 
+pub use content::{Installed, installed};
 pub use icon::{ALPHA, BLUE, GREEN, GameIcon, RED};
 pub use install::find_install;
 pub use texture::{decode_rgba, distance_field_coverage};

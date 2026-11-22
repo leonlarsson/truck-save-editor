@@ -212,7 +212,8 @@ fn profile_roots(game: Game) -> Vec<(PathBuf, Location)> {
     roots
 }
 
-pub(crate) fn documents_dirs() -> Vec<PathBuf> {
+/// The Documents folders the game's own folder may be in.
+pub fn documents_dirs() -> Vec<PathBuf> {
     let mut dirs: Vec<PathBuf> = dirs::document_dir().into_iter().collect();
     // Under WSL (development), the Windows users' Documents folders.
     if cfg!(target_os = "linux")

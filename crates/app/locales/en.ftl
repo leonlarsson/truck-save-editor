@@ -787,3 +787,23 @@ column-when = When
 column-income = Income
 column-xp = XP
 column-damage = Damage
+
+## What the save needs
+needs = DLC and mods
+needs-description = { $mods ->
+    [0] This save was made with { $dlcs } DLCs. The game loads it only with the ones it needs installed.
+   *[other] This save was made with { $dlcs } DLCs and { $mods } mods. The game loads it only with the ones it needs installed.
+}
+needs-unknown = Can't check without the game. Pick its folder in Settings.
+needs-all-here = Everything it was made with is installed.
+needs-missing = { $count ->
+    [one] One missing that the save needs. Install it, or the game won't load this save:
+   *[other] { $count } missing that the save needs. Install them, or the game won't load this save:
+}
+needs-missing-extras = { $count ->
+    [one] One extra missing (the save loads without it):
+   *[other] { $count } extras missing (the save loads without them):
+}
+needs-mods = Mods
+needs-installed = Installed
+needs-not-installed = Not installed
