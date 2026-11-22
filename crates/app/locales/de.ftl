@@ -364,6 +364,9 @@ palette-theme = Hellen oder dunklen Modus wechseln
 report-problem = Problem melden…
 report-this = Dieses Problem melden
 report-description = Öffnet ein neues Issue auf GitHub in deinem Browser, mit der Version des Editors schon ausgefüllt. Gesendet wird erst, wenn du es veröffentlichst.
+crash-title = Der Editor wurde beim letzten Mal unerwartet beendet
+crash-body = Etwas ist schiefgelaufen und er musste anhalten. Deine Spielstände wurden nicht angerührt: Nichts wird ohne Sicherung geschrieben. Eine Meldung öffnet ein GitHub-Issue mit dem, was passiert ist, zum Prüfen und Veröffentlichen.
+crash-dismiss = Ausblenden
 palette-report = Problem auf GitHub melden
 
 ## Backups

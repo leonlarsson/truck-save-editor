@@ -268,3 +268,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** the save only holds which roads were driven, by id; the map files are the only source of where anything is. Tiles because drawing a picture of the whole view on every move flickered (edges went blank, dots changed size).
 
 **Considered:** drawing each dot as a shape every frame (hundreds of thousands: too slow); roads as lines (needs each road's end points, deeper in its item than the scan reads); city positions from the save (it has none).
+
+## 2026-11-22: A crash is written down and offered for reporting
+
+**Decided:** a panic hook (`crash.rs`, installed first thing) writes `crash.txt` next to the settings: the version, the system, the error, where it happened and a backtrace, with paths under the home folder written from `~` so the user's name isn't in it. On the next start, the start screen says the editor closed unexpectedly, with Report this problem (a GitHub issue filled in with the report, for the user to check and post) and Dismiss; either removes the file.
+
+**Why:** a crash on someone else's PC otherwise ends with the window gone and nothing learned. The report is sent only by the user, through GitHub, like any other report.
+
+**Considered:** sending crash reports automatically (needs a server and consent, and sends data without asking).

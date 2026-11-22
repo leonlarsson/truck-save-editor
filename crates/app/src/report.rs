@@ -51,6 +51,13 @@ pub fn issue_url(cx: &App, error: Option<(&str, &str)>) -> String {
     )
 }
 
+/// Opens a new issue about a crash, with its report (see `crash.rs`).
+pub fn open_crash(cx: &mut App, report: &str) {
+    let title = format!("The editor crashed: {}", crate::crash::summary(report));
+    let url = issue_url(cx, Some((&title, report)));
+    cx.open_url(&url);
+}
+
 /// Opens the new issue in the browser.
 pub fn open(cx: &mut App, error: Option<(&str, &str)>) {
     let url = issue_url(cx, error);

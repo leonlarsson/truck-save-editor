@@ -377,6 +377,9 @@ palette-theme = Przełącz tryb jasny lub ciemny
 report-problem = Zgłoś problem…
 report-this = Zgłoś ten problem
 report-description = Otwiera nowe zgłoszenie na GitHubie w przeglądarce, z już wpisaną wersją edytora. Nic nie zostanie wysłane, dopóki go nie opublikujesz.
+crash-title = Ostatnim razem edytor nieoczekiwanie się zamknął
+crash-body = Coś poszło nie tak i musiał się zatrzymać. Twoje zapisy nie zostały naruszone: nic nie jest zapisywane bez kopii zapasowej. Zgłoszenie otwiera zgłoszenie na GitHubie z opisem zdarzenia, do sprawdzenia i opublikowania.
+crash-dismiss = Zamknij
 palette-report = Zgłoś problem na GitHubie
 
 ## Backups

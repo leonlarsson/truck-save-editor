@@ -6,6 +6,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod assets;
+mod crash;
 mod format;
 mod game_data;
 mod i18n;
@@ -79,7 +80,18 @@ fn dev_window_size() -> Option<gpui_kit::Size<gpui_kit::Pixels>> {
     Some(size(px(width.parse().ok()?), px(height.parse().ok()?)))
 }
 
+/// Development builds only: `TSE_CRASH=1` crashes on purpose, to see the crash report written and
+/// offered on the next start.
+#[allow(clippy::panic)]
+fn crash_for_testing() {
+    if cfg!(debug_assertions) && std::env::var_os("TSE_CRASH").is_some() {
+        panic!("A crash on purpose (TSE_CRASH), to try the crash report");
+    }
+}
+
 fn main() {
+    // First, so even a crash while starting is written down.
+    crash::install();
     gpui_kit::application()
         .with_assets(assets::AppAssets)
         .run(|cx| {
@@ -91,6 +103,7 @@ fn main() {
             theme::init(cx);
             game_data::init(cx);
             bind_keys(cx);
+            crash_for_testing();
 
             let options = WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(Bounds::centered(

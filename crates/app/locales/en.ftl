@@ -360,6 +360,9 @@ palette-theme = Switch light or dark mode
 report-problem = Report a problem…
 report-this = Report this problem
 report-description = Opens a new issue on GitHub in your browser, with the editor's version filled in. Nothing is sent until you post it.
+crash-title = The editor closed unexpectedly last time
+crash-body = Something went wrong and it had to stop. Your saves weren't touched: nothing is written without a backup. Reporting it opens a GitHub issue with what happened, for you to check and post.
+crash-dismiss = Dismiss
 palette-report = Report a problem on GitHub
 
 ## Backups

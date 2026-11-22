@@ -63,6 +63,8 @@ pub struct OpenSavePage {
     shows_missing_folders: bool,
     /// Whether every save the game made is shown, rather than the newest few.
     shows_all_game_saves: bool,
+    /// What happened when the editor last crashed, until it's reported or dismissed.
+    crash: Option<String>,
     /// Why the last folder chosen or dropped wasn't added, if it wasn't.
     add_problem: Option<SharedString>,
     /// Each slot's preview picture, by slot folder, as they load.
@@ -87,6 +89,7 @@ impl OpenSavePage {
             select_after: None,
             shows_all_game_saves: false,
             shows_missing_folders: false,
+            crash: crate::crash::last(),
             add_problem: None,
             previews: HashMap::new(),
             row_focus: HashMap::new(),
@@ -368,6 +371,51 @@ impl OpenSavePage {
                     cx.notify();
                 }
             }))
+    }
+
+    /// After a crash: says so, with a way to report it (an issue filled in with what happened)
+    /// or put it away.
+    fn render_crash(&self, cx: &mut Context<Self>) -> Option<impl IntoElement> {
+        let report = self.crash.clone()?;
+        Some(
+            v_flex()
+                .gap_3()
+                .child(
+                    Alert::warning("crashed", t!(cx, "crash-body"))
+                        .title(t!(cx, "crash-title"))
+                        .text_color(cx.theme().foreground)
+                        .icon(Icon::new(IconName::TriangleAlert).text_color(cx.theme().warning)),
+                )
+                .child(
+                    h_flex()
+                        .px_3()
+                        .gap_2()
+                        .child(
+                            Button::new("crash-report")
+                                .small()
+                                .primary()
+                                .icon(Icon::new(IconName::ExternalLink))
+                                .label(t!(cx, "report-this"))
+                                .on_click(cx.listener(move |this, _, _, cx| {
+                                    crate::report::open_crash(cx, &report);
+                                    crate::crash::forget();
+                                    this.crash = None;
+                                    cx.notify();
+                                })),
+                        )
+                        .child(
+                            Button::new("crash-dismiss")
+                                .small()
+                                .ghost()
+                                .label(t!(cx, "crash-dismiss"))
+                                .on_click(cx.listener(|this, _, _, cx| {
+                                    crate::crash::forget();
+                                    this.crash = None;
+                                    cx.notify();
+                                })),
+                        ),
+                ),
+        )
     }
 
     /// What's shown and where it's from: how many saves, the profile, where it's kept, and its
@@ -935,6 +983,7 @@ impl Render for OpenSavePage {
                     // Everything on the slot rows' text edge: the rows pad their content so their
                     // hover fill reaches past it; the header and the rest line up with that text.
                     .child(div().px_3().child(header))
+                    .children(self.render_crash(cx))
                     .children(crate::updates::available(cx).map(|(version, url)| {
                         // A newer version: one quiet line with the way to get it.
                         h_flex()

@@ -360,6 +360,9 @@ palette-theme = Byt mellan ljust och mörkt läge
 report-problem = Rapportera ett problem…
 report-this = Rapportera problemet
 report-description = Öppnar ett nytt ärende på GitHub i webbläsaren, med redigerarens version ifylld. Inget skickas förrän du publicerar det.
+crash-title = Redigeraren stängdes oväntat förra gången
+crash-body = Något gick fel och den var tvungen att avslutas. Dina sparfiler rördes inte: inget skrivs utan en säkerhetskopia. En rapport öppnar ett GitHub-ärende med vad som hände, som du kan granska och publicera.
+crash-dismiss = Stäng
 palette-report = Rapportera ett problem på GitHub
 
 ## Backups
