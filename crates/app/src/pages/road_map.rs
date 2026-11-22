@@ -646,10 +646,16 @@ impl Render for RoadMap {
             );
 
         let has_roads = game_data::map_roads(cx).is_some();
-        let message = match (paint.is_empty(), has_roads) {
-            (true, true) => Some(t!(cx, "road-map-drawing")),
-            (_, false) => Some(t!(cx, "road-map-needs-game")),
-            _ => None,
+        // "Drawing" only while something is: an area with no roads (the sea, past the map's
+        // edge) just shows nothing.
+        let is_getting_ready =
+            self.index.is_none() || self.driven.is_none() || !self.drawing.is_empty();
+        let message = if !has_roads {
+            Some(t!(cx, "road-map-needs-game"))
+        } else if paint.is_empty() && is_getting_ready {
+            Some(t!(cx, "road-map-drawing"))
+        } else {
+            None
         };
         // The truck, drawn over the tiles at one size whatever the zoom.
         let truck = save::position(&self.session.read(cx).preview())
