@@ -196,3 +196,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** a copy is made as a local profile, because the game lists local profiles from the disk while Steam Cloud only shows files the game wrote (found in the in-game check). The copy's World of Trucks login is emptied, so two profiles never share one, and nothing reads it. Renaming changes `profile_name` only: the folder keeps its name, since Steam Cloud knows the files under it. The game writes `config.cfg` and profiles when it exits, so changes made while it runs would be lost.
 
 **Considered:** zipping backups (a plain folder can be opened and restored by hand, like slot backups); renaming the profile's folder (breaks Steam Cloud); keeping the login in a copy (two profiles linked to one account).
+
+## 2026-11-22: The player's truck and where it stands
+
+**Decided:** a truck in a garage can be made the player's (the two slots swap drivers, the player's vehicles point at it, and its garage becomes the headquarters, where the player's slot is). The player can be moved in three ways, none of which guesses coordinates: ask the game to take them to a city they've been to (`schedule_quick_travel`, with the truck's city set) or to the headquarters (`schedule_transfer_to_hq`) when the save loads; or take the exact spot from another save of the same profile. None of it works during a job; moving to another save's spot also needs the trailer unhitched.
+
+**Why:** a position is an exact placement on a road (`(x, y, z) (w; x, y, z)`), which only the game knows how to choose; the map's road data is in its binary sector files. The game's own travel picks the spot itself, and another save's spot is one the game made. Both are untested in game as of this entry: the quick-travel fields are understood from their names and where they sit.
+
+**Considered:** a map to click on (needs the road network from the binary map files); coordinates typed by hand (no way to know a valid one).

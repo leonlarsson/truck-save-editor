@@ -671,3 +671,27 @@ profile-tools-settings-copied = Kopierade till ”{ $name }”.
 profile-tools-settings-none = Det finns ingen annan profil med inställningar att kopiera till.
 profile-tools-running = Stäng spelet först: det skriver profiler när det avslutas.
 profile-tools-failed = Det gick inte: { $error }
+
+# The player's truck and position
+player-truck = Din lastbil
+player-truck-yours = Den här kör du
+player-drive = Kör den själv
+player-drive-tooltip = Gör den till din lastbil: den som körde den får din, och dess garage blir ditt huvudkontor. Den står där du är när du laddar sparfilen.
+player-why-on-job = Slutför eller avbryt det pågående uppdraget först.
+player-why-not-in-garage = Bara lastbilar i ett garage kan bli dina.
+player-position = Din position
+player-position-somewhere = Någonstans på kartan
+player-position-from = { $place }, som i ”{ $save }”
+player-position-now = Din lastbil är i { $place }.
+player-trip-pick = Ta mig till en stad…
+player-trip-hq-button = Ta mig till huvudkontoret
+player-trip-tooltip = Spelet tar din lastbil dit när du laddar sparfilen, som dess egna resor gör, och väljer platsen själv.
+player-trip-city = Till { $city }, när sparfilen laddas
+player-trip-hq = Till huvudkontoret, när sparfilen laddas
+player-trip-unavailable = Den här sparfilen kan inte be spelet om en resa (en äldre version av spelet).
+player-move = Flytta dit en annan sparfil är
+player-move-pick = Välj en sparfil…
+player-move-description = Din lastbil flyttas dit den står i en annan sparfil i den här profilen.
+player-move-reading = Läser ”{ $save }”…
+player-move-no-position = ”{ $save }” säger inte var din lastbil är.
+player-move-hitched = Koppla loss trailern i spelet först: den skulle också behöva en plats.

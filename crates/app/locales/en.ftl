@@ -671,3 +671,27 @@ profile-tools-settings-copied = Copied to “{ $name }”.
 profile-tools-settings-none = There's no other profile with settings to copy to.
 profile-tools-running = Close the game first: it writes profiles when it exits.
 profile-tools-failed = That didn't work: { $error }
+
+# The player's truck and position
+player-truck = Your truck
+player-truck-yours = You drive this one
+player-drive = Drive it yourself
+player-drive-tooltip = Makes it your truck: whoever drove it gets yours, and its garage becomes your headquarters. It's at your position when you load the save.
+player-why-on-job = Finish or cancel the job in progress first.
+player-why-not-in-garage = Only trucks in a garage can be yours.
+player-position = Your position
+player-position-somewhere = Somewhere on the map
+player-position-from = { $place }, as in “{ $save }”
+player-position-now = Your truck is in { $place }.
+player-trip-pick = Take me to a city…
+player-trip-hq-button = Take me to headquarters
+player-trip-tooltip = The game takes your truck there when you load the save, the way its own travel does, and picks the spot itself.
+player-trip-city = To { $city }, when the save loads
+player-trip-hq = To headquarters, when the save loads
+player-trip-unavailable = This save can't ask the game for a trip (an older game version).
+player-move = Move to where another save is
+player-move-pick = Choose a save…
+player-move-description = Your truck moves to where it stands in another save of this profile.
+player-move-reading = Reading “{ $save }”…
+player-move-no-position = “{ $save }” doesn't say where your truck is.
+player-move-hitched = Unhitch your trailer in the game first: it would need a place too.

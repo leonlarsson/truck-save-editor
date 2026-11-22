@@ -31,6 +31,8 @@ pub struct MapPage {
     dealers: PlaceCount,
     recruitments: PlaceCount,
     filter: Entity<FilterBar>,
+    /// Moving the player's truck to another save's spot.
+    position: Entity<crate::pages::position::PositionPicker>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -89,6 +91,10 @@ impl MapPage {
             game_data::observe(cx, |this, cx| this.reload(cx)),
             cx.subscribe(&filter, |this, _, _: &FilterChanged, cx| this.reload(cx)),
         ];
+        let position = {
+            let session = session.clone();
+            cx.new(|cx| crate::pages::position::PositionPicker::new(session, window, cx))
+        };
         let mut page = Self {
             session,
             table,
@@ -97,6 +103,7 @@ impl MapPage {
             dealers: PlaceCount::default(),
             recruitments: PlaceCount::default(),
             filter,
+            position,
             _subscriptions,
         };
         page.reload(cx);
@@ -325,6 +332,23 @@ impl Render for MapPage {
                             ),
                     ),
             )
+            .child({
+                // Where the player's truck stands, and moving it to another save's spot.
+                let place = save::position(&self.session.read(cx).preview())
+                    .and_then(|position| position.city)
+                    .map(|city| game_data::city_name(cx, &city))
+                    .unwrap_or_else(|| t!(cx, "player-position-somewhere").to_string());
+                h_flex()
+                    .gap_3()
+                    .flex_wrap()
+                    .items_start()
+                    .child(div().pt_1().text_sm().child(t!(
+                        cx,
+                        "player-position-now",
+                        place = place
+                    )))
+                    .child(self.position.clone())
+            })
             .child(self.filter.clone())
             // Not hidden, and not just a disabled button: say why, and what makes it work.
             .children((!has_game_data).then(|| {

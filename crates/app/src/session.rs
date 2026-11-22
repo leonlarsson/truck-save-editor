@@ -87,6 +87,12 @@ struct Pending {
     /// Changes to single trucks and trailers (cargo, weight, countries, fuel, badge); a later one
     /// of the same kind for the same vehicle replaces the earlier.
     vehicle_edits: Vec<save::VehicleEdit>,
+    /// Another of the company's trucks for the player to drive.
+    drive_truck: Option<String>,
+    /// Where to move the player's truck, and the save that position comes from (its name).
+    move_to: Option<(save::Position, String)>,
+    /// A trip the game makes when the save loads (to a city, or to the headquarters).
+    trip: Option<save::Trip>,
 }
 
 impl Pending {
@@ -111,6 +117,9 @@ impl Pending {
             removed: Vec::new(),
             forget_roads: false,
             vehicle_edits: Vec::new(),
+            drive_truck: None,
+            move_to: None,
+            trip: None,
         }
     }
 
@@ -502,6 +511,9 @@ impl Session {
             + usize::from(self.pending.remove_job_deadline)
             + self.pending.removed.len()
             + self.pending.vehicle_edits.len()
+            + usize::from(self.pending.drive_truck.is_some())
+            + usize::from(self.pending.move_to.is_some())
+            + usize::from(self.pending.trip.is_some())
             + usize::from(self.pending.forget_roads)
     }
 
@@ -610,6 +622,48 @@ impl Session {
             if !pending.removed.contains(&removal) {
                 pending.removed.push(removal);
             }
+        });
+    }
+
+    /// The truck the player drives, as it'll be after saving.
+    pub fn own_truck(&self) -> Option<String> {
+        save::own_truck(&self.preview())
+    }
+
+    /// Whether the player can drive another of the company's trucks.
+    pub fn can_drive(&self, truck: &str) -> Result<(), save::PlayerProblem> {
+        save::can_drive(&self.preview(), truck)
+    }
+
+    /// Makes another of the company's trucks the player's.
+    pub fn drive_truck(&mut self, truck: &str, cx: &mut Context<Self>) {
+        let truck = truck.to_string();
+        self.change(cx, |pending, _| pending.drive_truck = Some(truck));
+    }
+
+    /// Whether the player's truck can be moved.
+    pub fn can_move_player(&self) -> Result<(), save::PlayerProblem> {
+        save::can_move_player(&self.preview())
+    }
+
+    /// Moves the player's truck to a position from another save (named `from`).
+    pub fn move_player(&mut self, to: save::Position, from: String, cx: &mut Context<Self>) {
+        self.change(cx, |pending, _| {
+            pending.move_to = Some((to, from));
+            pending.trip = None;
+        });
+    }
+
+    /// Whether the game can be asked to take the player somewhere.
+    pub fn can_travel(&self) -> Result<(), save::PlayerProblem> {
+        save::can_travel(&self.preview())
+    }
+
+    /// Asks the game to take the player to a city or the headquarters when the save loads.
+    pub fn travel(&mut self, trip: save::Trip, cx: &mut Context<Self>) {
+        self.change(cx, |pending, _| {
+            pending.trip = Some(trip);
+            pending.move_to = None;
         });
     }
 
@@ -982,6 +1036,57 @@ impl Session {
             };
             add(what, before, after);
         }
+        let vehicle_name = |id: &str| -> SharedString {
+            match self.saved_vehicles.iter().find(|v| v.id == id) {
+                Some(vehicle) => {
+                    let model = crate::game_data::model_name(cx, vehicle).unwrap_or_default();
+                    t!(
+                        cx,
+                        "move-what-truck",
+                        model = model,
+                        plate = vehicle.plate.clone()
+                    )
+                }
+                None => id.to_string().into(),
+            }
+        };
+        if let Some(truck) = &self.pending.drive_truck {
+            let before = save::own_truck(&self.loaded.game)
+                .map(|id| vehicle_name(&id))
+                .unwrap_or_default();
+            add(t!(cx, "player-truck"), before, vehicle_name(truck));
+        }
+        if let Some((to, from)) = &self.pending.move_to {
+            let place = |position: &save::Position| -> SharedString {
+                match &position.city {
+                    Some(city) => crate::game_data::city_name(cx, city).into(),
+                    None => t!(cx, "player-position-somewhere"),
+                }
+            };
+            let before = save::position(&self.loaded.game)
+                .map(|position| place(&position))
+                .unwrap_or_default();
+            add(
+                t!(cx, "player-position"),
+                before,
+                t!(cx, "player-position-from", place = place(to), save = from),
+            );
+        }
+        if let Some(trip) = &self.pending.trip {
+            let before = save::position(&self.loaded.game)
+                .and_then(|position| position.city)
+                .map(|city| SharedString::from(crate::game_data::city_name(cx, &city)))
+                .unwrap_or_else(|| t!(cx, "player-position-somewhere"));
+            let after = match trip {
+                save::Trip::City(city) => t!(
+                    cx,
+                    "player-trip-city",
+                    city = crate::game_data::city_name(cx, city)
+                ),
+                save::Trip::Headquarters => t!(cx, "player-trip-hq"),
+            };
+            add(t!(cx, "player-position"), before, after);
+        }
         if self.pending.forget_roads {
             let (saved, _) = self.discovered_roads();
             add(
@@ -1098,6 +1203,15 @@ impl Session {
         }
         for edit in &self.pending.vehicle_edits {
             save::apply_vehicle_edit(&mut slot.game, edit);
+        }
+        if let Some(truck) = &self.pending.drive_truck {
+            let _ = save::drive_truck(&mut slot.game, truck);
+        }
+        if let Some((position, _)) = &self.pending.move_to {
+            let _ = save::move_player(&mut slot.game, position);
+        }
+        if let Some(trip) = &self.pending.trip {
+            let _ = save::schedule_trip(&mut slot.game, trip);
         }
         for removal in &self.pending.removed {
             // One that no longer can (an earlier change took its place) is skipped; pages only

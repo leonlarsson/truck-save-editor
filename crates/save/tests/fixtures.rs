@@ -467,3 +467,53 @@ fn real_trucks_have_parts_to_swap() {
         }
     }
 }
+
+/// In real saves: the player's truck and position are found, another truck can be driven without
+/// losing a driver, and a position can be moved to.
+#[test]
+fn real_saves_know_the_players_truck_and_position() {
+    for (index, dir) in slot_dirs().into_iter().enumerate() {
+        let mut slot = save::load(&dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display()));
+        let own = save::own_truck(&slot.game);
+        assert!(own.is_some(), "slot {index}: the player's truck");
+        let position = save::position(&slot.game);
+        assert!(position.is_some(), "slot {index}: the player's position");
+        let drivers = |document: &sii::Document| {
+            save::garages(document)
+                .iter()
+                .map(|garage| garage.drivers)
+                .sum::<usize>()
+        };
+        let before = drivers(&slot.game);
+        let other = save::vehicles(&slot.game).into_iter().find(|v| {
+            v.kind == save::VehicleKind::Truck && save::can_drive(&slot.game, &v.id).is_ok()
+        });
+        if let Some(other) = other {
+            assert_eq!(
+                save::drive_truck(&mut slot.game, &other.id),
+                Ok(()),
+                "slot {index}"
+            );
+            assert_eq!(
+                save::own_truck(&slot.game),
+                Some(other.id.clone()),
+                "slot {index}"
+            );
+            assert_eq!(drivers(&slot.game), before, "slot {index}: nobody lost");
+        }
+        if save::can_move_player(&slot.game).is_ok()
+            && let Some(position) = position
+        {
+            assert_eq!(
+                save::move_player(&mut slot.game, &position),
+                Ok(()),
+                "slot {index}"
+            );
+        }
+        let text = sii::to_text(&slot.game);
+        assert_eq!(
+            sii::to_text(&sii::parse_text(&text).expect("reads back")),
+            text
+        );
+    }
+}

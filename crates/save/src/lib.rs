@@ -16,6 +16,7 @@ mod info;
 mod jobs;
 mod levels;
 mod map;
+mod player_vehicle;
 mod preview;
 mod profile_file;
 #[cfg(feature = "native")]
@@ -51,6 +52,10 @@ pub use info::{SlotInfo, read_info, set_name, update_info};
 pub use jobs::{Job, extend_offers, game_time, jobs};
 pub use levels::{FALLBACK_STEPS, Level, LevelTable};
 pub use map::{City, Place, cities, unlock, unlocked, visit_all_cities};
+pub use player_vehicle::{
+    PlayerProblem, Position, Trip, can_drive, can_move_player, can_travel, drive_truck,
+    move_player, own_truck, position, schedule_trip,
+};
 pub use preview::{Picture, decode_tga};
 pub use profile_file::{
     company_name, profile_name, set_cached_experience, set_company_name, set_profile_name,

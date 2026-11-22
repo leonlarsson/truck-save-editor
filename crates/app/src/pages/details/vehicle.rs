@@ -579,6 +579,48 @@ impl Render for VehicleDetail {
                             cx,
                         )
                     }))
+                    .children((vehicle.kind == VehicleKind::Truck).then(|| {
+                        let session = self.session.read(cx);
+                        let is_yours = session.own_truck().as_deref() == Some(self.id.as_str());
+                        let problem = session.can_drive(&self.id).err();
+                        let id = self.id.clone();
+                        let content = if is_yours {
+                            div()
+                                .text_sm()
+                                .child(t!(cx, "player-truck-yours"))
+                                .into_any_element()
+                        } else {
+                            let why = problem.map(|problem| match problem {
+                                save::PlayerProblem::OnJob => t!(cx, "player-why-on-job"),
+                                _ => t!(cx, "player-why-not-in-garage"),
+                            });
+                            v_flex()
+                                .items_end()
+                                .gap_1()
+                                .child(
+                                    Button::new("drive-truck")
+                                        .xsmall()
+                                        .outline()
+                                        .label(t!(cx, "player-drive"))
+                                        .tooltip(t!(cx, "player-drive-tooltip"))
+                                        .disabled(problem.is_some())
+                                        .on_click(cx.listener(move |this, _, _, cx| {
+                                            let id = id.clone();
+                                            this.session.update(cx, |session, cx| {
+                                                session.drive_truck(&id, cx)
+                                            });
+                                        })),
+                                )
+                                .children(why.map(|why| {
+                                    div()
+                                        .text_xs()
+                                        .text_color(cx.theme().muted_foreground)
+                                        .child(why)
+                                }))
+                                .into_any_element()
+                        };
+                        fact(t!(cx, "player-truck"), content, cx)
+                    }))
                     .children(has_badge.then(|| {
                         let id = self.id.clone();
                         fact(
