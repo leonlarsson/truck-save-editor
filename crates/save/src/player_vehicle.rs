@@ -35,6 +35,26 @@ fn truck_vehicles(document: &Document) -> Option<String> {
         .map(|unit| unit.id.clone())
 }
 
+/// The `player_vehicles` unit the game uses for the truck being driven: the player's
+/// `assigned_vehicles`, when it holds one of the player's trucks. It's a unit of its own, apart
+/// from the truck's entry in `my_vehicles` (found in a 1.5x save, 2026-11-22), and the one whose
+/// placement is current. Falls back to the `my_vehicles` entry.
+fn active_truck_vehicles(document: &Document) -> Option<String> {
+    let player = document.unit(&player(document)?)?;
+    let trucks = player.items("trucks");
+    player
+        .single("assigned_vehicles")
+        .filter(|id| *id != "null")
+        .and_then(|id| document.unit(id))
+        .filter(|unit| unit.kind == "player_vehicles")
+        .filter(|unit| {
+            unit.single("vehicle")
+                .is_some_and(|vehicle| trucks.iter().any(|truck| truck == vehicle))
+        })
+        .map(|unit| unit.id.clone())
+        .or_else(|| truck_vehicles(document))
+}
+
 /// The truck the player drives, if any.
 pub fn own_truck(document: &Document) -> Option<String> {
     if let Some(holder) = truck_vehicles(document) {
@@ -231,14 +251,22 @@ pub struct Position {
 }
 
 pub fn position(document: &Document) -> Option<Position> {
-    if let Some(holder) = truck_vehicles(document) {
+    if let Some(holder) = active_truck_vehicles(document) {
         let unit = document.unit(&holder)?;
+        let city = |unit: &sii::Unit| {
+            unit.single("stored_vehicle_city")
+                .filter(|city| *city != "null")
+                .map(|city| city.trim_start_matches("city.").to_string())
+        };
+        // The active entry may not name its city; the `my_vehicles` entry may.
+        let city = city(unit).or_else(|| {
+            truck_vehicles(document)
+                .and_then(|id| document.unit(&id))
+                .and_then(city)
+        });
         return Some(Position {
             placement: unit.single("stored_vehicle_placement")?.to_string(),
-            city: unit
-                .single("stored_vehicle_city")
-                .filter(|city| *city != "null")
-                .map(|city| city.trim_start_matches("city.").to_string()),
+            city,
         });
     }
     let player = document.unit(&player(document)?)?;
@@ -254,7 +282,7 @@ pub fn can_move_player(document: &Document) -> Result<(), PlayerProblem> {
         return Err(PlayerProblem::OnJob);
     }
     position(document).ok_or(PlayerProblem::NoPosition)?;
-    let hitched = truck_vehicles(document)
+    let hitched = active_truck_vehicles(document)
         .and_then(|holder| document.unit(&holder))
         .is_some_and(|unit| {
             unit.single("trailer")
@@ -277,16 +305,26 @@ pub fn move_player(document: &mut Document, to: &Position) -> Result<(), PlayerP
     if !to.placement.starts_with('(') || !to.placement.contains(';') {
         return Err(PlayerProblem::NoPosition);
     }
-    if let Some(holder) = truck_vehicles(document) {
-        if let Some(mut unit) = document.unit_mut(&holder) {
-            unit.set(
-                "stored_vehicle_placement",
-                Value::single(to.placement.clone()),
-            );
-            if let Some(city) = &to.city
-                && unit.get("stored_vehicle_city").is_some()
-            {
-                unit.set("stored_vehicle_city", Value::single(format!("city.{city}")));
+    // Both the active entry and the truck's `my_vehicles` entry, so whichever the game reads
+    // has the new place.
+    let mut holders: Vec<String> = active_truck_vehicles(document).into_iter().collect();
+    if let Some(entry) = truck_vehicles(document)
+        && !holders.contains(&entry)
+    {
+        holders.push(entry);
+    }
+    if !holders.is_empty() {
+        for holder in holders {
+            if let Some(mut unit) = document.unit_mut(&holder) {
+                unit.set(
+                    "stored_vehicle_placement",
+                    Value::single(to.placement.clone()),
+                );
+                if let Some(city) = &to.city
+                    && unit.get("stored_vehicle_city").is_some()
+                {
+                    unit.set("stored_vehicle_city", Value::single(format!("city.{city}")));
+                }
             }
         }
         return Ok(());
@@ -428,5 +466,34 @@ mod tests {
         let on_job = SAVE.replace("current_job: null", "current_job: job.1");
         let document = sii::parse_text(&on_job).expect("parses");
         assert_eq!(can_drive(&document, "truck.b"), Err(PlayerProblem::OnJob));
+    }
+
+    #[test]
+    fn reads_and_moves_the_active_entry_too() {
+        // Newer saves: `assigned_vehicles` is an entry of its own, apart from `my_vehicles`.
+        let save = SAVE
+            .replace(" assigned_vehicles: pv.truck\r\n", " assigned_vehicles: pv.active\r\n")
+            .replace(
+                "player_vehicles : pv.bus {",
+                "player_vehicles : pv.active {\r\n vehicle: truck.me\r\n stored_vehicle_placement: (9, 9, 9) (1; 0, 0, 0)\r\n stored_vehicle_city: null\r\n trailer: null\r\n stored_trailer_attached: false\r\n}\r\n\r\nplayer_vehicles : pv.bus {",
+            );
+        let mut document = sii::parse_text(&save).expect("parses");
+        let here = position(&document).expect("a position");
+        assert_eq!(here.placement, "(9, 9, 9) (1; 0, 0, 0)");
+        assert_eq!(here.city.as_deref(), Some("lyon"));
+        let to = Position {
+            placement: "(500, 10, -200) (&3f3504f3; 0, &3f3504f3, 0)".into(),
+            city: Some("oslo".into()),
+        };
+        assert_eq!(move_player(&mut document, &to), Ok(()));
+        for entry in ["pv.active", "pv.truck"] {
+            assert_eq!(
+                document
+                    .unit(entry)
+                    .and_then(|unit| unit.single("stored_vehicle_placement")),
+                Some(to.placement.as_str()),
+                "{entry}"
+            );
+        }
     }
 }
