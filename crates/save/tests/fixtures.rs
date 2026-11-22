@@ -357,3 +357,77 @@ fn real_removals_keep_the_save_whole() {
         );
     }
 }
+
+/// Changing a real trailer's cargo, weight and countries, a truck's fuel and its badge keeps the
+/// save whole and reads back.
+#[test]
+fn real_vehicle_edits_keep_the_save_whole() {
+    use save::VehicleEdit;
+    for (index, dir) in slot_dirs().into_iter().enumerate() {
+        let mut slot = save::load(&dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display()));
+        let vehicles = save::vehicles(&slot.game);
+        let mut edits = Vec::new();
+        if let Some(trailer) = vehicles
+            .iter()
+            .find(|v| v.kind == save::VehicleKind::Trailer)
+        {
+            let load = save::trailer_load(&slot.game, &trailer.id).expect("a trailer's load");
+            edits.push(VehicleEdit::CargoMass {
+                trailer: trailer.id.clone(),
+                kg: 20000.0,
+            });
+            edits.push(VehicleEdit::EmptyMass {
+                trailer: trailer.id.clone(),
+                kg: load.empty_kg / 2.0,
+            });
+            edits.push(VehicleEdit::Unrestrict {
+                trailer: trailer.id.clone(),
+            });
+        }
+        if let Some(truck) = vehicles.iter().find(|v| {
+            v.kind == save::VehicleKind::Truck && save::badge(&slot.game, &v.id).is_some()
+        }) {
+            edits.push(VehicleEdit::Fuel {
+                vehicle: truck.id.clone(),
+                ratio: 3.0,
+            });
+            edits.push(VehicleEdit::RemoveBadge {
+                vehicle: truck.id.clone(),
+            });
+        }
+        for edit in &edits {
+            assert!(
+                save::apply_vehicle_edit(&mut slot.game, edit),
+                "slot {index}: {edit:?}"
+            );
+        }
+        for edit in &edits {
+            match edit {
+                VehicleEdit::CargoMass { trailer, .. } => {
+                    let load = save::trailer_load(&slot.game, trailer).expect("a trailer's load");
+                    assert!((load.cargo_kg - 20000.0).abs() < 1.0, "slot {index}");
+                    assert!(load.countries.is_empty(), "slot {index}");
+                }
+                VehicleEdit::RemoveBadge { vehicle } => {
+                    assert!(save::badge(&slot.game, vehicle).is_none(), "slot {index}");
+                }
+                _ => {}
+            }
+        }
+        let root = slot
+            .game
+            .first_of_kind("economy")
+            .map(|unit| unit.id.clone())
+            .expect("economy");
+        assert_eq!(
+            slot.game.reachable_from(&root).len(),
+            slot.game.len(),
+            "slot {index}: one tree"
+        );
+        let text = sii::to_text(&slot.game);
+        assert_eq!(
+            sii::to_text(&sii::parse_text(&text).expect("reads back")),
+            text
+        );
+    }
+}

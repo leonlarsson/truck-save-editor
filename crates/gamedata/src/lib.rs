@@ -59,6 +59,8 @@ pub struct GameData {
     dealer_cities: BTreeSet<String>,
     /// City token → its country's short code (`verona` → `I`).
     city_country_codes: BTreeMap<String, String>,
+    /// Country token → the key of its name in the game's text.
+    country_names: BTreeMap<String, String>,
     /// Cities with a recruitment agency (of those the installed game has).
     recruitment_cities: BTreeSet<String>,
     /// Vehicle models: model id → (brand text key, series text key).
@@ -173,6 +175,7 @@ impl GameData {
             .filter(|token| cities.names.contains_key(**token))
             .map(|token| token.to_string())
             .collect();
+        data.country_names = cities.country_names.clone();
         data.dealer_cities = cities.dealers;
         data.city_names = cities.names;
         data.city_country_codes = cities
@@ -210,6 +213,12 @@ impl GameData {
     }
 
     /// A city's name as the game shows it (`malmo` → `Malmö`): its `city_name_localized` text.
+    /// A country's name in the game's language (`Italia` → `Italy`), by its token (`italy`).
+    pub fn country_name(&self, token: &str) -> Option<String> {
+        let key = self.country_names.get(token)?;
+        self.text(key).filter(|name| !name.is_empty())
+    }
+
     /// The short code of a city's country, as the game shows it after the city's name (`I`).
     pub fn city_country_code(&self, token: &str) -> Option<&str> {
         self.city_country_codes.get(token).map(String::as_str)

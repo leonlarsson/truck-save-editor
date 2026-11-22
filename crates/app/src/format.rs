@@ -57,6 +57,31 @@ fn thousands_with(value: i64, style: NumberStyle) -> String {
     out
 }
 
+/// `20.45` with 1 place → `"20.5"` (or `"20,5"`), whole part grouped like `thousands`; a whole
+/// result drops its decimals (`20.0` → `"20"`).
+pub fn decimal(value: f64, places: usize) -> String {
+    decimal_with(value, places, style())
+}
+
+fn decimal_with(value: f64, places: usize, style: NumberStyle) -> String {
+    let scale = 10f64.powi(places as i32);
+    let rounded = (value * scale).round() / scale;
+    let whole = rounded.trunc();
+    let mut out = thousands_with(whole as i64, style);
+    if rounded < 0.0 && whole == 0.0 {
+        out.insert(0, '-');
+    }
+    let fraction = ((rounded - whole).abs() * scale).round() as i64;
+    if fraction > 0 {
+        out.push(match style {
+            NumberStyle::Comma => '.',
+            NumberStyle::Space => ',',
+        });
+        out.push_str(&format!("{fraction:0places$}"));
+    }
+    out
+}
+
 /// `1_000_000` → `"1M"`: the short form people can also type into an amount field.
 pub fn compact(value: i64) -> String {
     let units: [(i64, &str); 3] = [(1_000_000_000, "B"), (1_000_000, "M"), (1_000, "k")];
@@ -204,5 +229,13 @@ mod tests {
         assert_eq!(parse_amount("12a", 0), None);
         assert_eq!(parse_amount("1.2.3", 0), None);
         assert_eq!(parse_amount("99999999999b", 0), None);
+    }
+
+    #[test]
+    fn writes_decimals_in_each_style() {
+        assert_eq!(decimal_with(20.45, 1, NumberStyle::Comma), "20.5");
+        assert_eq!(decimal_with(20.0, 1, NumberStyle::Comma), "20");
+        assert_eq!(decimal_with(1234.5, 1, NumberStyle::Space), "1\u{a0}234,5");
+        assert_eq!(decimal_with(0.05, 2, NumberStyle::Comma), "0.05");
     }
 }

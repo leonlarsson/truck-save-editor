@@ -82,6 +82,9 @@ struct Pending {
     removed: Vec<save::Removal>,
     /// Whether to forget every road driven.
     forget_roads: bool,
+    /// Changes to single trucks and trailers (cargo, weight, countries, fuel, badge); a later one
+    /// of the same kind for the same vehicle replaces the earlier.
+    vehicle_edits: Vec<save::VehicleEdit>,
 }
 
 impl Pending {
@@ -104,6 +107,7 @@ impl Pending {
             remove_job_deadline: false,
             removed: Vec::new(),
             forget_roads: false,
+            vehicle_edits: Vec::new(),
         }
     }
 
@@ -466,6 +470,7 @@ impl Session {
             + usize::from(self.pending.cancel_job)
             + usize::from(self.pending.remove_job_deadline)
             + self.pending.removed.len()
+            + self.pending.vehicle_edits.len()
             + usize::from(self.pending.forget_roads)
     }
 
@@ -575,6 +580,26 @@ impl Session {
                 pending.removed.push(removal);
             }
         });
+    }
+
+    /// Changes one truck or trailer (cargo, weight, countries, fuel, badge).
+    pub fn edit_vehicle(&mut self, edit: save::VehicleEdit, cx: &mut Context<Self>) {
+        self.change(cx, |pending, _| {
+            pending
+                .vehicle_edits
+                .retain(|earlier| !earlier.same_kind(&edit));
+            pending.vehicle_edits.push(edit);
+        });
+    }
+
+    /// A trailer's cargo, own weight and allowed countries, as they'll be after saving.
+    pub fn trailer_load(&self, trailer: &str) -> Option<save::TrailerLoad> {
+        save::trailer_load(&self.preview(), trailer)
+    }
+
+    /// Whether a truck has a badge, as it'll be after saving.
+    pub fn has_badge(&self, vehicle: &str) -> bool {
+        save::badge(&self.preview(), vehicle).is_some()
     }
 
     /// How many road pieces are discovered: (on disk, after saving).
@@ -857,6 +882,64 @@ impl Session {
             };
             add(what, t!(cx, "removal-before"), t!(cx, "removal-after"));
         }
+        for edit in &self.pending.vehicle_edits {
+            let id = edit.vehicle();
+            let what: SharedString = match self.saved_vehicles.iter().find(|v| v.id == id) {
+                Some(vehicle) => {
+                    let model = crate::game_data::model_name(cx, vehicle).unwrap_or_default();
+                    t!(
+                        cx,
+                        "move-what-truck",
+                        model = model,
+                        plate = vehicle.plate.clone()
+                    )
+                }
+                None => id.to_string().into(),
+            };
+            let saved = save::trailer_load(&self.loaded.game, id);
+            let tonnes = |kg: f64| crate::format::decimal(kg / 1000.0, 1);
+            let (before, after) = match edit {
+                save::VehicleEdit::CargoMass { kg, .. } => (
+                    t!(
+                        cx,
+                        "edit-cargo",
+                        tonnes = tonnes(saved.as_ref().map_or(0.0, |l| l.cargo_kg))
+                    ),
+                    t!(cx, "edit-cargo", tonnes = tonnes(*kg)),
+                ),
+                save::VehicleEdit::EmptyMass { kg, .. } => (
+                    t!(
+                        cx,
+                        "edit-empty",
+                        tonnes = tonnes(saved.as_ref().map_or(0.0, |l| l.empty_kg))
+                    ),
+                    t!(cx, "edit-empty", tonnes = tonnes(*kg)),
+                ),
+                save::VehicleEdit::Unrestrict { .. } => {
+                    (t!(cx, "edit-restricted"), t!(cx, "edit-unrestricted"))
+                }
+                save::VehicleEdit::Fuel { ratio, .. } => {
+                    let saved_ratio = self
+                        .saved_vehicles
+                        .iter()
+                        .find(|v| v.id == id)
+                        .and_then(|v| v.fuel)
+                        .unwrap_or(0.0);
+                    (
+                        t!(
+                            cx,
+                            "edit-fuel",
+                            percent = (f64::from(saved_ratio) * 100.0).round() as i64
+                        ),
+                        t!(cx, "edit-fuel", percent = (ratio * 100.0).round() as i64),
+                    )
+                }
+                save::VehicleEdit::RemoveBadge { .. } => {
+                    (t!(cx, "edit-badge"), t!(cx, "edit-no-badge"))
+                }
+            };
+            add(what, before, after);
+        }
         if self.pending.forget_roads {
             let (saved, _) = self.discovered_roads();
             add(
@@ -962,6 +1045,9 @@ impl Session {
             // A move that no longer fits (an earlier one took the slot) is skipped; the page
             // only offers moves that fit the preview, which this builds.
             let _ = save::move_to_garage(&mut slot.game, id, garage);
+        }
+        for edit in &self.pending.vehicle_edits {
+            save::apply_vehicle_edit(&mut slot.game, edit);
         }
         for removal in &self.pending.removed {
             // One that no longer can (an earlier change took its place) is skipped; pages only

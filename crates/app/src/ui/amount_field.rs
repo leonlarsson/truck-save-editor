@@ -24,6 +24,9 @@ pub struct AmountChanged(pub i64);
 pub struct AmountField {
     /// Small, to sit in a row of other small fields (detail panels); large otherwise.
     is_compact: bool,
+    /// The input's element id (`amount-input` unless named), so a panel with several fields can
+    /// tell them apart (tests find fields by it).
+    element_id: SharedString,
     /// The field's own focus, outside the text box: where focus goes when it leaves editing, so it
     /// stays inside whatever holds the field (a panel still hears Esc to close).
     focus_handle: FocusHandle,
@@ -70,6 +73,7 @@ impl AmountField {
             input,
             focus_handle: cx.focus_handle(),
             is_compact: false,
+            element_id: "amount-input".into(),
             value,
             min: None,
             label: label.into(),
@@ -84,6 +88,12 @@ impl AmountField {
     /// The small size, matching the other fields in a detail panel.
     pub fn compact(mut self) -> Self {
         self.is_compact = true;
+        self
+    }
+
+    /// Names the input element (see `element_id`).
+    pub fn id(mut self, id: impl Into<SharedString>) -> Self {
+        self.element_id = id.into();
         self
     }
 
@@ -196,7 +206,7 @@ impl Render for AmountField {
             }))
             .child(
                 Input::new(&self.input)
-                    .id("amount-input")
+                    .id(self.element_id.clone())
                     .when(self.is_compact, |input| input.small())
                     .when(!self.is_compact, |input| input.large())
                     .aria_label(self.label.clone())

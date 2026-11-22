@@ -1,4 +1,5 @@
-//! One truck, coach or trailer: its plate, odometer, fuel and the wear of each part.
+//! One truck, coach or trailer: its plate (and its colours), odometer, fuel, badge, a trailer's
+//! cargo, weight and the countries it may enter, and the wear of each part.
 
 use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Sizable as _, WindowExt as _,
@@ -6,6 +7,7 @@ use gpui_kit::component::{
     h_flex,
     input::{Input, InputEvent, InputState},
     progress::Progress,
+    select::{SearchableVec, Select, SelectEvent, SelectItem, SelectState},
     v_flex,
 };
 use gpui_kit::{
@@ -38,6 +40,13 @@ pub struct VehicleDetail {
     plate: Entity<InputState>,
     /// The garage, as a picker that moves the truck (trucks in a garage only).
     garage: Option<Entity<GaragePicker>>,
+    /// The fuel level in percent (trucks and coaches): more than 100 is more than the tank holds.
+    fuel: Option<Entity<AmountField>>,
+    /// A trailer's cargo and its own weight, in kilograms (all its trailers together).
+    cargo: Option<Entity<AmountField>>,
+    empty_weight: Option<Entity<AmountField>>,
+    /// Colour schemes for the plate.
+    plate_colours: Entity<SelectState<SearchableVec<PlateColours>>>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -53,6 +62,7 @@ impl VehicleDetail {
         let label = t!(cx, "column-odometer");
         let odometer = cx.new(|cx| {
             AmountField::new(odometer_km, label, window, cx)
+                .id("odometer-input")
                 .min(0)
                 .suffix("km")
                 .compact()
@@ -69,7 +79,59 @@ impl VehicleDetail {
             let (session, id) = (session.clone(), id.clone());
             cx.new(|cx| GaragePicker::new(session, id, true, window, cx))
         });
-        let _subscriptions = vec![
+        let fuel = vehicle.as_ref().and_then(|v| v.fuel).map(|fuel| {
+            let percent = (f64::from(fuel) * 100.0).round() as i64;
+            let label = t!(cx, "column-fuel");
+            cx.new(|cx| {
+                AmountField::new(percent, label, window, cx)
+                    .id("fuel-input")
+                    .min(0)
+                    .suffix("%")
+                    .compact()
+            })
+        });
+        let load = vehicle
+            .as_ref()
+            .filter(|v| v.kind == VehicleKind::Trailer)
+            .and_then(|_| session.read(cx).trailer_load(&id));
+        let cargo = load.as_ref().map(|load| {
+            let label = t!(cx, "trailer-cargo");
+            let kg = load.cargo_kg.round() as i64;
+            cx.new(|cx| {
+                AmountField::new(kg, label, window, cx)
+                    .id("cargo-input")
+                    .min(0)
+                    .suffix("kg")
+                    .compact()
+            })
+        });
+        let empty_weight = load.as_ref().map(|load| {
+            let label = t!(cx, "trailer-empty-weight");
+            let kg = load.empty_kg.round() as i64;
+            cx.new(|cx| {
+                AmountField::new(kg, label, window, cx)
+                    .id("empty-weight-input")
+                    .min(0)
+                    .suffix("kg")
+                    .compact()
+            })
+        });
+        let plate_colours = cx.new(|cx| {
+            SelectState::new(SearchableVec::new(PlateColours::all(cx)), None, window, cx)
+        });
+        let mut _subscriptions = vec![
+            cx.subscribe_in(
+                &plate_colours,
+                window,
+                |this, _, event: &SelectEvent<SearchableVec<PlateColours>>, window, cx| {
+                    if let SelectEvent::Confirm(Some(key)) = event {
+                        this.write_plate_colours(key, cx);
+                        // An action, not a setting: the list goes back to its prompt.
+                        this.plate_colours
+                            .update(cx, |select, cx| select.set_selected_index(None, window, cx));
+                    }
+                },
+            ),
             cx.subscribe(&odometer, |this, _, AmountChanged(km), cx| {
                 let id = this.id.clone();
                 let km = (*km).max(0).to_string();
@@ -87,12 +149,46 @@ impl VehicleDetail {
                 this.sync(window, cx)
             }),
         ];
+        if let Some(field) = &fuel {
+            _subscriptions.push(cx.subscribe(field, |this, _, AmountChanged(percent), cx| {
+                let edit = save::VehicleEdit::Fuel {
+                    vehicle: this.id.clone(),
+                    ratio: (*percent).max(0) as f64 / 100.0,
+                };
+                this.session
+                    .update(cx, |session, cx| session.edit_vehicle(edit, cx));
+            }));
+        }
+        if let Some(field) = &cargo {
+            _subscriptions.push(cx.subscribe(field, |this, _, AmountChanged(kg), cx| {
+                let edit = save::VehicleEdit::CargoMass {
+                    trailer: this.id.clone(),
+                    kg: (*kg).max(0) as f64,
+                };
+                this.session
+                    .update(cx, |session, cx| session.edit_vehicle(edit, cx));
+            }));
+        }
+        if let Some(field) = &empty_weight {
+            _subscriptions.push(cx.subscribe(field, |this, _, AmountChanged(kg), cx| {
+                let edit = save::VehicleEdit::EmptyMass {
+                    trailer: this.id.clone(),
+                    kg: (*kg).max(0) as f64,
+                };
+                this.session
+                    .update(cx, |session, cx| session.edit_vehicle(edit, cx));
+            }));
+        }
         Self {
             session,
             id,
             odometer,
             plate,
             garage,
+            fuel,
+            cargo,
+            empty_weight,
+            plate_colours,
             _subscriptions,
         }
     }
@@ -111,7 +207,46 @@ impl VehicleDetail {
                 input.set_value(vehicle.plate.clone(), window, cx)
             });
         }
+        if let (Some(field), Some(fuel)) = (&self.fuel, vehicle.fuel) {
+            let percent = (f64::from(fuel) * 100.0).round() as i64;
+            if field.read(cx).value() != percent {
+                field.update(cx, |field, cx| field.set_value(percent, window, cx));
+            }
+        }
+        if let Some(load) = self.session.read(cx).trailer_load(&self.id) {
+            for (field, kg) in [
+                (&self.cargo, load.cargo_kg),
+                (&self.empty_weight, load.empty_kg),
+            ] {
+                let kg = kg.round() as i64;
+                if let Some(field) = field
+                    && field.read(cx).value() != kg
+                {
+                    field.update(cx, |field, cx| field.set_value(kg, window, cx));
+                }
+            }
+        }
         cx.notify();
+    }
+
+    /// Writes the plate in a colour scheme (or plain again), keeping its text and country.
+    fn write_plate_colours(&mut self, key: &str, cx: &mut Context<Self>) {
+        let Some(vehicle) = find(&self.session, &self.id, cx) else {
+            return;
+        };
+        let country = vehicle.plate_country.clone().unwrap_or_default();
+        let plate = match PlateColours::colours(key) {
+            Some((background, letters)) => {
+                save::coloured_plate(&vehicle.plate, &country, background, letters)
+            }
+            None if country.is_empty() => vehicle.plate.clone(),
+            None => format!("{}|{country}", vehicle.plate),
+        };
+        let value = format!("\"{plate}\"");
+        let id = self.id.clone();
+        self.session.update(cx, |session, cx| {
+            session.set_field(&id, "license_plate", None, value, cx)
+        });
     }
 
     /// Writes the plate, keeping its country (`AB 123|germany`). Formatting tags the game put
@@ -270,6 +405,11 @@ impl Render for VehicleDetail {
         };
         let id = self.id.clone();
         let refuel_id = self.id.clone();
+        let has_badge =
+            vehicle.kind == VehicleKind::Truck && self.session.read(cx).has_badge(&self.id);
+        let load = (vehicle.kind == VehicleKind::Trailer)
+            .then(|| self.session.read(cx).trailer_load(&self.id))
+            .flatten();
         v_flex()
             .pt_2()
             .gap_6()
@@ -280,6 +420,15 @@ impl Render for VehicleDetail {
                     .child(fact(
                         t!(cx, "column-plate"),
                         div().w(rems(11.)).child(Input::new(&self.plate).small()),
+                        cx,
+                    ))
+                    .child(fact(
+                        t!(cx, "plate-colours"),
+                        div().w(rems(11.)).child(
+                            Select::new(&self.plate_colours)
+                                .small()
+                                .placeholder(t!(cx, "plate-colours-pick")),
+                        ),
                         cx,
                     ))
                     .child(match &self.garage {
@@ -293,20 +442,20 @@ impl Render for VehicleDetail {
                         div().w(rems(11.)).child(self.odometer.clone()),
                         cx,
                     ))
-                    .children(vehicle.fuel.map(|fuel| {
-                        let percent = (fuel * 100.0).floor() as i64;
+                    .children(self.fuel.clone().map(|field| {
+                        let is_full = vehicle.fuel.is_some_and(|fuel| fuel >= 1.0);
                         fact(
                             t!(cx, "column-fuel"),
                             h_flex()
                                 .gap_2()
                                 .items_center()
-                                .child(t!(cx, "percent", amount = percent))
+                                .child(div().w(rems(7.)).child(field))
                                 .child(
                                     Button::new("fill-tank")
                                         .xsmall()
                                         .ghost()
                                         .label(t!(cx, "fill-tank"))
-                                        .disabled(percent >= 100)
+                                        .disabled(is_full)
                                         .on_click(cx.listener(move |this, _, _, cx| {
                                             let id = refuel_id.clone();
                                             this.session
@@ -315,8 +464,81 @@ impl Render for VehicleDetail {
                                 ),
                             cx,
                         )
+                    }))
+                    .children(has_badge.then(|| {
+                        let id = self.id.clone();
+                        fact(
+                            t!(cx, "truck-badge"),
+                            Button::new("remove-badge")
+                                .xsmall()
+                                .ghost()
+                                .label(t!(cx, "truck-remove-badge"))
+                                .on_click(cx.listener(move |this, _, _, cx| {
+                                    let edit = save::VehicleEdit::RemoveBadge {
+                                        vehicle: id.clone(),
+                                    };
+                                    this.session
+                                        .update(cx, |session, cx| session.edit_vehicle(edit, cx));
+                                })),
+                            cx,
+                        )
                     })),
             ))
+            .children(load.map(|load| {
+                let id = self.id.clone();
+                let countries = if load.countries.is_empty() {
+                    t!(cx, "trailer-everywhere")
+                } else {
+                    load.countries
+                        .iter()
+                        .map(|token| game_data::country_name(cx, token))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                        .into()
+                };
+                group(
+                    t!(cx, "trailer-load"),
+                    v_flex()
+                        .gap_1()
+                        .children(self.cargo.clone().map(|field| {
+                            fact(t!(cx, "trailer-cargo"), div().w(rems(11.)).child(field), cx)
+                        }))
+                        .children(self.empty_weight.clone().map(|field| {
+                            fact(
+                                t!(cx, "trailer-empty-weight"),
+                                div().w(rems(11.)).child(field),
+                                cx,
+                            )
+                        }))
+                        .child(
+                            v_flex()
+                                .gap_1()
+                                .child(fact(
+                                    t!(cx, "trailer-countries"),
+                                    Button::new("unrestrict")
+                                        .xsmall()
+                                        .ghost()
+                                        .label(t!(cx, "trailer-allow-everywhere"))
+                                        .disabled(load.countries.is_empty())
+                                        .on_click(cx.listener(move |this, _, _, cx| {
+                                            let edit = save::VehicleEdit::Unrestrict {
+                                                trailer: id.clone(),
+                                            };
+                                            this.session.update(cx, |session, cx| {
+                                                session.edit_vehicle(edit, cx)
+                                            });
+                                        })),
+                                    cx,
+                                ))
+                                .child(
+                                    div()
+                                        .text_xs()
+                                        .text_color(cx.theme().muted_foreground)
+                                        .child(countries),
+                                ),
+                        ),
+                )
+            }))
             .child(group(t!(cx, "column-wear"), wear))
             .child(super::actions_row(
                 Button::new("repair-vehicle")
@@ -379,4 +601,59 @@ pub fn open(
             .child(name.clone());
         sheet.title(title).size(px(SHEET_WIDTH)).child(view.clone())
     });
+}
+
+/// A colour scheme for a plate, in the plate colours list.
+#[derive(Clone)]
+struct PlateColours {
+    key: SharedString,
+    name: SharedString,
+}
+
+impl PlateColours {
+    /// The schemes, with the game's own plate first.
+    fn all(cx: &gpui_kit::App) -> Vec<PlateColours> {
+        let scheme = |key: &'static str, name: SharedString| PlateColours {
+            key: key.into(),
+            name,
+        };
+        vec![
+            scheme("plain", t!(cx, "plate-plain")),
+            scheme("yellow", t!(cx, "plate-black-on-yellow")),
+            scheme("white", t!(cx, "plate-black-on-white")),
+            scheme("black", t!(cx, "plate-white-on-black")),
+            scheme("blue", t!(cx, "plate-white-on-blue")),
+            scheme("red", t!(cx, "plate-white-on-red")),
+            scheme("green", t!(cx, "plate-white-on-green")),
+            scheme("gold", t!(cx, "plate-gold-on-black")),
+        ]
+    }
+
+    /// (background, letters) as red, green, blue; `None` for the game's own plate.
+    fn colours(key: &str) -> Option<([u8; 3], [u8; 3])> {
+        const BLACK: [u8; 3] = [0, 0, 0];
+        const WHITE: [u8; 3] = [255, 255, 255];
+        match key {
+            "yellow" => Some(([255, 204, 0], BLACK)),
+            "white" => Some((WHITE, BLACK)),
+            "black" => Some((BLACK, WHITE)),
+            "blue" => Some(([0, 51, 153], WHITE)),
+            "red" => Some(([190, 20, 30], WHITE)),
+            "green" => Some(([0, 110, 60], WHITE)),
+            "gold" => Some((BLACK, [212, 175, 55])),
+            _ => None,
+        }
+    }
+}
+
+impl SelectItem for PlateColours {
+    type Value = SharedString;
+
+    fn title(&self) -> SharedString {
+        self.name.clone()
+    }
+
+    fn value(&self) -> &Self::Value {
+        &self.key
+    }
 }

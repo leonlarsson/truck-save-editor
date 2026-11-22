@@ -15,6 +15,8 @@ pub(crate) struct Cities {
     pub countries: BTreeMap<String, String>,
     /// Country token → its short code (`italy` → `I`).
     pub country_codes: BTreeMap<String, String>,
+    /// Country token → the key of its name in the game's text (`italy`).
+    pub country_names: BTreeMap<String, String>,
 }
 
 impl Cities {
@@ -48,6 +50,12 @@ impl Cities {
             let Some(token) = unit.id.strip_prefix("country.data.") else {
                 continue;
             };
+            let name_key = unit
+                .single("name_localized")
+                .map(|key| sii::value::parse_string(key).trim_matches('@').to_string())
+                .filter(|key| !key.is_empty())
+                .unwrap_or_else(|| token.to_string());
+            self.country_names.insert(token.to_string(), name_key);
             if let Some(code) = unit.single("country_code") {
                 let code = sii::value::parse_string(code).to_string();
                 if !code.is_empty() {

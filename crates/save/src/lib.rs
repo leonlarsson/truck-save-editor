@@ -24,6 +24,7 @@ mod removals;
 mod store;
 #[cfg(feature = "native")]
 mod time;
+mod vehicle_edits;
 
 pub use career::{ADR_ALL, Career, CoachSkills, MAX_COACH_SKILL_LEVEL, MAX_SKILL_LEVEL, Skills};
 pub use current_job::{CurrentJob, JobKind, cancel_job, current_job, remove_job_deadline};
@@ -58,6 +59,10 @@ pub use store::{
 };
 #[cfg(feature = "native")]
 pub use time::{utc_parts, utc_timestamp};
+pub use vehicle_edits::{
+    TrailerLoad, VehicleEdit, apply_vehicle_edit, badge, coloured_plate, trailer_chain,
+    trailer_load,
+};
 
 /// The newest save format version (`version` in `info.sii`) the editor has been tested with.
 /// Newer saves still open, with a warning (see `docs/compatibility.md`).

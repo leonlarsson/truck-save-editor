@@ -285,7 +285,7 @@ fn escape_leaves_a_field_then_closes_its_panel(cx: &mut TestAppContext) {
         .advance_clock(std::time::Duration::from_secs(1));
     cx.run_until_parked();
 
-    act(cx, handle, |window, cx| window.click("amount-input", cx));
+    act(cx, handle, |window, cx| window.click("odometer-input", cx));
     act(cx, handle, |window, cx| window.press("escape", cx));
     act(cx, handle, |window, _| {
         assert!(

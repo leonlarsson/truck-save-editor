@@ -86,6 +86,14 @@ pub fn coach_rank(cx: &App, level: i64) -> Option<String> {
     data(cx)?.coach_rank(level)
 }
 
+/// A country's name in the app's language, by its token (`italy` → `Italy`); made from the token
+/// when the game's data isn't there.
+pub fn country_name(cx: &App, token: &str) -> String {
+    data(cx)
+        .and_then(|d| d.country_name(token))
+        .unwrap_or_else(|| save::city_display_name(token))
+}
+
 /// A city's name: the game's own (`Malmö`), else made from its token (`Malmo`), with its
 /// country's short code as the game shows a city in jobs and the delivery log: `Verona (I)`,
 /// `Maribor (SLO)` (when the game's data is there).
