@@ -251,11 +251,11 @@ fn renaming_the_company_changes_only_its_name(cx: &mut TestAppContext) {
 fn ctrl_and_a_number_goes_to_a_page_and_enter_opens_a_row(cx: &mut TestAppContext) {
     let slot = TempSlot::new("keyboard");
     let (handle, _) = open(cx, &slot);
-    act(cx, handle, |window, cx| window.press("ctrl-2", cx));
+    act(cx, handle, |window, cx| window.press("ctrl-3", cx));
     act(cx, handle, |window, _| {
         assert!(
             window.try_find("refuel-all").is_some(),
-            "Ctrl+2 shows Fleet"
+            "Ctrl+3 shows Fleet"
         );
     });
 
@@ -278,7 +278,7 @@ fn ctrl_and_a_number_goes_to_a_page_and_enter_opens_a_row(cx: &mut TestAppContex
 fn escape_leaves_a_field_then_closes_its_panel(cx: &mut TestAppContext) {
     let slot = TempSlot::new("escape");
     let (handle, _) = open(cx, &slot);
-    act(cx, handle, |window, cx| window.press("ctrl-2", cx));
+    act(cx, handle, |window, cx| window.press("ctrl-3", cx));
     act(cx, handle, |window, cx| {
         window.click(("details", 0usize), cx)
     });
@@ -310,7 +310,7 @@ fn escape_leaves_a_field_then_closes_its_panel(cx: &mut TestAppContext) {
 fn a_search_with_no_matches_offers_to_clear_it(cx: &mut TestAppContext) {
     let slot = TempSlot::new("no-matches");
     let (handle, _) = open(cx, &slot);
-    act(cx, handle, |window, cx| window.press("ctrl-2", cx));
+    act(cx, handle, |window, cx| window.press("ctrl-3", cx));
     act(cx, handle, |window, cx| window.click("filter-search", cx));
     act(cx, handle, |window, cx| window.input("no such truck", cx));
     act(cx, handle, |window, _| {
@@ -364,7 +364,7 @@ fn session(
 fn the_current_job_can_be_cancelled_and_brought_back(cx: &mut TestAppContext) {
     let slot = TempSlot::new("cancel-job");
     let (handle, workspace) = open(cx, &slot);
-    act(cx, handle, |window, cx| window.press("ctrl-6", cx));
+    act(cx, handle, |window, cx| window.press("ctrl-7", cx));
     let session = session(&workspace, cx);
     let has_job =
         |cx: &mut TestAppContext| cx.update(|cx| session.read(cx).current_job().is_some());
@@ -390,7 +390,7 @@ fn the_current_job_can_be_cancelled_and_brought_back(cx: &mut TestAppContext) {
 fn the_current_job_can_lose_its_deadline(cx: &mut TestAppContext) {
     let slot = TempSlot::new("job-deadline");
     let (handle, workspace) = open(cx, &slot);
-    act(cx, handle, |window, cx| window.press("ctrl-6", cx));
+    act(cx, handle, |window, cx| window.press("ctrl-7", cx));
     let session = session(&workspace, cx);
     let deadline = |cx: &mut TestAppContext| {
         cx.update(|cx| session.read(cx).current_job().and_then(|job| job.deadline))

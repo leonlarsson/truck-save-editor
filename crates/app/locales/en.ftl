@@ -760,3 +760,30 @@ picks-removed-all = { $count ->
 picks-clear = Clear
 picks-all = Pick every row shown
 picks-row = Pick { $name }
+
+## Statistics
+page-statistics = Statistics
+stats-deliveries = Deliveries
+stats-income = Earned from deliveries
+stats-xp = XP from deliveries
+stats-driven = Driven in all
+stats-days = Days on the road
+stats-average = Average per delivery
+stats-favourite = Hauled most
+stats-favourite-value = { $cargo } ({ $count })
+stats-cancelled = Jobs cancelled
+stats-note = From the game's delivery log. Read-only: the game keeps these numbers itself.
+stats-search = Search by cargo or city
+stats-filter-damaged = Damaged cargo
+stats-table = Deliveries
+stats-none = No deliveries yet
+stats-none-body = Each cargo you deliver shows here, newest first.
+stats-when = { $days ->
+    [0] Today
+    [1] Yesterday
+   *[other] { $days } days ago
+}
+column-when = When
+column-income = Income
+column-xp = XP
+column-damage = Damage

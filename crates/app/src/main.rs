@@ -57,6 +57,7 @@ pub fn bind_keys(cx: &mut gpui_kit::App) {
         KeyBinding::new("ctrl-6", workspace::GoToPage6, None),
         KeyBinding::new("ctrl-7", workspace::GoToPage7, None),
         KeyBinding::new("ctrl-8", workspace::GoToPage8, None),
+        KeyBinding::new("ctrl-9", workspace::GoToPage9, None),
     ]);
 }
 

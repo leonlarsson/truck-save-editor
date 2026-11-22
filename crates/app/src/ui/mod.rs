@@ -10,6 +10,7 @@ mod level_picker;
 mod page;
 mod picks;
 mod section;
+mod stat;
 mod step_buttons;
 mod text_table;
 
@@ -22,6 +23,7 @@ pub use level_picker::LevelPicker;
 pub use page::{PageHeader, page_body};
 pub use picks::{Choice, PickBar, Picks, owned_garages, pick_box};
 pub use section::Section;
+pub use stat::Stat;
 pub use step_buttons::StepButtons;
 pub use text_table::{RowLook, TextColumn, TextRow, TextTable};
 

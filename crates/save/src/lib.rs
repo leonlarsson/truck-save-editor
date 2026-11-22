@@ -25,6 +25,7 @@ mod profile_tools;
 #[cfg(feature = "native")]
 mod profiles;
 mod removals;
+mod statistics;
 #[cfg(feature = "native")]
 mod store;
 #[cfg(feature = "native")]
@@ -78,6 +79,10 @@ pub use profiles::{
     profile_slots,
 };
 pub use removals::{Removal, RemoveProblem, can_remove, discovered_roads, forget_roads, remove};
+pub use statistics::{
+    Delivery, DeliveryKind, Earnings, Totals, deliveries, driver_earnings, earnings, totals,
+    truck_earnings,
+};
 #[cfg(feature = "native")]
 pub use store::{
     Backup, LoadedSlot, back_up, backups, is_game_running, load, restore, save, save_as_new_slot,

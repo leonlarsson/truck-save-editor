@@ -553,3 +553,26 @@ fn real_saves_take_the_players_day_edits() {
         );
     }
 }
+
+#[test]
+fn real_saves_have_readable_statistics() {
+    for (index, dir) in slot_dirs().into_iter().enumerate() {
+        let slot = save::load(&dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display()));
+        let deliveries = save::deliveries(&slot.game);
+        assert!(
+            deliveries
+                .iter()
+                .all(|delivery| !delivery.cargo.is_empty() && delivery.distance_km >= 0),
+            "save {index}: every delivery has a cargo"
+        );
+        let totals = save::totals(&slot.game);
+        if !deliveries.is_empty() {
+            assert!(
+                totals.distance_km > 0,
+                "save {index}: it has driven somewhere"
+            );
+        }
+        // Only counts, nothing personal.
+        println!("save {index}: {} deliveries", deliveries.len());
+    }
+}

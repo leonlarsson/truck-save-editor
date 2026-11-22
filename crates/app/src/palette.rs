@@ -206,6 +206,7 @@ fn item(command: PaletteCommand, cx: &App) -> CommandItem {
 fn page_shortcut(page: Page) -> Option<Box<dyn gpui_kit::Action>> {
     use crate::workspace::{
         GoToPage1, GoToPage2, GoToPage3, GoToPage4, GoToPage5, GoToPage6, GoToPage7, GoToPage8,
+        GoToPage9,
     };
     let index = Page::ALL.iter().position(|p| *p == page)?;
     let action: Box<dyn gpui_kit::Action> = match index {
@@ -217,6 +218,7 @@ fn page_shortcut(page: Page) -> Option<Box<dyn gpui_kit::Action>> {
         5 => Box::new(GoToPage6),
         6 => Box::new(GoToPage7),
         7 => Box::new(GoToPage8),
+        8 => Box::new(GoToPage9),
         _ => return None,
     };
     Some(action)

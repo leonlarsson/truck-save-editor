@@ -12,6 +12,7 @@ pub mod overview;
 pub mod position;
 pub mod profile_tools;
 pub mod settings;
+pub mod statistics;
 
 use gpui_kit::{App, SharedString};
 
@@ -23,6 +24,7 @@ use gpui_kit::assets::IconName;
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Page {
     Overview,
+    Statistics,
     Fleet,
     Garages,
     Drivers,
@@ -33,8 +35,9 @@ pub enum Page {
 }
 
 impl Page {
-    pub const ALL: [Page; 8] = [
+    pub const ALL: [Page; 9] = [
         Page::Overview,
+        Page::Statistics,
         Page::Fleet,
         Page::Garages,
         Page::Drivers,
@@ -43,7 +46,7 @@ impl Page {
         Page::AllData,
         Page::Settings,
     ];
-    pub const CAREER: [Page; 1] = [Page::Overview];
+    pub const CAREER: [Page; 2] = [Page::Overview, Page::Statistics];
     pub const COMPANY: [Page; 5] = [
         Page::Fleet,
         Page::Garages,
@@ -56,6 +59,7 @@ impl Page {
     pub fn title(self, cx: &App) -> SharedString {
         match self {
             Page::Overview => t!(cx, "page-overview"),
+            Page::Statistics => t!(cx, "page-statistics"),
             Page::Fleet => t!(cx, "page-fleet"),
             Page::Garages => t!(cx, "page-garages"),
             Page::Drivers => t!(cx, "page-drivers"),
@@ -70,6 +74,7 @@ impl Page {
     pub fn slug(self) -> &'static str {
         match self {
             Page::Overview => "overview",
+            Page::Statistics => "statistics",
             Page::Fleet => "fleet",
             Page::Garages => "garages",
             Page::Drivers => "drivers",
@@ -83,6 +88,7 @@ impl Page {
     pub fn icon(self) -> IconName {
         match self {
             Page::Overview => IconName::Gauge,
+            Page::Statistics => IconName::ChartNoAxesColumn,
             Page::Fleet => IconName::Truck,
             Page::Garages => IconName::Warehouse,
             Page::Drivers => IconName::Users,

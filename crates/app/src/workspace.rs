@@ -62,6 +62,7 @@ gpui_kit::actions!(
         GoToPage6,
         GoToPage7,
         GoToPage8,
+        GoToPage9,
     ]
 );
 
@@ -149,6 +150,7 @@ pub struct Workspace {
 struct Opened {
     session: Entity<Session>,
     overview: Entity<OverviewPage>,
+    statistics: Entity<crate::pages::statistics::StatisticsPage>,
     fleet: Entity<FleetPage>,
     garages: Entity<GaragesPage>,
     drivers: Entity<DriversPage>,
@@ -276,6 +278,8 @@ impl Workspace {
         cx: &mut Context<Self>,
     ) {
         let overview = cx.new(|cx| OverviewPage::new(session.clone(), window, cx));
+        let statistics =
+            cx.new(|cx| crate::pages::statistics::StatisticsPage::new(session.clone(), window, cx));
         let fleet = cx.new(|cx| FleetPage::new(session.clone(), window, cx));
         let garages = cx.new(|cx| GaragesPage::new(session.clone(), window, cx));
         let drivers = cx.new(|cx| DriversPage::new(session.clone(), window, cx));
@@ -287,6 +291,7 @@ impl Workspace {
         self.opened = Some(Opened {
             session,
             overview,
+            statistics,
             fleet,
             garages,
             drivers,
@@ -305,7 +310,7 @@ impl Workspace {
         self.opened.as_ref().map(|opened| opened.session.clone())
     }
 
-    /// Ctrl+1 … Ctrl+8: the pages in the sidebar's order.
+    /// Ctrl+1 … Ctrl+9: the pages in the sidebar's order.
     fn go_to_page(&mut self, index: usize, cx: &mut Context<Self>) {
         if let Some(page) = Page::ALL.get(index) {
             self.page = *page;
@@ -995,6 +1000,10 @@ impl Workspace {
                 .overflow_y_scroll()
                 .child(opened.overview.clone())
                 .into_any_element(),
+            Page::Statistics => div()
+                .size_full()
+                .child(opened.statistics.clone())
+                .into_any_element(),
             Page::Fleet => div()
                 .size_full()
                 .child(opened.fleet.clone())
@@ -1056,6 +1065,7 @@ impl Render for Workspace {
             .on_action(cx.listener(|this, _: &GoToPage6, _, cx| this.go_to_page(5, cx)))
             .on_action(cx.listener(|this, _: &GoToPage7, _, cx| this.go_to_page(6, cx)))
             .on_action(cx.listener(|this, _: &GoToPage8, _, cx| this.go_to_page(7, cx)))
+            .on_action(cx.listener(|this, _: &GoToPage9, _, cx| this.go_to_page(8, cx)))
             .bg(cx.theme().background)
             .text_color(cx.theme().foreground)
             .child(self.render_sidebar(&session, cx))

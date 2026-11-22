@@ -31,7 +31,8 @@ gpui_kit::assets::icon_assets!(
         Wallet,
         Warehouse,
         Wrench,
-        Award
+        Award,
+        ChartNoAxesColumn
     ]
 );
 

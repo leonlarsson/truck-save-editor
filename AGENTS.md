@@ -88,7 +88,7 @@ Dependencies point downward: `app` → `gamedata` → `save` → `sii`, and `gam
 - **Build screens from the UI kit** in `crates/app/src/ui/` (our own components, wrapping `gpui-component` where it helps). Screens don't style raw elements ad hoc. A missing component goes in the kit.
 - **Colours, spacing, radii, type sizes and durations come only from theme tokens** (`ui/theme.rs`), defined for light and dark. Check both after changing the kit.
 - Loading, decoding and saving run on the background executor; the UI shows progress and stays responsive.
-- Keyboard shortcuts are GPUI actions with their key bindings registered in one place (`bind_keys` in `main.rs`): Ctrl+K palette, Ctrl+Z / Ctrl+Shift+Z undo and redo (anywhere, panels included), Ctrl+1…8 pages, Enter on a table row opens its panel. Icon-only buttons get an `accessibility_label` as well as a tooltip.
+- Keyboard shortcuts are GPUI actions with their key bindings registered in one place (`bind_keys` in `main.rs`): Ctrl+K palette, Ctrl+Z / Ctrl+Shift+Z undo and redo (anywhere, panels included), Ctrl+1…9 pages, Enter on a table row opens its panel. Icon-only buttons get an `accessibility_label` as well as a tooltip.
 - One entity holds an open save; views observe it.
 
 ## Safety: real saves and personal data

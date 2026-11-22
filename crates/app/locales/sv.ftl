@@ -760,3 +760,30 @@ picks-removed-all = { $count ->
 picks-clear = Rensa
 picks-all = Välj varje rad som visas
 picks-row = Välj { $name }
+
+## Statistics
+page-statistics = Statistik
+stats-deliveries = Leveranser
+stats-income = Intjänat på leveranser
+stats-xp = XP från leveranser
+stats-driven = Kört totalt
+stats-days = Dagar på vägen
+stats-average = Snitt per leverans
+stats-favourite = Kört mest
+stats-favourite-value = { $cargo } ({ $count })
+stats-cancelled = Avbrutna uppdrag
+stats-note = Från spelets leveranslogg. Kan inte ändras: spelet håller själv i de här siffrorna.
+stats-search = Sök efter last eller stad
+stats-filter-damaged = Skadad last
+stats-table = Leveranser
+stats-none = Inga leveranser än
+stats-none-body = Varje last du levererar visas här, den senaste först.
+stats-when = { $days ->
+    [0] I dag
+    [1] I går
+   *[other] För { $days } dagar sedan
+}
+column-when = När
+column-income = Inkomst
+column-xp = XP
+column-damage = Skada
