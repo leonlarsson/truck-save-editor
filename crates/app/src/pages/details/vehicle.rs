@@ -621,6 +621,51 @@ impl Render for VehicleDetail {
                         };
                         fact(t!(cx, "player-truck"), content, cx)
                     }))
+                    .children((vehicle.kind == VehicleKind::Trailer).then(|| {
+                        let session = self.session.read(cx);
+                        let is_yours = save::own_trailer(&session.preview()).as_deref()
+                            == Some(self.id.as_str());
+                        let problem = session.can_take_trailer(&self.id).err();
+                        let id = self.id.clone();
+                        let content = if is_yours {
+                            div()
+                                .text_sm()
+                                .child(t!(cx, "player-trailer-yours"))
+                                .into_any_element()
+                        } else {
+                            let why = problem.and_then(|problem| match problem {
+                                save::PlayerProblem::OnJob => Some(t!(cx, "player-why-on-job")),
+                                _ => None,
+                            });
+                            v_flex()
+                                .items_end()
+                                .gap_1()
+                                .child(
+                                    Button::new("pull-trailer")
+                                        .xsmall()
+                                        .outline()
+                                        .label(t!(cx, "player-pull"))
+                                        .tooltip(t!(cx, "player-pull-tooltip"))
+                                        .disabled(problem.is_some())
+                                        .on_click(cx.listener(move |this, _, _, cx| {
+                                            let edit = save::PlayerEdit::TakeTrailer {
+                                                trailer: id.clone(),
+                                            };
+                                            this.session.update(cx, |session, cx| {
+                                                session.edit_player(edit, cx)
+                                            });
+                                        })),
+                                )
+                                .children(why.map(|why| {
+                                    div()
+                                        .text_xs()
+                                        .text_color(cx.theme().muted_foreground)
+                                        .child(why)
+                                }))
+                                .into_any_element()
+                        };
+                        fact(t!(cx, "player-trailer"), content, cx)
+                    }))
                     .children(has_badge.then(|| {
                         let id = self.id.clone();
                         fact(

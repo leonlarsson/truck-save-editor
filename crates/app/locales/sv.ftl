@@ -695,3 +695,44 @@ player-move-description = Din lastbil flyttas dit den står i en annan sparfil i
 player-move-reading = Läser ”{ $save }”…
 player-move-no-position = ”{ $save }” säger inte var din lastbil är.
 player-move-hitched = Koppla loss trailern i spelet först: den skulle också behöva en plats.
+
+# Your day
+day-section = Din dag
+day-description = Hur länge du har kört, ditt register hos polisen och klockan. Ändringar här skrivs när du sparar, som resten.
+day-since-break = Sedan din senaste rast
+day-rest = Vila
+day-rest-tooltip = Som om du hade sovit: ingen trötthet och ingen rast som väntar.
+day-rest-what = Trötthet
+day-rested = Utvilad
+day-record = Polisregister
+day-record-summary = { $count ->
+    [0] Rent
+    [one] En förseelse, { $amount } € i böter
+   *[other] { $count } förseelser, { $amount } € i böter
+}
+day-record-clear-button = Rensa registret
+day-record-tooltip = Tar bort varje förseelse ur registret. Böter som redan är betalda förblir betalda.
+day-record-clear = Rent
+day-cargo-damage = Lastskada
+day-repair-cargo = Laga lasten
+day-time = Tid
+day-time-on-job = Att flytta klockan skulle göra ditt uppdrag försenat.
+day-skip-morning = Morgon (08:00)
+day-skip-noon = Mitt på dagen (12:00)
+day-skip-evening = Kväll (18:00)
+day-skip-night = Natt (22:00)
+day-and-time = { $day } { $time }
+day-monday = måndag
+day-tuesday = tisdag
+day-wednesday = onsdag
+day-thursday = torsdag
+day-friday = fredag
+day-saturday = lördag
+day-sunday = söndag
+duration-minutes = { $minutes } min
+duration-hours = { $hours } h { $minutes } min
+player-trailer = Din trailer
+player-trailer-none = Ingen
+player-trailer-yours = Den här drar du
+player-pull = Dra den själv
+player-pull-tooltip = Gör den till trailern du drar. Den är inte påkopplad: koppla på den i spelet.

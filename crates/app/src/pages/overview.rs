@@ -2,7 +2,7 @@
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::{
-    ActiveTheme as _, Icon, Sizable as _, StyledExt as _,
+    ActiveTheme as _, Disableable as _, Icon, Sizable as _, StyledExt as _,
     button::Button,
     checkbox::Checkbox,
     h_flex,
@@ -11,7 +11,7 @@ use gpui_kit::component::{
     v_flex,
 };
 use gpui_kit::{
-    App, AppContext as _, Context, Entity, InteractiveElement as _, IntoElement,
+    AnyElement, App, AppContext as _, Context, Entity, InteractiveElement as _, IntoElement,
     ParentElement as _, Render, SharedString, StatefulInteractiveElement as _, Styled as _,
     Subscription, Window, div, rems,
 };
@@ -390,6 +390,126 @@ impl OverviewPage {
         )
     }
 
+    /// The player's day: tiredness, the police record and the clock, each with what resets it.
+    fn render_day(&self, cx: &mut Context<Self>) -> Section {
+        let preview = self.session.read(cx).preview();
+        let muted = cx.theme().muted_foreground;
+        let since_break = save::minutes_since_break(&preview);
+        let (offences, fines) = save::offences(&preview);
+        let clock = save::time_of_day(&preview);
+        let on_job = save::is_on_job(&preview);
+        let row =
+            |label: SharedString, value: SharedString, action: AnyElement, cx: &Context<Self>| {
+                h_flex()
+                    .gap_4()
+                    .flex_wrap()
+                    .items_center()
+                    .justify_between()
+                    .min_h(rems(2.25))
+                    .child(
+                        v_flex().child(div().text_sm().child(label)).child(
+                            div()
+                                .text_sm()
+                                .text_color(cx.theme().muted_foreground)
+                                .child(value),
+                        ),
+                    )
+                    .child(action)
+            };
+        let mut rows: Vec<AnyElement> = Vec::new();
+        if let Some(minutes) = since_break {
+            rows.push(
+                row(
+                    t!(cx, "day-since-break"),
+                    crate::labels::duration(cx, minutes),
+                    Button::new("rest")
+                        .small()
+                        .outline()
+                        .label(t!(cx, "day-rest"))
+                        .tooltip(t!(cx, "day-rest-tooltip"))
+                        .disabled(minutes == 0)
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.session.update(cx, |session, cx| {
+                                session.edit_player(save::PlayerEdit::Rest, cx)
+                            });
+                        }))
+                        .into_any_element(),
+                    cx,
+                )
+                .into_any_element(),
+            );
+        }
+        rows.push(
+            row(
+                t!(cx, "day-record"),
+                t!(
+                    cx,
+                    "day-record-summary",
+                    count = offences,
+                    amount = crate::format::thousands(fines)
+                ),
+                Button::new("clear-record")
+                    .small()
+                    .outline()
+                    .label(t!(cx, "day-record-clear-button"))
+                    .tooltip(t!(cx, "day-record-tooltip"))
+                    .disabled(offences == 0)
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.session.update(cx, |session, cx| {
+                            session.edit_player(save::PlayerEdit::ClearOffences, cx)
+                        });
+                    }))
+                    .into_any_element(),
+                cx,
+            )
+            .into_any_element(),
+        );
+        if let Some((day, minutes)) = clock {
+            let skip =
+                |id: &'static str, hour: i64, label: SharedString, cx: &mut Context<Self>| {
+                    Button::new(id)
+                        .small()
+                        .outline()
+                        .label(label)
+                        .disabled(on_job)
+                        .on_click(cx.listener(move |this, _, _, cx| {
+                            this.session.update(cx, |session, cx| {
+                                session.edit_player(save::PlayerEdit::SkipTo { hour }, cx)
+                            });
+                        }))
+                };
+            let buttons = h_flex()
+                .gap_2()
+                .flex_wrap()
+                .child(skip("skip-morning", 8, t!(cx, "day-skip-morning"), cx))
+                .child(skip("skip-noon", 12, t!(cx, "day-skip-noon"), cx))
+                .child(skip("skip-evening", 18, t!(cx, "day-skip-evening"), cx))
+                .child(skip("skip-night", 22, t!(cx, "day-skip-night"), cx));
+            rows.push(
+                row(
+                    t!(cx, "day-time"),
+                    crate::labels::day_time(cx, day, minutes),
+                    v_flex()
+                        .items_end()
+                        .gap_1()
+                        .child(buttons)
+                        .children(on_job.then(|| {
+                            div()
+                                .text_xs()
+                                .text_color(muted)
+                                .child(t!(cx, "day-time-on-job"))
+                        }))
+                        .into_any_element(),
+                    cx,
+                )
+                .into_any_element(),
+            );
+        }
+        Section::new(t!(cx, "day-section"))
+            .description(t!(cx, "day-description"))
+            .child(v_flex().gap_2().children(rows))
+    }
+
     fn render_adr(&self, cx: &mut Context<Self>) -> Section {
         let adr = self.session.read(cx).career().skills.adr;
         let classes = (0..ADR_CLASS_COUNT).map(|bit| {
@@ -543,7 +663,8 @@ impl Render for OverviewPage {
                 })
                 .child(self.render_skills(cx))
                 .child(self.render_adr(cx))
-                .children(self.render_coach_skills(cx)),
+                .children(self.render_coach_skills(cx))
+                .child(self.render_day(cx)),
         )
     }
 }

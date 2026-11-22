@@ -93,6 +93,9 @@ struct Pending {
     move_to: Option<(save::Position, String)>,
     /// A trip the game makes when the save loads (to a city, or to the headquarters).
     trip: Option<save::Trip>,
+    /// Changes to the player's day (rest, the police record, cargo damage, the clock, the
+    /// trailer); a later one of the same kind replaces the earlier.
+    player_edits: Vec<save::PlayerEdit>,
 }
 
 impl Pending {
@@ -120,6 +123,7 @@ impl Pending {
             drive_truck: None,
             move_to: None,
             trip: None,
+            player_edits: Vec::new(),
         }
     }
 
@@ -514,6 +518,7 @@ impl Session {
             + usize::from(self.pending.drive_truck.is_some())
             + usize::from(self.pending.move_to.is_some())
             + usize::from(self.pending.trip.is_some())
+            + self.pending.player_edits.len()
             + usize::from(self.pending.forget_roads)
     }
 
@@ -652,6 +657,21 @@ impl Session {
             pending.move_to = Some((to, from));
             pending.trip = None;
         });
+    }
+
+    /// Changes the player's day (rest, the police record, cargo damage, the clock, the trailer).
+    pub fn edit_player(&mut self, edit: save::PlayerEdit, cx: &mut Context<Self>) {
+        self.change(cx, |pending, _| {
+            pending
+                .player_edits
+                .retain(|earlier| !earlier.same_kind(&edit));
+            pending.player_edits.push(edit);
+        });
+    }
+
+    /// Whether the player can pull one of the company's trailers.
+    pub fn can_take_trailer(&self, trailer: &str) -> Result<(), save::PlayerProblem> {
+        save::can_take_trailer(&self.preview(), trailer)
     }
 
     /// Whether the game can be asked to take the player somewhere.
@@ -1072,6 +1092,59 @@ impl Session {
                 t!(cx, "player-position-from", place = place(to), save = from),
             );
         }
+        let saved = &self.loaded.game;
+        for edit in &self.pending.player_edits {
+            let (what, before, after) = match edit {
+                save::PlayerEdit::Rest => (
+                    t!(cx, "day-rest-what"),
+                    crate::labels::duration(cx, save::minutes_since_break(saved).unwrap_or(0)),
+                    t!(cx, "day-rested"),
+                ),
+                save::PlayerEdit::ClearOffences => {
+                    let (count, fines) = save::offences(saved);
+                    (
+                        t!(cx, "day-record"),
+                        t!(
+                            cx,
+                            "day-record-summary",
+                            count = count,
+                            amount = crate::format::thousands(fines)
+                        ),
+                        t!(cx, "day-record-clear"),
+                    )
+                }
+                save::PlayerEdit::RepairCargo => (
+                    t!(cx, "day-cargo-damage"),
+                    t!(
+                        cx,
+                        "percent",
+                        amount = (save::cargo_damage(saved).unwrap_or(0.0) * 100.0).round() as i64
+                    ),
+                    t!(cx, "percent", amount = 0),
+                ),
+                save::PlayerEdit::SkipTo { hour } => {
+                    let (day, minutes) = save::time_of_day(saved).unwrap_or((0, 0));
+                    let later_day = if *hour * 60 > minutes {
+                        day
+                    } else {
+                        (day + 1) % 7
+                    };
+                    (
+                        t!(cx, "day-time"),
+                        crate::labels::day_time(cx, day, minutes),
+                        crate::labels::day_time(cx, later_day, hour * 60),
+                    )
+                }
+                save::PlayerEdit::TakeTrailer { trailer } => (
+                    t!(cx, "player-trailer"),
+                    save::own_trailer(saved)
+                        .map(|id| vehicle_name(&id))
+                        .unwrap_or_else(|| t!(cx, "player-trailer-none")),
+                    vehicle_name(trailer),
+                ),
+            };
+            add(what, before, after);
+        }
         if let Some(trip) = &self.pending.trip {
             let before = save::position(&self.loaded.game)
                 .and_then(|position| position.city)
@@ -1212,6 +1285,9 @@ impl Session {
         }
         if let Some(trip) = &self.pending.trip {
             let _ = save::schedule_trip(&mut slot.game, trip);
+        }
+        for edit in &self.pending.player_edits {
+            save::apply_player_edit(&mut slot.game, edit);
         }
         for removal in &self.pending.removed {
             // One that no longer can (an earlier change took its place) is skipped; pages only

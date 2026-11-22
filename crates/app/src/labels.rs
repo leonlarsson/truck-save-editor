@@ -127,6 +127,40 @@ pub fn profile_place(cx: &App, profile: &save::Profile) -> SharedString {
     }
 }
 
+/// A length of time in game minutes: `8 h 05 min`, or `45 min`.
+pub fn duration(cx: &App, minutes: i64) -> SharedString {
+    let minutes = minutes.max(0);
+    if minutes < 60 {
+        t!(cx, "duration-minutes", minutes = minutes)
+    } else {
+        t!(
+            cx,
+            "duration-hours",
+            hours = minutes / 60,
+            minutes = format!("{:02}", minutes % 60)
+        )
+    }
+}
+
+/// A day of the week and a time (`Thursday 07:26`), as the game's clock shows them.
+pub fn day_time(cx: &App, day: i64, minutes: i64) -> SharedString {
+    let name = match day.rem_euclid(7) {
+        0 => t!(cx, "day-monday"),
+        1 => t!(cx, "day-tuesday"),
+        2 => t!(cx, "day-wednesday"),
+        3 => t!(cx, "day-thursday"),
+        4 => t!(cx, "day-friday"),
+        5 => t!(cx, "day-saturday"),
+        _ => t!(cx, "day-sunday"),
+    };
+    t!(
+        cx,
+        "day-and-time",
+        day = name,
+        time = format!("{:02}:{:02}", minutes / 60 % 24, minutes % 60)
+    )
+}
+
 /// How long ago something happened, roughly: `just now`, `5 minutes ago`, `3 years ago`.
 /// (Relative times need no time zone, and read better than dates in lists.)
 pub fn ago(cx: &App, when: SystemTime) -> SharedString {

@@ -517,3 +517,39 @@ fn real_saves_know_the_players_truck_and_position() {
         );
     }
 }
+
+/// Resting, clearing the record and moving the clock on a real save keep it whole.
+#[test]
+fn real_saves_take_the_players_day_edits() {
+    use save::PlayerEdit;
+    for (index, dir) in slot_dirs().into_iter().enumerate() {
+        let mut slot = save::load(&dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display()));
+        let before = save::time_of_day(&slot.game).expect("a clock");
+        for edit in [
+            PlayerEdit::Rest,
+            PlayerEdit::ClearOffences,
+            PlayerEdit::SkipTo { hour: 8 },
+        ] {
+            save::apply_player_edit(&mut slot.game, &edit);
+        }
+        assert_eq!(save::offences(&slot.game).0, 0, "slot {index}");
+        let after = save::time_of_day(&slot.game).expect("a clock");
+        assert_eq!(after.1, 8 * 60, "slot {index}");
+        assert!(after != before, "slot {index}: the clock moved");
+        let root = slot
+            .game
+            .first_of_kind("economy")
+            .map(|unit| unit.id.clone())
+            .expect("economy");
+        assert_eq!(
+            slot.game.reachable_from(&root).len(),
+            slot.game.len(),
+            "slot {index}: one tree"
+        );
+        let text = sii::to_text(&slot.game);
+        assert_eq!(
+            sii::to_text(&sii::parse_text(&text).expect("reads back")),
+            text
+        );
+    }
+}

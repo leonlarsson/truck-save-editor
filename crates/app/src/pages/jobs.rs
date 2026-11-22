@@ -190,6 +190,8 @@ impl JobsPage {
         let (saved, is_cancelled) = session.saved_job()?;
         let job = session.current_job().unwrap_or(saved);
         let now = session.jobs().1;
+        // Read now, while the session is borrowed; the pictures below need `cx` mutably.
+        let damage = save::cargo_damage(&session.preview());
 
         let place = |company: &str, city: &str, cx: &mut Context<Self>| {
             let logo = game_data::company_logo(cx, company);
@@ -308,7 +310,29 @@ impl JobsPage {
                         facts
                             .into_iter()
                             .map(|(label, value)| fact(label, value, cx)),
-                    ),
+                    )
+                    .children(damage.filter(|_| !is_cancelled).map(|damage| {
+                        h_flex()
+                            .gap_2()
+                            .items_end()
+                            .child(fact(
+                                t!(cx, "day-cargo-damage"),
+                                t!(cx, "percent", amount = (damage * 100.0).round() as i64),
+                                cx,
+                            ))
+                            .child(
+                                Button::new("repair-cargo")
+                                    .xsmall()
+                                    .ghost()
+                                    .label(t!(cx, "day-repair-cargo"))
+                                    .disabled(damage <= 0.0)
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        this.session.update(cx, |session, cx| {
+                                            session.edit_player(save::PlayerEdit::RepairCargo, cx)
+                                        });
+                                    })),
+                            )
+                    })),
             )
             // A cancelled job reads as set aside, not gone.
             .when(is_cancelled, |section| section.opacity(0.6));

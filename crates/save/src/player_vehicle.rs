@@ -157,6 +157,72 @@ pub fn drive_truck(document: &mut Document, truck: &str) -> Result<(), PlayerPro
     Ok(())
 }
 
+/// The trailer the player pulls (newer saves: the truck's vehicles unit; older: the player's).
+pub fn own_trailer(document: &Document) -> Option<String> {
+    if let Some(holder) = truck_vehicles(document) {
+        return document
+            .unit(&holder)?
+            .single("trailer")
+            .filter(|id| *id != "null")
+            .map(str::to_string);
+    }
+    let player = document.unit(&player(document)?)?;
+    ["my_trailer", "assigned_trailer"]
+        .iter()
+        .filter_map(|field| player.single(field))
+        .find(|id| *id != "null")
+        .map(str::to_string)
+}
+
+/// Whether the player can pull one of the company's trailers, and if not, why.
+pub fn can_take_trailer(document: &Document, trailer: &str) -> Result<(), PlayerProblem> {
+    if on_job(document) {
+        return Err(PlayerProblem::OnJob);
+    }
+    if own_trailer(document).as_deref() == Some(trailer) {
+        return Err(PlayerProblem::AlreadyYours);
+    }
+    let owned = player(document)
+        .and_then(|id| document.unit(&id))
+        .is_some_and(|player| player.items("trailers").iter().any(|id| id == trailer));
+    if !owned {
+        return Err(PlayerProblem::NotInGarage);
+    }
+    Ok(())
+}
+
+/// Makes one of the company's trailers the one the player pulls, not hitched (a hitched trailer
+/// would need a place behind the truck). `false` if it can't.
+pub(crate) fn take_trailer(document: &mut Document, trailer: &str) -> bool {
+    if can_take_trailer(document, trailer).is_err() {
+        return false;
+    }
+    if let Some(holder) = truck_vehicles(document) {
+        if let Some(mut unit) = document.unit_mut(&holder) {
+            unit.set("trailer", Value::single(trailer));
+            if unit.get("stored_trailer_attached").is_some() {
+                unit.set("stored_trailer_attached", Value::single("false"));
+            }
+            if unit.get("stored_trailer_placements").is_some() {
+                unit.set("stored_trailer_placements", Value::Array(Vec::new()));
+            }
+        }
+        return true;
+    }
+    let Some(player) = player(document) else {
+        return false;
+    };
+    if let Some(mut unit) = document.unit_mut(&player) {
+        if unit.get("my_trailer").is_some() {
+            unit.set("my_trailer", Value::single(trailer));
+        }
+        if unit.get("my_trailer_attached").is_some() {
+            unit.set("my_trailer_attached", Value::single("false"));
+        }
+    }
+    true
+}
+
 /// Where the player's truck stands: its placement and city token, if the save says.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Position {

@@ -695,3 +695,44 @@ player-move-description = Your truck moves to where it stands in another save of
 player-move-reading = Reading “{ $save }”…
 player-move-no-position = “{ $save }” doesn't say where your truck is.
 player-move-hitched = Unhitch your trailer in the game first: it would need a place too.
+
+# Your day
+day-section = Your day
+day-description = How long you've driven, your record with the police, and the clock. Changes here are written when you save, like the rest.
+day-since-break = Since your last break
+day-rest = Rest
+day-rest-tooltip = As if you'd slept: no tiredness and no break due.
+day-rest-what = Tiredness
+day-rested = Rested
+day-record = Police record
+day-record-summary = { $count ->
+    [0] Clean
+    [one] One offence, € { $amount } in fines
+   *[other] { $count } offences, € { $amount } in fines
+}
+day-record-clear-button = Clear the record
+day-record-tooltip = Removes every offence from the record. Fines already paid stay paid.
+day-record-clear = Clean
+day-cargo-damage = Cargo damage
+day-repair-cargo = Repair the cargo
+day-time = Time
+day-time-on-job = Moving the clock would make your job late.
+day-skip-morning = Morning (08:00)
+day-skip-noon = Noon (12:00)
+day-skip-evening = Evening (18:00)
+day-skip-night = Night (22:00)
+day-and-time = { $day } { $time }
+day-monday = Monday
+day-tuesday = Tuesday
+day-wednesday = Wednesday
+day-thursday = Thursday
+day-friday = Friday
+day-saturday = Saturday
+day-sunday = Sunday
+duration-minutes = { $minutes } min
+duration-hours = { $hours } h { $minutes } min
+player-trailer = Your trailer
+player-trailer-none = None
+player-trailer-yours = You pull this one
+player-pull = Pull it yourself
+player-pull-tooltip = Makes it the trailer you pull. It isn't hitched: hitch it in the game.

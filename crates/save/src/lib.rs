@@ -16,6 +16,7 @@ mod info;
 mod jobs;
 mod levels;
 mod map;
+mod player_state;
 mod player_vehicle;
 mod preview;
 mod profile_file;
@@ -52,9 +53,13 @@ pub use info::{SlotInfo, read_info, set_name, update_info};
 pub use jobs::{Job, extend_offers, game_time, jobs};
 pub use levels::{FALLBACK_STEPS, Level, LevelTable};
 pub use map::{City, Place, cities, unlock, unlocked, visit_all_cities};
+pub use player_state::{
+    DAY_MINUTES, PlayerEdit, apply_player_edit, cargo_damage, is_on_job, minutes_since_break,
+    offences, time_of_day,
+};
 pub use player_vehicle::{
-    PlayerProblem, Position, Trip, can_drive, can_move_player, can_travel, drive_truck,
-    move_player, own_truck, position, schedule_trip,
+    PlayerProblem, Position, Trip, can_drive, can_move_player, can_take_trailer, can_travel,
+    drive_truck, move_player, own_trailer, own_truck, position, schedule_trip,
 };
 pub use preview::{Picture, decode_tga};
 pub use profile_file::{
