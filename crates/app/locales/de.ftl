@@ -17,6 +17,10 @@ start-none-body = Gesucht wird in Steam Cloud und in Dokumente\Euro Truck Simula
 start-look-again = Erneut suchen
 start-your-saves = Deine Spielstände
 start-game-saves = Vom Spiel gespeichert
+start-slot-missing = { $count ->
+    [one] Braucht einen DLC oder Mod, der nicht installiert ist
+   *[other] Braucht { $count } DLCs oder Mods, die nicht installiert sind
+}
 start-slot-number = Speicherplatz { $number }
 profile-place = { $name } · { $place }
 profile-game-place = { $name } · { $game } · { $place }

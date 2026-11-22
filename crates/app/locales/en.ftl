@@ -13,6 +13,10 @@ start-none-body = Saves are looked for in Steam Cloud and in Documents\Euro Truc
 start-look-again = Look again
 start-your-saves = Your saves
 start-game-saves = Saved by the game
+start-slot-missing = { $count ->
+    [one] Needs a DLC or mod that isn't installed
+   *[other] Needs { $count } DLCs or mods that aren't installed
+}
 start-slot-number = Slot { $number }
 profile-place = { $name } · { $place }
 profile-game-place = { $name } · { $game } · { $place }

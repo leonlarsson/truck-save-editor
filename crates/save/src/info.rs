@@ -47,6 +47,14 @@ impl SlotInfo {
         }
     }
 
+    /// What the save needs, read from `dependencies` (see `save::requirements`).
+    pub fn requirements(&self) -> Vec<crate::Requirement> {
+        self.dependencies
+            .iter()
+            .filter_map(|text| crate::requirements::parse_requirement(text))
+            .collect()
+    }
+
     /// The DLC names, without the technical prefix (`DLC - Scandinavia` → `Scandinavia`).
     pub fn dlc_names(&self) -> impl Iterator<Item = &str> {
         self.dependencies.iter().filter_map(|dependency| {

@@ -82,7 +82,7 @@ pub use profiles::{
     profile_slots,
 };
 pub use removals::{Removal, RemoveProblem, can_remove, discovered_roads, forget_roads, remove};
-pub use requirements::{Requirement, RequirementKind, requirements};
+pub use requirements::{Requirement, RequirementKind, parse_requirement, requirements};
 pub use statistics::{
     Delivery, DeliveryKind, Earnings, Totals, deliveries, driver_earnings, earnings, totals,
     truck_earnings,

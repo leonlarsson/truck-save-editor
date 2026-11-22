@@ -17,6 +17,11 @@ start-none-body = Zapisy są wyszukiwane w Steam Cloud i w folderze Dokumenty\Eu
 start-look-again = Szukaj ponownie
 start-your-saves = Twoje zapisy
 start-game-saves = Zapisane przez grę
+start-slot-missing = { $count ->
+    [one] Wymaga DLC lub modyfikacji, której nie zainstalowano
+    [few] Wymaga DLC lub modyfikacji, których nie zainstalowano: { $count }
+   *[many] Wymaga DLC lub modyfikacji, których nie zainstalowano: { $count }
+}
 start-slot-number = Slot { $number }
 profile-place = { $name } · { $place }
 profile-game-place = { $name } · { $game } · { $place }

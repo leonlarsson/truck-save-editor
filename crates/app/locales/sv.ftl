@@ -13,6 +13,10 @@ start-none-body = Sparfiler letas efter i Steam Cloud och i Dokument\Euro Truck 
 start-look-again = Leta igen
 start-your-saves = Dina sparfiler
 start-game-saves = Sparade av spelet
+start-slot-missing = { $count ->
+    [one] Behöver en DLC eller modd som inte är installerad
+   *[other] Behöver { $count } DLC:er eller moddar som inte är installerade
+}
 start-slot-number = Plats { $number }
 profile-place = { $name } · { $place }
 profile-game-place = { $name } · { $game } · { $place }

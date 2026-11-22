@@ -42,20 +42,22 @@ pub fn requirements(info: &Document) -> Vec<Requirement> {
     };
     unit.items("dependencies")
         .iter()
-        .filter_map(|item| {
-            let text = value::parse_string(item);
-            let mut parts = text.splitn(3, '|');
-            let kind = match parts.next()? {
-                "dlc" => RequirementKind::Dlc,
-                "rdlc" => RequirementKind::RemovableDlc,
-                "mod" => RequirementKind::Mod,
-                _ => return None,
-            };
-            let id = parts.next()?.to_string();
-            let name = parts.next().unwrap_or(&id).to_string();
-            Some(Requirement { kind, id, name })
-        })
+        .filter_map(|item| parse_requirement(&value::parse_string(item)))
         .collect()
+}
+
+/// One `dependencies[]` entry (`dlc|eut2_north|DLC - Scandinavia`), unquoted.
+pub fn parse_requirement(text: &str) -> Option<Requirement> {
+    let mut parts = text.splitn(3, '|');
+    let kind = match parts.next()? {
+        "dlc" => RequirementKind::Dlc,
+        "rdlc" => RequirementKind::RemovableDlc,
+        "mod" => RequirementKind::Mod,
+        _ => return None,
+    };
+    let id = parts.next()?.to_string();
+    let name = parts.next().unwrap_or(&id).to_string();
+    Some(Requirement { kind, id, name })
 }
 
 #[cfg(test)]

@@ -217,6 +217,16 @@ impl OpenSavePage {
                         }
                         parts.join(" · ")
                     };
+                    // What the save needs that this PC doesn't have: the game won't load it.
+                    // (Unknown until the game's data is read; nothing is said then.)
+                    let missing = crate::game_data::installed(cx).map(|installed| {
+                        slot.info
+                            .requirements()
+                            .iter()
+                            .filter(|r| r.kind != save::RequirementKind::RemovableDlc)
+                            .filter(|r| !installed.has(r))
+                            .count()
+                    });
                     let money = slot
                         .info
                         .money
@@ -278,7 +288,24 @@ impl OpenSavePage {
                                                         .text_xs()
                                                         .text_color(cx.theme().muted_foreground)
                                                         .child(detail),
-                                                ),
+                                                )
+                                                .children(missing.filter(|count| *count > 0).map(
+                                                    |count| {
+                                                        h_flex()
+                                                            .gap_1()
+                                                            .text_xs()
+                                                            .text_color(cx.theme().danger)
+                                                            .child(
+                                                                Icon::new(IconName::TriangleAlert)
+                                                                    .xsmall(),
+                                                            )
+                                                            .child(t!(
+                                                                cx,
+                                                                "start-slot-missing",
+                                                                count = count
+                                                            ))
+                                                    },
+                                                )),
                                         ),
                                 )
                                 .child(
