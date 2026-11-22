@@ -108,7 +108,7 @@ new-slot-name = { $name } (redigerad)
 saved-as-new-title = Sparad och kontrollerad som ”{ $name }”
 saved-as-new-body = ”{ $original }” är oförändrad. Du redigerar nu den nya platsen.
 save-confirm-note = Först görs en säkerhetskopia av platsen, och efter skrivningen läses sparfilen in igen och kontrolleras. Stäng spelet innan du sparar: det skriver över sparfiler när det avslutas.
-save-confirm-cloud = Den här profilen ligger i Steam Cloud. Om Steam frågar vilken kopia som ska behållas nästa gång spelet startar, välj den på den här datorn. Spara som ny plats är avstängt: spelet visar bara sparfiler som Steam känner till, och det är de som spelet har gjort. För att behålla den här sparfilen som den är, gör en ny sparfil i spelet och redigera den.
+save-confirm-cloud = Den här profilen ligger i Steam Cloud: om Steam frågar vilken kopia som ska behållas, välj den på den här datorn. Spara som ny plats är avstängt, eftersom spelet bara visar sparfiler som det har gjort själv.
 save-prepare-failed = Kunde inte förbereda sparningen
 save-no-backup-folder-title = Kunde inte spara
 save-no-backup-folder = Det finns ingen mapp att lägga säkerhetskopior i, så ingenting skrevs.
@@ -551,12 +551,9 @@ trucks-table = Fordon
 unknown-truck = Okänd modell
 
 # Moving trucks and drivers; the current job
-moves-what = Flyttar mellan garage
-moves-after = { $count ->
-    [one] En flytt
-   *[other] { $count } flyttar
-}
 move-garage-full = { $city } · fullt
+move-what-truck = { $model } · { $plate }
+move-what-driver = Förare från { $city }
 move-hint = Välj ett annat garage för att flytta dit.
 move-with-driver = Föraren följer med.
 move-with-truck = Lastbilen följer med.

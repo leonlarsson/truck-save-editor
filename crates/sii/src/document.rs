@@ -5,7 +5,7 @@
 //! (nothing is reformatted or rounded), and binary saves decode into the same form. The `value`
 //! module reads and writes the typed values inside.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// A whole SII file.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -63,6 +63,49 @@ impl Document {
     /// The first unit of a kind, for kinds there's only one of (`economy`, `bank`).
     pub fn first_of_kind(&self, kind: &str) -> Option<&Unit> {
         self.units.iter().find(|unit| unit.kind == kind)
+    }
+
+    /// The ids of every unit reachable from `root` (itself included) by following values that
+    /// name a unit. The game reads a save as one tree from its root; a unit nothing points at
+    /// is a second tree, and the game refuses the file ("There are multiple unit trees").
+    pub fn reachable_from(&self, root: &str) -> HashSet<String> {
+        let mut reached = HashSet::new();
+        let mut waiting = vec![root.to_string()];
+        while let Some(id) = waiting.pop() {
+            let Some(unit) = self.unit(&id) else {
+                continue;
+            };
+            if !reached.insert(id) {
+                continue;
+            }
+            for field in &unit.fields {
+                let values: &[String] = match &field.value {
+                    Value::Single(text) => std::slice::from_ref(text),
+                    Value::Array(items) => items,
+                };
+                for value in values {
+                    if self.index.contains_key(value) && !reached.contains(value) {
+                        waiting.push(value.clone());
+                    }
+                }
+            }
+        }
+        reached
+    }
+
+    /// Removes units by id, keeping the others in their order.
+    pub fn remove_units(&mut self, ids: &HashSet<String>) {
+        if ids.is_empty() {
+            return;
+        }
+        self.units.retain(|unit| !ids.contains(&unit.id));
+        self.index = self
+            .units
+            .iter()
+            .enumerate()
+            .filter(|(_, unit)| unit.id != "null")
+            .map(|(position, unit)| (unit.id.clone(), position))
+            .collect();
     }
 }
 
@@ -173,6 +216,57 @@ impl Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn tree() -> Document {
+        let mut document = Document::new();
+        let unit = |kind: &str, id: &str, fields: &[(&str, Value)]| Unit {
+            kind: kind.to_string(),
+            id: id.to_string(),
+            fields: fields
+                .iter()
+                .map(|(name, value)| Field {
+                    name: name.to_string(),
+                    value: value.clone(),
+                })
+                .collect(),
+        };
+        document.push(unit(
+            "economy",
+            "root",
+            &[("bank", Value::single("bank.1"))],
+        ));
+        document.push(unit(
+            "bank",
+            "bank.1",
+            &[("loans", Value::Array(vec!["loan.1".into(), "null".into()]))],
+        ));
+        document.push(unit("loan", "loan.1", &[]));
+        document.push(unit(
+            "job",
+            "job.1",
+            &[("trailer", Value::single("trailer.1"))],
+        ));
+        document.push(unit("trailer", "trailer.1", &[]));
+        document
+    }
+
+    #[test]
+    fn follows_references_from_the_root() {
+        let document = tree();
+        let reached = document.reachable_from("root");
+        let expected: HashSet<String> = ["root", "bank.1", "loan.1"].map(String::from).into();
+        assert_eq!(reached, expected);
+    }
+
+    #[test]
+    fn removes_units_and_keeps_the_rest_in_order() {
+        let mut document = tree();
+        let gone: HashSet<String> = ["job.1", "trailer.1"].map(String::from).into();
+        document.remove_units(&gone);
+        let ids: Vec<&str> = document.units().iter().map(|u| u.id.as_str()).collect();
+        assert_eq!(ids, ["root", "bank.1", "loan.1"]);
+        assert!(document.unit("loan.1").is_some() && document.unit("job.1").is_none());
+    }
 
     fn bank() -> Unit {
         let mut unit = Unit::new("bank", "_nameless.1.2");

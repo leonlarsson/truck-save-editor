@@ -456,7 +456,7 @@ impl Session {
             + usize::from(self.pending.company_name.is_some())
             + usize::from(!self.pending.unlock_dealers.is_empty())
             + usize::from(!self.pending.unlock_recruitments.is_empty())
-            + usize::from(!self.pending.garage_moves.is_empty())
+            + self.moved().len()
             + usize::from(self.pending.cancel_job)
             + usize::from(self.pending.remove_job_deadline)
     }
@@ -552,6 +552,27 @@ impl Session {
     /// Where a truck or driver could move, as the save will be after the changes so far.
     pub fn move_options(&self, id: &str) -> Result<save::MoveOptions, save::MoveProblem> {
         save::move_options(&self.preview(), id)
+    }
+
+    /// The trucks and drivers asked to move that end up in another garage than on disk: (id,
+    /// garage on disk, garage after saving), in the order asked, each once.
+    fn moved(&self) -> Vec<(String, String, String)> {
+        if self.pending.garage_moves.is_empty() {
+            return Vec::new();
+        }
+        let preview = self.preview();
+        let mut moved: Vec<(String, String, String)> = Vec::new();
+        for (id, _) in &self.pending.garage_moves {
+            if moved.iter().any(|(seen, _, _)| seen == id) {
+                continue;
+            }
+            let from = save::garage_of(&self.loaded.game, id).unwrap_or_default();
+            let to = save::garage_of(&preview, id).unwrap_or_default();
+            if from != to {
+                moved.push((id.clone(), from, to));
+            }
+        }
+        moved
     }
 
     /// Moves a truck or driver, with the rest of its slot, to another garage.
@@ -738,12 +759,32 @@ impl Session {
                 ),
             );
         }
-        if !self.pending.garage_moves.is_empty() {
-            add(
-                t!(cx, "moves-what"),
-                t!(cx, "garages-before"),
-                t!(cx, "moves-after", count = self.pending.garage_moves.len()),
-            );
+        // One line per truck or driver moved: what it is, and from which garage to which.
+        for (id, from, to) in self.moved() {
+            let what: SharedString = match self.saved_vehicles.iter().find(|v| v.id == id) {
+                Some(vehicle) => {
+                    let model = crate::game_data::model_name(cx, vehicle).unwrap_or_default();
+                    t!(
+                        cx,
+                        "move-what-truck",
+                        model = model,
+                        plate = vehicle.plate.clone()
+                    )
+                }
+                None => {
+                    let hometown = self
+                        .saved_drivers
+                        .iter()
+                        .find(|driver| driver.id == id)
+                        .map(|driver| crate::game_data::city_name(cx, &driver.hometown))
+                        .unwrap_or_default();
+                    t!(cx, "move-what-driver", city = hometown)
+                }
+            };
+            let city = |garage: &str| {
+                crate::game_data::city_name(cx, garage.strip_prefix("garage.").unwrap_or(garage))
+            };
+            add(what, city(&from).into(), city(&to).into());
         }
         if self.pending.cancel_job || self.pending.remove_job_deadline {
             let saved = save::current_job(&self.loaded.game);
@@ -856,6 +897,9 @@ impl Session {
             let cities: Vec<String> = self.pending.unlocks(place).iter().cloned().collect();
             save::unlock(&mut slot.game, place, &cities);
         }
+        // The game reads a save as one tree from the economy; drop anything an edit cut off
+        // (a cancelled job's units, a reference cleared in All data).
+        save::drop_unreachable(&mut slot.game);
         if let Some(info) = &mut slot.info {
             save::update_info(info, &self.pending.career);
         }

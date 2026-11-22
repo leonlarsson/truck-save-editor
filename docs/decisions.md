@@ -164,3 +164,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** the first in-game check showed the game lists only the save files Steam knows (Steam's `remotecache.vdf`), and Steam only learns of files the game writes. A slot folder the editor made was written correctly but never appeared in the game. Files Steam already knows (an existing slot, `profile.sii`) are picked up when changed and uploaded.
 
 **Considered:** registering new files with Steam through its API (would mean running as the game); telling the player to turn Steam Cloud off for the profile (works, but moves their saves; a choice for them, not a requirement of the editor).
+
+## 2026-11-22: A save is one tree; units an edit cuts off are removed
+
+**Decided:** replaces "Cancelling a job leaves its units in the file" (2026-11-21). After the changes are applied, every unit no longer reachable from the `economy` unit is removed (`save::drop_unreachable`, in `Session::prepared`), and cancelling a job removes the job and its company trailer with their parts. Nothing else is ever removed, and the order of the rest is kept.
+
+**Why:** the in-game check refused the save with the cancelled job: "There are multiple unit trees in the file … Unable to create economy unit!". The game reads a save as one tree from the economy and treats unreferenced units as a second tree. A fixture test confirms every save the game wrote is exactly one tree (all units reachable), so removing only what's cut off makes the file look like the game's own after a finished job.
+
+**Considered:** keeping the units and pointing something at them (there's nothing in the game that would); refusing edits that cut units off (cancelling a job has to).

@@ -113,8 +113,8 @@ fn real_saves_read_back_the_way_they_were_written() {
     }
 }
 
-/// A job in progress reads, and cancelling it (where the editor can) leaves nothing pointing at
-/// the job or its company trailer, as the game leaves a delivered job.
+/// A job in progress reads, and cancelling it (where the editor can) removes the job and its
+/// company trailer and leaves the save one tree, as the game leaves a delivered job.
 #[test]
 fn real_jobs_read_and_cancel_cleanly() {
     for (index, dir) in slot_dirs().into_iter().enumerate() {
@@ -138,23 +138,27 @@ fn real_jobs_read_and_cancel_cleanly() {
             .to_string();
         assert!(save::cancel_job(&mut slot.game), "slot {index}: cancels");
         assert!(save::current_job(&slot.game).is_none(), "slot {index}");
+        // Gone with nothing pointing at them, as when the game finishes a job, and the save
+        // is still one tree.
+        assert!(
+            slot.game.unit(&job.id).is_none(),
+            "slot {index}: the job is gone"
+        );
+        assert!(
+            slot.game.unit(&trailer).is_none(),
+            "slot {index}: the trailer is gone"
+        );
+        let root = slot
+            .game
+            .first_of_kind("economy")
+            .map(|unit| unit.id.clone())
+            .expect("an economy unit");
+        assert_eq!(
+            slot.game.reachable_from(&root).len(),
+            slot.game.len(),
+            "slot {index}: one tree"
+        );
         let text = sii::to_text(&slot.game);
-        let references = |id: &str| {
-            text.lines()
-                .filter(|line| line.ends_with(&format!(": {id}")))
-                .count()
-        };
-        assert_eq!(
-            references(&job.id),
-            0,
-            "slot {index}: nothing points at the job"
-        );
-        // Only the job itself (now unreferenced) still names its trailer.
-        assert_eq!(
-            references(&trailer),
-            1,
-            "slot {index}: nothing else points at the trailer"
-        );
         // And it still reads back as written.
         let again = sii::parse_text(&text).expect("reads back");
         assert_eq!(sii::to_text(&again), text, "slot {index}");
@@ -230,5 +234,33 @@ fn real_saves_write_rotations_the_way_the_game_reads_them() {
             }
         }
         assert!(rotations > 0, "slot {index}: a real save has rotations");
+    }
+}
+
+/// A save is one tree: every unit in a save the game wrote is reachable from the economy unit.
+/// (The game refuses a file with units nothing points at: "There are multiple unit trees".)
+#[test]
+fn real_saves_are_one_tree_from_the_economy() {
+    for (index, dir) in slot_dirs().into_iter().enumerate() {
+        let slot = save::load(&dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display()));
+        let root = slot
+            .game
+            .first_of_kind("economy")
+            .map(|unit| unit.id.clone())
+            .expect("an economy unit");
+        let reached = slot.game.reachable_from(&root);
+        let stray: Vec<&str> = slot
+            .game
+            .units()
+            .iter()
+            .filter(|unit| !reached.contains(&unit.id))
+            .map(|unit| unit.kind.as_str())
+            .collect();
+        assert!(
+            stray.is_empty(),
+            "slot {index}: {} units not reachable, kinds {:?}",
+            stray.len(),
+            stray.iter().take(5).collect::<Vec<_>>()
+        );
     }
 }

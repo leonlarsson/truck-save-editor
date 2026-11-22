@@ -7,8 +7,9 @@
 //! trailer (`company_truck: null`, `company_trailer` set), from the freight market or an external
 //! contract. It clears `player.current_job` and unhitches the company trailer (from
 //! `player.assigned_trailer` in older saves, from a `player_vehicles` unit's `trailer` in newer
-//! ones). The job and trailer units stay in the file, unreferenced: units are never dropped (see
-//! `docs/decisions.md`), and when the game delivers a job it leaves no reference to either.
+//! ones), then removes the job and trailer units (and the trailer's parts): with nothing pointing
+//! at them they'd be a second unit tree, which the game refuses ("There are multiple unit trees";
+//! found in the in-game check). That's what the game does when a job ends.
 //! Quick jobs (a company truck), jobs in the player's own trailer and special transports are
 //! left alone: no save to learn them from yet.
 //!
@@ -171,21 +172,24 @@ pub fn cancel_job(document: &mut Document) -> bool {
         .filter(|unit| unit.single("trailer") == Some(trailer.as_str()))
         .map(|unit| unit.id.clone())
         .collect();
-    for holder in holders {
-        set_existing(document, &holder, "trailer", Value::single("null"));
+    for holder in &holders {
+        let holder = holder.as_str();
+        set_existing(document, holder, "trailer", Value::single("null"));
         set_existing(
             document,
-            &holder,
+            holder,
             "stored_trailer_attached",
             Value::single("false"),
         );
         set_existing(
             document,
-            &holder,
+            holder,
             "stored_trailer_placements",
             Value::Array(Vec::new()),
         );
     }
+    // The job and its trailer (with its parts) now hang from nothing.
+    crate::drop_unreachable(document);
     true
 }
 
@@ -248,9 +252,9 @@ mod tests {
         assert_eq!(holder.single("trailer"), Some("null"));
         assert_eq!(holder.single("stored_trailer_attached"), Some("false"));
         assert!(holder.items("stored_trailer_placements").is_empty());
-        // The truck stays; the units stay in the file.
+        // The truck stays; the job and the company's trailer are gone from the file.
         assert_eq!(holder.single("vehicle"), Some("truck.1"));
-        assert!(document.unit("job.1").is_some() && document.unit("trailer.c").is_some());
+        assert!(document.unit("job.1").is_none() && document.unit("trailer.c").is_none());
         // No field the save didn't have was added.
         let player = document.unit("p").expect("player");
         assert!(player.get("assigned_trailer_connected").is_none());

@@ -645,25 +645,25 @@ impl Workspace {
                 .id("save-changes")
                 .max_h(rems(18.))
                 .overflow_y_scroll()
-                .gap_1()
+                .gap_2()
+                // What changed on one line, before → after below it: names of any length
+                // (a truck and its plate) read whole instead of wrapping in a narrow column.
                 .children(changes.iter().map(|change| {
-                    h_flex()
-                        .gap_2()
+                    v_flex()
                         .text_sm()
+                        .child(div().font_medium().child(change.what.clone()))
                         .child(
-                            div()
-                                .w(rems(9.))
-                                .flex_shrink_0()
-                                .font_medium()
-                                .child(change.what.clone()),
+                            h_flex()
+                                .flex_wrap()
+                                .gap_x_2()
+                                .child(
+                                    div()
+                                        .text_color(cx.theme().muted_foreground)
+                                        .child(change.before.clone()),
+                                )
+                                .child(div().text_color(cx.theme().muted_foreground).child("→"))
+                                .child(div().child(change.after.clone())),
                         )
-                        .child(
-                            div()
-                                .text_color(cx.theme().muted_foreground)
-                                .child(change.before.clone()),
-                        )
-                        .child(div().text_color(cx.theme().muted_foreground).child("→"))
-                        .child(div().child(change.after.clone()))
                 }));
             alert
                 .title(t!(cx, "save-confirm-title", name = &name))

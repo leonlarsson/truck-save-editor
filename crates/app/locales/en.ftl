@@ -108,7 +108,7 @@ new-slot-name = { $name } (edited)
 saved-as-new-title = Saved and checked as “{ $name }”
 saved-as-new-body = “{ $original }” is unchanged. You're now editing the new slot.
 save-confirm-note = A backup of the slot is made first, and the save is read back and checked after writing. Close the game before saving: it overwrites saves when it exits.
-save-confirm-cloud = This profile is in Steam Cloud. If Steam asks which copy to keep the next time the game starts, choose the one on this PC. Save as new slot is off: the game only lists the saves Steam knows, and those are the ones the game made. To keep this save as it is, make a new save in the game and edit that one.
+save-confirm-cloud = This profile is in Steam Cloud: if Steam asks which copy to keep, choose the one on this PC. Save as new slot is off, because the game only lists saves it made itself.
 save-prepare-failed = Couldn't prepare the save
 save-no-backup-folder-title = Couldn't save
 save-no-backup-folder = There's no folder to keep backups in, so nothing was written.
@@ -551,12 +551,9 @@ trucks-table = Vehicles
 unknown-truck = Unknown model
 
 # Moving trucks and drivers; the current job
-moves-what = Moves between garages
-moves-after = { $count ->
-    [one] One move
-   *[other] { $count } moves
-}
 move-garage-full = { $city } · full
+move-what-truck = { $model } · { $plate }
+move-what-driver = Driver from { $city }
 move-hint = Pick another garage to move it there.
 move-with-driver = Its driver moves with it.
 move-with-truck = Their truck moves with them.

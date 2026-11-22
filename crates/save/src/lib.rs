@@ -104,3 +104,26 @@ pub fn city_display_name(token: &str) -> String {
         .collect::<Vec<_>>()
         .join(" ")
 }
+
+/// Removes the units nothing points at any more, following references from the economy unit.
+/// A save the game writes is one tree from there, and it refuses a file with units outside it
+/// ("There are multiple unit trees"); an edit that clears the last reference to a unit (a
+/// cancelled job, an All data edit) leaves such units behind. Returns how many were removed.
+pub fn drop_unreachable(document: &mut sii::Document) -> usize {
+    let Some(root) = document
+        .first_of_kind("economy")
+        .map(|unit| unit.id.clone())
+    else {
+        return 0;
+    };
+    let reached = document.reachable_from(&root);
+    let stray: std::collections::HashSet<String> = document
+        .units()
+        .iter()
+        .filter(|unit| !reached.contains(&unit.id))
+        .map(|unit| unit.id.clone())
+        .collect();
+    let count = stray.len();
+    document.remove_units(&stray);
+    count
+}

@@ -71,7 +71,7 @@ Dependencies point downward: `app` → `gamedata` → `save` → `sii`, and `gam
 
 ## The save model
 
-- A document keeps **units in file order and fields in their order**. Writing an unedited document gives back the same data. Edits change values in place; never reorder or drop units.
+- A document keeps **units in file order and fields in their order**. Writing an unedited document gives back the same data. Edits change values in place; never reorder units. A save is **one tree** from the `economy` unit: the game refuses units nothing points at ("There are multiple unit trees"), so units an edit cuts off are removed (`save::drop_unreachable`, run when a slot is prepared), and nothing else is.
 - Units point to each other by id (`economy.bank` → the `bank` unit). The document keeps an index by id.
 - Screens use **typed access** from `save` (`Bank`, `Economy`, `Vehicle`, …), not raw field names scattered through UI code. All data is the only screen that works on raw units and fields.
 - **Every change goes through one place** that records it (unit, field, old value, new value). That one list drives undo/redo, the changes shown before saving and the dirty state. The UI never mutates the document directly.
