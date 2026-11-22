@@ -802,10 +802,15 @@ impl Workspace {
         let is_dark = cx.theme().is_dark();
         let (slot_name, profile_name) = {
             let session = session.read(cx);
-            (
-                labels::slot_name(cx, session.slot()),
-                session.profile().name.clone(),
-            )
+            // Under the save's name, its profile's; a save on its own has none, so it says that
+            // (its folder's name would read like a profile's).
+            let profile = session.profile();
+            let profile_name: SharedString = if profile.location == save::Location::Loose {
+                labels::location(cx, profile.location)
+            } else {
+                profile.name.clone().into()
+            };
+            (labels::slot_name(cx, session.slot()), profile_name)
         };
         Sidebar::new("sidebar")
             .w(px(232.))
