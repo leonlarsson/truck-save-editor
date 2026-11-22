@@ -740,6 +740,10 @@ road-map-not-driven = Jeszcze nie przejechane
 road-map-truck = Twoja ciężarówka
 road-map-drawing = Rysowanie mapy…
 road-map-needs-game = Wymaga gry zainstalowanej na tym komputerze: mapa pochodzi z jej plików.
+road-map-hint = Przewiń, aby powiększyć, przeciągnij, aby przesunąć
+road-map-zoom-in = Powiększ
+road-map-zoom-out = Pomniejsz
+road-map-fit = Cała mapa
 
 # Truck and trailer details
 plate-colours = Kolory tablicy

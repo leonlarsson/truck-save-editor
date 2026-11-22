@@ -703,6 +703,10 @@ road-map-not-driven = Inte körda än
 road-map-truck = Din lastbil
 road-map-drawing = Ritar kartan…
 road-map-needs-game = Kräver att spelet är installerat på den här datorn: kartan kommer från dess filer.
+road-map-hint = Scrolla för att zooma, dra för att flytta
+road-map-zoom-in = Zooma in
+road-map-zoom-out = Zooma ut
+road-map-fit = Hela kartan
 
 # Truck and trailer details
 plate-colours = Skyltens färger

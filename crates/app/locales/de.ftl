@@ -707,6 +707,10 @@ road-map-not-driven = Noch nicht befahren
 road-map-truck = Dein Lkw
 road-map-drawing = Karte wird gezeichnet…
 road-map-needs-game = Braucht das auf diesem PC installierte Spiel: Die Karte kommt aus seinen Dateien.
+road-map-hint = Scrollen zum Zoomen, Ziehen zum Verschieben
+road-map-zoom-in = Hineinzoomen
+road-map-zoom-out = Herauszoomen
+road-map-fit = Ganze Karte
 
 # Truck and trailer details
 plate-colours = Kennzeichenfarben

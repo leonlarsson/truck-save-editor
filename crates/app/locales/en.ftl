@@ -703,6 +703,10 @@ road-map-not-driven = Not driven yet
 road-map-truck = Your truck
 road-map-drawing = Drawing the map…
 road-map-needs-game = Needs the game installed on this PC: the map comes from its files.
+road-map-hint = Scroll to zoom, drag to move
+road-map-zoom-in = Zoom in
+road-map-zoom-out = Zoom out
+road-map-fit = Whole map
 
 # Truck and trailer details
 plate-colours = Plate colours
