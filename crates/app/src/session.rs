@@ -659,6 +659,71 @@ impl Session {
         });
     }
 
+    /// Picked rows, acted on together: one change each, so one Undo takes it all back.
+    pub fn repair_many(&mut self, ids: &[String], cx: &mut Context<Self>) {
+        self.change(cx, |pending, _| {
+            pending.repaired.extend(ids.iter().cloned())
+        });
+    }
+
+    pub fn refuel_many(&mut self, ids: &[String], cx: &mut Context<Self>) {
+        self.change(cx, |pending, _| {
+            pending.refueled.extend(ids.iter().cloned())
+        });
+    }
+
+    pub fn max_drivers_many(&mut self, ids: &[String], cx: &mut Context<Self>) {
+        self.change(cx, |pending, _| {
+            pending.maxed_drivers.extend(ids.iter().cloned())
+        });
+    }
+
+    pub fn upgrade_garages_many(&mut self, ids: &[String], cx: &mut Context<Self>) {
+        self.change(cx, |pending, _| {
+            pending.upgraded_garages.extend(ids.iter().cloned())
+        });
+    }
+
+    /// Moves several trucks or drivers to one garage, as many as it has room for (in order);
+    /// returns how many fit.
+    pub fn move_many(&mut self, ids: &[String], garage: &str, cx: &mut Context<Self>) -> usize {
+        // Check each against the save as it'd be after the ones before it.
+        let mut document = (*self.preview()).clone();
+        let fitting: Vec<String> = ids
+            .iter()
+            .filter(|id| save::move_to_garage(&mut document, id, garage).is_ok())
+            .cloned()
+            .collect();
+        if !fitting.is_empty() {
+            self.change(cx, |pending, _| {
+                for id in &fitting {
+                    pending.garage_moves.push((id.clone(), garage.to_string()));
+                }
+            });
+        }
+        fitting.len()
+    }
+
+    /// Removes several things; those that can't go (see `can_remove`) stay. Returns how many go.
+    pub fn remove_many(&mut self, removals: Vec<save::Removal>, cx: &mut Context<Self>) -> usize {
+        let mut document = (*self.preview()).clone();
+        let going: Vec<save::Removal> = removals
+            .into_iter()
+            .filter(|removal| save::remove(&mut document, removal).is_ok())
+            .collect();
+        let count = going.len();
+        if count > 0 {
+            self.change(cx, |pending, _| {
+                for removal in going {
+                    if !pending.removed.contains(&removal) {
+                        pending.removed.push(removal);
+                    }
+                }
+            });
+        }
+        count
+    }
+
     /// Changes the player's day (rest, the police record, cargo damage, the clock, the trailer).
     pub fn edit_player(&mut self, edit: save::PlayerEdit, cx: &mut Context<Self>) {
         self.change(cx, |pending, _| {

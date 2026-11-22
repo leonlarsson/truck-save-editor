@@ -736,3 +736,27 @@ player-trailer-none = None
 player-trailer-yours = You pull this one
 player-pull = Pull it yourself
 player-pull-tooltip = Makes it the trailer you pull. It isn't hitched: hitch it in the game.
+
+# Picking rows
+picks-count = { $count ->
+    [one] One picked
+   *[other] { $count } picked
+}
+picks-max = Max their skills
+picks-large = Make them large
+picks-move = Move to garage…
+picks-refuel = Fill the tanks
+picks-remove = Remove
+picks-moved = Moved { $moved } of { $count }: the others didn't fit there.
+picks-removed = Removed { $removed } of { $count }: the rest can't be (open one to see why).
+picks-moved-all = { $count ->
+    [one] Moved.
+   *[other] Moved all { $count }.
+}
+picks-removed-all = { $count ->
+    [one] Removed.
+   *[other] Removed all { $count }.
+}
+picks-clear = Clear
+picks-all = Pick every row shown
+picks-row = Pick { $name }

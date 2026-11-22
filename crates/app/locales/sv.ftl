@@ -736,3 +736,27 @@ player-trailer-none = Ingen
 player-trailer-yours = Den här drar du
 player-pull = Dra den själv
 player-pull-tooltip = Gör den till trailern du drar. Den är inte påkopplad: koppla på den i spelet.
+
+# Picking rows
+picks-count = { $count ->
+    [one] En vald
+   *[other] { $count } valda
+}
+picks-max = Maxa deras färdigheter
+picks-large = Gör dem stora
+picks-move = Flytta till garage…
+picks-refuel = Fyll tankarna
+picks-remove = Ta bort
+picks-moved = Flyttade { $moved } av { $count }: de andra fick inte plats där.
+picks-removed = Tog bort { $removed } av { $count }: resten kan inte tas bort (öppna en för att se varför).
+picks-moved-all = { $count ->
+    [one] Flyttad.
+   *[other] Flyttade alla { $count }.
+}
+picks-removed-all = { $count ->
+    [one] Borttagen.
+   *[other] Tog bort alla { $count }.
+}
+picks-clear = Rensa
+picks-all = Välj varje rad som visas
+picks-row = Välj { $name }

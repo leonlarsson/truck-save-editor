@@ -259,8 +259,9 @@ fn ctrl_and_a_number_goes_to_a_page_and_enter_opens_a_row(cx: &mut TestAppContex
         );
     });
 
-    // Pick the first row, then Enter opens its panel.
-    act(cx, handle, |window, cx| window.click("table-cell-0:0", cx));
+    // Select the first row (its model's cell: the first column is the pick checkbox), then
+    // Enter opens its panel.
+    act(cx, handle, |window, cx| window.click("table-cell-0:1", cx));
     act(cx, handle, |window, cx| window.press("enter", cx));
     cx.executor()
         .advance_clock(std::time::Duration::from_secs(1));
@@ -481,4 +482,35 @@ fn renaming_the_profile_changes_only_its_name(cx: &mut TestAppContext) {
         let unit = profile.first_of_kind("user_profile").expect("the profile");
         assert_eq!(unit.single("online_user_name"), Some("\"placeholder\""));
     });
+}
+
+#[gpui_kit::test]
+fn picked_rows_are_acted_on_together_in_one_undo(cx: &mut TestAppContext) {
+    let slot = TempSlot::new("picks");
+    let (_handle, workspace) = open(cx, &slot);
+    let session = session(&workspace, cx);
+    let ids = vec!["_nameless.4".to_string(), "no-such-truck".to_string()];
+    // The truck moves (with its driver); the one that doesn't exist doesn't.
+    let moved = cx.update(|cx| {
+        session.update(cx, |session, cx| {
+            session.move_many(&ids, "garage.paris", cx)
+        })
+    });
+    assert_eq!(moved, 1);
+    let removals = vec![
+        save::Removal::Driver("driver.7".into()),
+        save::Removal::Garage("garage.lyon".into()),
+    ];
+    // The driver goes; Lyon is the headquarters, so it stays.
+    let removed =
+        cx.update(|cx| session.update(cx, |session, cx| session.remove_many(removals, cx)));
+    assert_eq!(removed, 1);
+    cx.run_until_parked();
+    assert_eq!(change_count(&workspace, cx), 2);
+    cx.update(|cx| session.update(cx, |session, cx| session.undo(cx)));
+    assert_eq!(
+        change_count(&workspace, cx),
+        1,
+        "one Undo takes back the whole removal"
+    );
 }

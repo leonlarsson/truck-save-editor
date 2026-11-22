@@ -6,6 +6,7 @@ use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Icon, Sizable as _,
     button::{Button, ButtonVariants as _},
     h_flex,
+    select::{SearchableVec, Select, SelectEvent, SelectState},
     table::{Column, ColumnSort, DataTable, TableDelegate, TableEvent, TableState},
     v_flex,
 };
@@ -29,6 +30,11 @@ pub struct DriversPage {
     session: Entity<Session>,
     table: Entity<TableState<DriverTable>>,
     filter: Entity<FilterBar>,
+    /// The company's garages, to move the picked drivers to.
+    garages: Entity<SelectState<SearchableVec<crate::ui::Choice>>>,
+    /// How the last action on the picked rows went.
+    pick_status: Option<SharedString>,
+    garages_stale: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -42,6 +48,7 @@ impl DriversPage {
             drivers: Vec::new(),
             session: session.clone(),
             sort: None,
+            picks: crate::ui::Picks::default(),
         };
         let table = cx.new(|cx| TableState::new(delegate, window, cx).sortable(true));
         let toggles = vec![t!(cx, "drivers-filter-not-maxed")];
@@ -76,10 +83,40 @@ impl DriversPage {
             ),
             game_data::observe(cx, |this, cx| this.reload(cx)),
         ];
+        let garages = cx.new(|cx| {
+            SelectState::new(SearchableVec::new(Vec::new()), None, window, cx).searchable(true)
+        });
+        let mut _subscriptions = _subscriptions;
+        _subscriptions.push(cx.observe(&table, |_, _, cx| cx.notify()));
+        _subscriptions.push(cx.subscribe_in(
+            &garages,
+            window,
+            |this, _, event: &SelectEvent<SearchableVec<crate::ui::Choice>>, window, cx| {
+                if let SelectEvent::Confirm(Some(garage)) = event {
+                    let garage = garage.to_string();
+                    let ids = this.table.read(cx).delegate().picks.ids();
+                    let moved = this
+                        .session
+                        .update(cx, |session, cx| session.move_many(&ids, &garage, cx));
+                    this.pick_status = Some(crate::labels::picks_outcome(
+                        cx,
+                        crate::labels::PickAction::Move,
+                        moved,
+                        ids.len(),
+                    ));
+                    this.garages
+                        .update(cx, |select, cx| select.set_selected_index(None, window, cx));
+                    cx.notify();
+                }
+            },
+        ));
         let mut page = Self {
             session,
             table,
             filter,
+            garages,
+            pick_status: None,
+            garages_stale: true,
             _subscriptions,
         };
         page.reload(cx);
@@ -90,6 +127,7 @@ impl DriversPage {
     fn reload(&mut self, cx: &mut Context<Self>) {
         let all = self.session.read(cx).drivers();
         let total = all.len();
+        let existing: Vec<String> = all.iter().map(|driver| driver.id.clone()).collect();
         let drivers: Vec<Driver> = {
             let filter = self.filter.read(cx);
             all.into_iter()
@@ -105,16 +143,106 @@ impl DriversPage {
         self.filter
             .update(cx, |filter, cx| filter.set_counts(shown, total, cx));
         self.table.update(cx, |table, cx| {
-            table.delegate_mut().set_drivers(drivers);
+            let delegate = table.delegate_mut();
+            delegate.set_drivers(drivers);
+            delegate
+                .picks
+                .keep_only(existing.iter().map(String::as_str));
             table.refresh(cx);
             cx.notify();
         });
+        self.garages_stale = true;
         cx.notify();
+    }
+
+    /// The garage list, filled again when the garages may have changed (it needs the window).
+    fn sync_garages(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.garages_stale {
+            return;
+        }
+        self.garages_stale = false;
+        let garages = crate::ui::owned_garages(self.session.read(cx), cx);
+        self.garages.update(cx, |select, cx| {
+            select.set_items(SearchableVec::new(garages), window, cx)
+        });
+    }
+
+    /// The bar above the table while rows are picked: what can be done to all of them.
+    fn render_pick_bar(&self, cx: &mut Context<Self>) -> Option<crate::ui::PickBar> {
+        let picks = self.table.read(cx).delegate().picks.clone();
+        if picks.is_empty() {
+            return None;
+        }
+        let ids = picks.ids();
+        let table = self.table.clone();
+        let max_ids = ids.clone();
+        let remove_ids = ids;
+        let mut bar = crate::ui::PickBar::new(picks.len(), move |_, cx| {
+            table.update(cx, |table, cx| {
+                table.delegate_mut().picks.clear();
+                cx.notify();
+            });
+        })
+        .action(
+            Button::new("picks-max")
+                .xsmall()
+                .outline()
+                .label(t!(cx, "picks-max"))
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    let ids = max_ids.clone();
+                    this.session
+                        .update(cx, |session, cx| session.max_drivers_many(&ids, cx));
+                })),
+        )
+        .action(
+            div().w(rems(13.)).child(
+                Select::new(&self.garages)
+                    .xsmall()
+                    .placeholder(t!(cx, "picks-move"))
+                    .accessibility_label(t!(cx, "picks-move")),
+            ),
+        )
+        .action(
+            Button::new("picks-remove")
+                .xsmall()
+                .outline()
+                .danger()
+                .label(t!(cx, "picks-remove"))
+                .tooltip(t!(cx, "remove-tooltip"))
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    let removals: Vec<save::Removal> = remove_ids
+                        .iter()
+                        .map(|id| save::Removal::Driver(id.clone()))
+                        .collect();
+                    let count = removals.len();
+                    let removed = this
+                        .session
+                        .update(cx, |session, cx| session.remove_many(removals, cx));
+                    this.pick_status = Some(crate::labels::picks_outcome(
+                        cx,
+                        crate::labels::PickAction::Remove,
+                        removed,
+                        count,
+                    ));
+                    cx.notify();
+                })),
+        );
+        if let Some(status) = self.pick_status.clone() {
+            bar = bar.action(
+                div()
+                    .text_xs()
+                    .text_color(cx.theme().muted_foreground)
+                    .child(status),
+            );
+        }
+        Some(bar)
     }
 }
 
 impl Render for DriversPage {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.sync_garages(window, cx);
+        let pick_bar = self.render_pick_bar(cx);
         // The summary counts every driver, whatever the filter shows.
         let drivers = self.session.read(cx).drivers();
         let count = drivers.len();
@@ -124,38 +252,42 @@ impl Render for DriversPage {
             .count();
         let summary = t!(cx, "drivers-summary", count = count, maxed = maxed);
 
+        // While rows are picked, what can be done to them takes the toolbar's place.
+        let toolbar = match pick_bar {
+            Some(bar) => bar.into_any_element(),
+            None => h_flex()
+                .justify_between()
+                .items_center()
+                .gap_4()
+                // On a narrow window the buttons move to a line of their own.
+                .flex_wrap()
+                .gap_y_2()
+                .child(
+                    div()
+                        .text_sm()
+                        .text_color(cx.theme().muted_foreground)
+                        .child(summary),
+                )
+                .child(
+                    Button::new("max-drivers")
+                        .small()
+                        .outline()
+                        .label(t!(cx, "drivers-max-all"))
+                        .tooltip(t!(cx, "drivers-max-all-tooltip"))
+                        .disabled(maxed == count)
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.session
+                                .update(cx, |session, cx| session.max_all_drivers(cx));
+                        })),
+                )
+                .into_any_element(),
+        };
         v_flex()
             .size_full()
             .gap_4()
             .px_8()
             .py_6()
-            .child(
-                h_flex()
-                    .justify_between()
-                    .items_center()
-                    .gap_4()
-                    // On a narrow window the buttons move to a line of their own.
-                    .flex_wrap()
-                    .gap_y_2()
-                    .child(
-                        div()
-                            .text_sm()
-                            .text_color(cx.theme().muted_foreground)
-                            .child(summary),
-                    )
-                    .child(
-                        Button::new("max-drivers")
-                            .small()
-                            .outline()
-                            .label(t!(cx, "drivers-max-all"))
-                            .tooltip(t!(cx, "drivers-max-all-tooltip"))
-                            .disabled(maxed == count)
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.session
-                                    .update(cx, |session, cx| session.max_all_drivers(cx));
-                            })),
-                    ),
-            )
+            .child(toolbar)
             .child(self.filter.clone())
             .child(
                 div()
@@ -198,10 +330,14 @@ struct DriverTable {
     /// For the Details buttons.
     session: Entity<Session>,
     sort: Option<(DriverColumn, ColumnSort)>,
+    /// The rows picked to act on together (by driver id).
+    picks: crate::ui::Picks,
 }
 
 #[derive(Clone, Copy, PartialEq)]
 enum DriverColumn {
+    /// The checkbox that picks the row.
+    Pick,
     Hometown,
     Location,
     Experience,
@@ -211,7 +347,8 @@ enum DriverColumn {
 }
 
 impl DriverColumn {
-    const ALL: [DriverColumn; 6] = [
+    const ALL: [DriverColumn; 7] = [
+        DriverColumn::Pick,
         DriverColumn::Hometown,
         DriverColumn::Location,
         DriverColumn::Experience,
@@ -246,6 +383,7 @@ impl DriverTable {
             }
             Some(DriverColumn::Skills) => Column::new("skills", t!(cx, "column-skills")).sortable(),
             Some(DriverColumn::Details) => Column::new("details", ""),
+            Some(DriverColumn::Pick) => Column::new("pick", "").resizable(false).movable(false),
             Some(DriverColumn::Adr) | None => Column::new("adr", t!(cx, "column-adr")).sortable(),
         }
     }
@@ -287,7 +425,7 @@ impl DriverTable {
                 DriverColumn::Experience => a.experience.cmp(&b.experience),
                 DriverColumn::Skills => skill_total(&a.skills).cmp(&skill_total(&b.skills)),
                 DriverColumn::Adr => adr_count(&a.skills).cmp(&adr_count(&b.skills)),
-                DriverColumn::Details => std::cmp::Ordering::Equal,
+                DriverColumn::Details | DriverColumn::Pick => std::cmp::Ordering::Equal,
             };
             if sort == ColumnSort::Descending {
                 ordering.reverse()
@@ -319,7 +457,7 @@ impl DriverTable {
                 urgent = levels[3].1,
                 eco = levels[4].1
             ),
-            DriverColumn::Details => SharedString::default(),
+            DriverColumn::Details | DriverColumn::Pick => SharedString::default(),
             DriverColumn::Adr => t!(
                 cx,
                 "adr-count",
@@ -339,6 +477,7 @@ impl DriverColumn {
             DriverColumn::Experience => 140.,
             DriverColumn::Skills => 150.,
             DriverColumn::Details => 44.,
+            DriverColumn::Pick => 40.,
             DriverColumn::Adr => 90.,
         }
     }
@@ -409,6 +548,43 @@ impl TableDelegate for DriverTable {
         self.sort_by(column, sort);
     }
 
+    /// Headings as the kit draws them, but the pick column's: a checkbox for every row shown.
+    fn render_th(
+        &mut self,
+        col_ix: usize,
+        _: &mut Window,
+        cx: &mut Context<TableState<Self>>,
+    ) -> impl IntoElement {
+        if DriverColumn::ALL.get(col_ix) != Some(&DriverColumn::Pick) {
+            return div()
+                .w_full()
+                .child(self.column(col_ix, cx).name)
+                .into_any_element();
+        }
+        let shown: Vec<String> = self
+            .drivers
+            .iter()
+            .map(|driver| driver.id.clone())
+            .collect();
+        let is_all = self.picks.all_of(shown.iter().map(String::as_str));
+        div()
+            .w_full()
+            .flex()
+            .justify_center()
+            .child(
+                crate::ui::pick_box("pick-all", is_all, t!(cx, "picks-all")).on_click(cx.listener(
+                    move |table, _: &bool, _, cx| {
+                        table
+                            .delegate_mut()
+                            .picks
+                            .toggle_all(shown.iter().map(String::as_str));
+                        cx.notify();
+                    },
+                )),
+            )
+            .into_any_element()
+    }
+
     fn render_td(
         &mut self,
         row_ix: usize,
@@ -421,6 +597,34 @@ impl TableDelegate for DriverTable {
             .copied()
             .unwrap_or(DriverColumn::Hometown);
         let text = self.text(row_ix, column, cx);
+        if column == DriverColumn::Pick {
+            let Some(driver) = self.drivers.get(row_ix) else {
+                return div().into_any_element();
+            };
+            let id = driver.id.clone();
+            let label = t!(
+                cx,
+                "picks-row",
+                name = t!(
+                    cx,
+                    "driver-from",
+                    city = game_data::city_name(cx, &driver.hometown)
+                )
+            );
+            return h_flex()
+                .w_full()
+                .h_full()
+                .items_center()
+                .justify_center()
+                .child(
+                    crate::ui::pick_box(("pick", row_ix), self.picks.contains(&id), label)
+                        .on_click(cx.listener(move |table, _: &bool, _, cx| {
+                            table.delegate_mut().picks.toggle(&id);
+                            cx.notify();
+                        })),
+                )
+                .into_any_element();
+        }
         if column == DriverColumn::Details {
             let Some(driver) = self.drivers.get(row_ix).cloned() else {
                 return div().into_any_element();

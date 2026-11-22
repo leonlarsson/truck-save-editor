@@ -30,6 +30,8 @@ pub struct GaragesPage {
     /// The headquarters: one of the cities with an owned garage.
     headquarters: Entity<SelectState<SearchableVec<CityOption>>>,
     filter: Entity<FilterBar>,
+    /// How the last action on the picked rows went.
+    pick_status: Option<SharedString>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -44,6 +46,7 @@ impl GaragesPage {
             garages: Vec::new(),
             session: session.clone(),
             sort: None,
+            picks: crate::ui::Picks::default(),
         };
         let toggles = vec![
             t!(cx, "garages-filter-owned"),
@@ -102,11 +105,14 @@ impl GaragesPage {
                 },
             ),
         ];
+        let mut _subscriptions = _subscriptions;
+        _subscriptions.push(cx.observe(&table, |_, _, cx| cx.notify()));
         let mut page = Self {
             session,
             table,
             headquarters,
             filter,
+            pick_status: None,
             _subscriptions,
         };
         page.reload(cx);
@@ -118,6 +124,7 @@ impl GaragesPage {
     fn reload(&mut self, cx: &mut Context<Self>) {
         let all = self.session.read(cx).garages();
         let total = all.len();
+        let existing: Vec<String> = all.iter().map(|garage| garage.id.clone()).collect();
         let garages: Vec<Garage> = {
             let filter = self.filter.read(cx);
             all.into_iter()
@@ -133,7 +140,11 @@ impl GaragesPage {
         self.filter
             .update(cx, |filter, cx| filter.set_counts(shown, total, cx));
         self.table.update(cx, |table, cx| {
-            table.delegate_mut().set_garages(garages);
+            let delegate = table.delegate_mut();
+            delegate.set_garages(garages);
+            delegate
+                .picks
+                .keep_only(existing.iter().map(String::as_str));
             table.refresh(cx);
             cx.notify();
         });
@@ -160,6 +171,69 @@ impl GaragesPage {
         });
     }
 
+    /// The bar above the table while rows are picked: what can be done to all of them.
+    fn render_pick_bar(&self, cx: &mut Context<Self>) -> Option<crate::ui::PickBar> {
+        let picks = self.table.read(cx).delegate().picks.clone();
+        if picks.is_empty() {
+            return None;
+        }
+        let ids = picks.ids();
+        let table = self.table.clone();
+        let large_ids = ids.clone();
+        let remove_ids = ids;
+        let mut bar = crate::ui::PickBar::new(picks.len(), move |_, cx| {
+            table.update(cx, |table, cx| {
+                table.delegate_mut().picks.clear();
+                cx.notify();
+            });
+        })
+        .action(
+            Button::new("picks-large")
+                .xsmall()
+                .outline()
+                .label(t!(cx, "picks-large"))
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    let ids = large_ids.clone();
+                    this.session
+                        .update(cx, |session, cx| session.upgrade_garages_many(&ids, cx));
+                })),
+        )
+        .action(
+            Button::new("picks-remove")
+                .xsmall()
+                .outline()
+                .danger()
+                .label(t!(cx, "picks-remove"))
+                .tooltip(t!(cx, "remove-tooltip"))
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    let removals: Vec<save::Removal> = remove_ids
+                        .iter()
+                        .map(|id| save::Removal::Garage(id.clone()))
+                        .collect();
+                    let count = removals.len();
+                    let removed = this
+                        .session
+                        .update(cx, |session, cx| session.remove_many(removals, cx));
+                    this.pick_status = Some(crate::labels::picks_outcome(
+                        cx,
+                        crate::labels::PickAction::Remove,
+                        removed,
+                        count,
+                    ));
+                    cx.notify();
+                })),
+        );
+        if let Some(status) = self.pick_status.clone() {
+            bar = bar.action(
+                div()
+                    .text_xs()
+                    .text_color(cx.theme().muted_foreground)
+                    .child(status),
+            );
+        }
+        Some(bar)
+    }
+
     fn upgrade(&mut self, buy_all: bool, cx: &mut Context<Self>) {
         self.session
             .update(cx, |session, cx| session.upgrade_garages(buy_all, cx));
@@ -168,6 +242,7 @@ impl GaragesPage {
 
 impl Render for GaragesPage {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let pick_bar = self.render_pick_bar(cx);
         // The summary counts every garage, whatever the filter shows.
         let garages = self.session.read(cx).garages();
         let count = garages.len();
@@ -181,68 +256,70 @@ impl Render for GaragesPage {
             large = large
         );
 
+        // While rows are picked, what can be done to them takes the toolbar's place.
+        let toolbar = match pick_bar {
+            Some(bar) => bar.into_any_element(),
+            None => h_flex()
+                .justify_between()
+                .items_center()
+                .gap_4()
+                // On a narrow window the buttons move to a line of their own.
+                .flex_wrap()
+                .gap_y_2()
+                .child(
+                    h_flex()
+                        .gap_4()
+                        .items_center()
+                        .child(
+                            h_flex()
+                                .gap_2()
+                                .items_center()
+                                .child(div().text_sm().child(t!(cx, "headquarters")))
+                                .child(
+                                    div().w(gpui_kit::rems(13.)).child(
+                                        Select::new(&self.headquarters)
+                                            .small()
+                                            .placeholder(t!(cx, "headquarters-pick")),
+                                    ),
+                                ),
+                        )
+                        .child(
+                            div()
+                                .text_sm()
+                                .text_color(cx.theme().muted_foreground)
+                                .child(summary),
+                        ),
+                )
+                .child(
+                    h_flex()
+                        .gap_2()
+                        .child(
+                            Button::new("upgrade-owned")
+                                .small()
+                                .outline()
+                                .label(t!(cx, "garages-upgrade-owned"))
+                                .tooltip(t!(cx, "garages-upgrade-owned-tooltip"))
+                                .disabled(owned == large)
+                                .on_click(cx.listener(|this, _, _, cx| this.upgrade(false, cx))),
+                        )
+                        .child(
+                            Button::new("buy-all")
+                                .small()
+                                .outline()
+                                .label(t!(cx, "garages-buy-all"))
+                                .tooltip(t!(cx, "garages-buy-all-tooltip"))
+                                .disabled(large == count)
+                                .on_click(cx.listener(|this, _, _, cx| this.upgrade(true, cx))),
+                        ),
+                )
+                .into_any_element(),
+        };
         v_flex()
             .size_full()
             .gap_4()
             .px_8()
             .py_6()
-            .child(
-                h_flex()
-                    .justify_between()
-                    .items_center()
-                    .gap_4()
-                    // On a narrow window the buttons move to a line of their own.
-                    .flex_wrap()
-                    .gap_y_2()
-                    .child(
-                        h_flex()
-                            .gap_4()
-                            .items_center()
-                            .child(
-                                h_flex()
-                                    .gap_2()
-                                    .items_center()
-                                    .child(div().text_sm().child(t!(cx, "headquarters")))
-                                    .child(
-                                        div().w(gpui_kit::rems(13.)).child(
-                                            Select::new(&self.headquarters)
-                                                .small()
-                                                .placeholder(t!(cx, "headquarters-pick")),
-                                        ),
-                                    ),
-                            )
-                            .child(
-                                div()
-                                    .text_sm()
-                                    .text_color(cx.theme().muted_foreground)
-                                    .child(summary),
-                            ),
-                    )
-                    .child(
-                        h_flex()
-                            .gap_2()
-                            .child(
-                                Button::new("upgrade-owned")
-                                    .small()
-                                    .outline()
-                                    .label(t!(cx, "garages-upgrade-owned"))
-                                    .tooltip(t!(cx, "garages-upgrade-owned-tooltip"))
-                                    .disabled(owned == large)
-                                    .on_click(
-                                        cx.listener(|this, _, _, cx| this.upgrade(false, cx)),
-                                    ),
-                            )
-                            .child(
-                                Button::new("buy-all")
-                                    .small()
-                                    .outline()
-                                    .label(t!(cx, "garages-buy-all"))
-                                    .tooltip(t!(cx, "garages-buy-all-tooltip"))
-                                    .disabled(large == count)
-                                    .on_click(cx.listener(|this, _, _, cx| this.upgrade(true, cx))),
-                            ),
-                    ),
-            )
+            .child(toolbar)
             .child(self.filter.clone())
             .child(
                 div()
@@ -282,10 +359,14 @@ struct GarageTable {
     /// For the Details buttons.
     session: Entity<Session>,
     sort: Option<(GarageColumn, ColumnSort)>,
+    /// The rows picked to act on together (by garage id).
+    picks: crate::ui::Picks,
 }
 
 #[derive(Clone, Copy, PartialEq)]
 enum GarageColumn {
+    /// The checkbox that picks the row.
+    Pick,
     City,
     Size,
     Trucks,
@@ -294,7 +375,8 @@ enum GarageColumn {
 }
 
 impl GarageColumn {
-    const ALL: [GarageColumn; 5] = [
+    const ALL: [GarageColumn; 6] = [
+        GarageColumn::Pick,
         GarageColumn::City,
         GarageColumn::Size,
         GarageColumn::Trucks,
@@ -315,6 +397,7 @@ impl GarageTable {
                 .text_right()
                 .sortable(),
             Some(GarageColumn::Details) => Column::new("details", ""),
+            Some(GarageColumn::Pick) => Column::new("pick", "").resizable(false).movable(false),
             Some(GarageColumn::Drivers) | None => Column::new("drivers", t!(cx, "column-drivers"))
                 .text_right()
                 .sortable(),
@@ -357,7 +440,7 @@ impl GarageTable {
                 GarageColumn::Size => (a.is_owned, a.slots).cmp(&(b.is_owned, b.slots)),
                 GarageColumn::Trucks => a.trucks.cmp(&b.trucks),
                 GarageColumn::Drivers => a.drivers.cmp(&b.drivers),
-                GarageColumn::Details => std::cmp::Ordering::Equal,
+                GarageColumn::Details | GarageColumn::Pick => std::cmp::Ordering::Equal,
             };
             if sort == ColumnSort::Descending {
                 ordering.reverse()
@@ -385,7 +468,7 @@ impl GarageTable {
             GarageColumn::Size => t!(cx, "garage-slots", count = garage.slots),
             GarageColumn::Trucks => filled(garage.trucks),
             GarageColumn::Drivers => filled(garage.drivers),
-            GarageColumn::Details => SharedString::default(),
+            GarageColumn::Details | GarageColumn::Pick => SharedString::default(),
         }
     }
 }
@@ -398,6 +481,7 @@ impl GarageColumn {
             GarageColumn::Size => 150.,
             GarageColumn::Trucks => 110.,
             GarageColumn::Details => 44.,
+            GarageColumn::Pick => 40.,
             GarageColumn::Drivers => 110.,
         }
     }
@@ -468,6 +552,43 @@ impl TableDelegate for GarageTable {
         self.sort_by(column, sort);
     }
 
+    /// Headings as the kit draws them, but the pick column's: a checkbox for every row shown.
+    fn render_th(
+        &mut self,
+        col_ix: usize,
+        _: &mut Window,
+        cx: &mut Context<TableState<Self>>,
+    ) -> impl IntoElement {
+        if GarageColumn::ALL.get(col_ix) != Some(&GarageColumn::Pick) {
+            return div()
+                .w_full()
+                .child(self.column(col_ix, cx).name)
+                .into_any_element();
+        }
+        let shown: Vec<String> = self
+            .garages
+            .iter()
+            .map(|garage| garage.id.clone())
+            .collect();
+        let is_all = self.picks.all_of(shown.iter().map(String::as_str));
+        div()
+            .w_full()
+            .flex()
+            .justify_center()
+            .child(
+                crate::ui::pick_box("pick-all", is_all, t!(cx, "picks-all")).on_click(cx.listener(
+                    move |table, _: &bool, _, cx| {
+                        table
+                            .delegate_mut()
+                            .picks
+                            .toggle_all(shown.iter().map(String::as_str));
+                        cx.notify();
+                    },
+                )),
+            )
+            .into_any_element()
+    }
+
     fn render_td(
         &mut self,
         row_ix: usize,
@@ -479,6 +600,30 @@ impl TableDelegate for GarageTable {
             .get(col_ix)
             .copied()
             .unwrap_or(GarageColumn::City);
+        if column == GarageColumn::Pick {
+            let Some(garage) = self.garages.get(row_ix) else {
+                return div().into_any_element();
+            };
+            let id = garage.id.clone();
+            let label = t!(
+                cx,
+                "picks-row",
+                name = game_data::city_name(cx, &garage.city)
+            );
+            return h_flex()
+                .w_full()
+                .h_full()
+                .items_center()
+                .justify_center()
+                .child(
+                    crate::ui::pick_box(("pick", row_ix), self.picks.contains(&id), label)
+                        .on_click(cx.listener(move |table, _: &bool, _, cx| {
+                            table.delegate_mut().picks.toggle(&id);
+                            cx.notify();
+                        })),
+                )
+                .into_any_element();
+        }
         if column == GarageColumn::Details {
             let Some(garage) = self.garages.get(row_ix).cloned() else {
                 return div().into_any_element();

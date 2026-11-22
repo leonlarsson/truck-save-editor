@@ -161,6 +161,23 @@ pub fn day_time(cx: &App, day: i64, minutes: i64) -> SharedString {
     )
 }
 
+/// What was done to picked rows, for saying how it went.
+#[derive(Clone, Copy)]
+pub enum PickAction {
+    Move,
+    Remove,
+}
+
+/// How an action on picked rows went: all of them, or how many and why not the rest.
+pub fn picks_outcome(cx: &App, action: PickAction, done: usize, count: usize) -> SharedString {
+    match (action, done == count) {
+        (PickAction::Move, true) => t!(cx, "picks-moved-all", count = count),
+        (PickAction::Move, false) => t!(cx, "picks-moved", moved = done, count = count),
+        (PickAction::Remove, true) => t!(cx, "picks-removed-all", count = count),
+        (PickAction::Remove, false) => t!(cx, "picks-removed", removed = done, count = count),
+    }
+}
+
 /// How long ago something happened, roughly: `just now`, `5 minutes ago`, `3 years ago`.
 /// (Relative times need no time zone, and read better than dates in lists.)
 pub fn ago(cx: &App, when: SystemTime) -> SharedString {
