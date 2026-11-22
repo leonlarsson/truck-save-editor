@@ -1360,6 +1360,9 @@ fn other_slots(session: &Entity<Session>, cx: &App) -> Vec<save::Slot> {
 }
 
 /// Asks which of the profile's other slots to save over, then to confirm it.
+/// A slot with its place in the list it came from (for its button's id).
+type NumberedSlot<'a> = (usize, &'a save::Slot);
+
 fn choose_slot_to_save_over(session: Entity<Session>, window: &mut Window, cx: &mut App) {
     let slots = other_slots(&session, cx);
     let original = labels::slot_name(cx, session.read(cx).slot());
@@ -1367,7 +1370,7 @@ fn choose_slot_to_save_over(session: Entity<Session>, window: &mut Window, cx: &
     window.open_alert_dialog(cx, move |alert, _, cx| {
         // The player's own saves first, then the game's (which it overwrites as it goes), each
         // with what tells them apart: the slot, the money, when.
-        let (own, game_made): (Vec<(usize, &save::Slot)>, Vec<(usize, &save::Slot)>) = slots
+        let (own, game_made): (Vec<NumberedSlot>, Vec<NumberedSlot>) = slots
             .iter()
             .enumerate()
             .partition(|(_, slot)| slot.kind.is_manual());
