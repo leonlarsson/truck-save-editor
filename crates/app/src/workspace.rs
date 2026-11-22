@@ -250,10 +250,11 @@ impl Workspace {
                     }
                     Ok(session) => this.show(session, window, cx),
                     Err(error) => window.push_notification(
-                        Notification::new()
-                            .with_type(NotificationType::Error)
-                            .title(t!(cx, "open-failed", name = &name))
-                            .message(error.to_string()),
+                        crate::report::error_notification(
+                            t!(cx, "open-failed", name = &name),
+                            &error,
+                            "Couldn't open a save",
+                        ),
                         cx,
                     ),
                 }
@@ -424,6 +425,7 @@ impl Workspace {
             PaletteCommand::Backups => self.open_backups(window, cx),
             PaletteCommand::SwitchSave => self.close(window, cx),
             PaletteCommand::ToggleTheme => theme::toggle_mode(window, cx),
+            PaletteCommand::ReportProblem => crate::report::open(cx, None),
         }
     }
 
@@ -1143,10 +1145,11 @@ fn start_save(session: Entity<Session>, window: &mut Window, cx: &mut App) {
         Ok(slot) => slot,
         Err(error) => {
             window.push_notification(
-                Notification::new()
-                    .with_type(NotificationType::Error)
-                    .title(t!(cx, "save-prepare-failed"))
-                    .message(error.to_string()),
+                crate::report::error_notification(
+                    t!(cx, "save-prepare-failed"),
+                    &error,
+                    "Couldn't prepare a save",
+                ),
                 cx,
             );
             return;
@@ -1210,10 +1213,11 @@ fn start_save(session: Entity<Session>, window: &mut Window, cx: &mut App) {
                 Err(error) => {
                     session.update(cx, |session, cx| session.set_saving(false, cx));
                     window.push_notification(
-                        Notification::new()
-                            .with_type(NotificationType::Error)
-                            .title(t!(cx, "save-failed", name = &name))
-                            .message(error.to_string()),
+                        crate::report::error_notification(
+                            t!(cx, "save-failed", name = &name),
+                            &error,
+                            "Couldn't save",
+                        ),
                         cx,
                     );
                 }
@@ -1229,10 +1233,11 @@ fn start_save_as_new_slot(session: Entity<Session>, window: &mut Window, cx: &mu
         Ok(slot) => slot,
         Err(error) => {
             window.push_notification(
-                Notification::new()
-                    .with_type(NotificationType::Error)
-                    .title(t!(cx, "save-prepare-failed"))
-                    .message(error.to_string()),
+                crate::report::error_notification(
+                    t!(cx, "save-prepare-failed"),
+                    &error,
+                    "Couldn't prepare a save",
+                ),
                 cx,
             );
             return;
@@ -1290,10 +1295,11 @@ fn start_save_as_new_slot(session: Entity<Session>, window: &mut Window, cx: &mu
                 Err(error) => {
                     session.update(cx, |session, cx| session.set_saving(false, cx));
                     window.push_notification(
-                        Notification::new()
-                            .with_type(NotificationType::Error)
-                            .title(t!(cx, "save-failed", name = &new_name))
-                            .message(error.to_string()),
+                        crate::report::error_notification(
+                            t!(cx, "save-failed", name = &new_name),
+                            &error,
+                            "Couldn't save",
+                        ),
                         cx,
                     );
                 }
@@ -1438,10 +1444,11 @@ fn start_save_over(
         Ok(slot) => slot,
         Err(error) => {
             window.push_notification(
-                Notification::new()
-                    .with_type(NotificationType::Error)
-                    .title(t!(cx, "save-prepare-failed"))
-                    .message(error.to_string()),
+                crate::report::error_notification(
+                    t!(cx, "save-prepare-failed"),
+                    &error,
+                    "Couldn't prepare a save",
+                ),
                 cx,
             );
             return;
@@ -1505,10 +1512,11 @@ fn start_save_over(
                 Err(error) => {
                     session.update(cx, |session, cx| session.set_saving(false, cx));
                     window.push_notification(
-                        Notification::new()
-                            .with_type(NotificationType::Error)
-                            .title(t!(cx, "save-failed", name = &target_name))
-                            .message(error.to_string()),
+                        crate::report::error_notification(
+                            t!(cx, "save-failed", name = &target_name),
+                            &error,
+                            "Couldn't save",
+                        ),
                         cx,
                     );
                 }
@@ -1596,10 +1604,11 @@ fn start_restore(
                     );
                 }
                 Err(error) => window.push_notification(
-                    Notification::new()
-                        .with_type(NotificationType::Error)
-                        .title(t!(cx, "restore-failed", name = &name))
-                        .message(error.to_string()),
+                    crate::report::error_notification(
+                        t!(cx, "restore-failed", name = &name),
+                        &error,
+                        "Couldn't restore a backup",
+                    ),
                     cx,
                 ),
             });

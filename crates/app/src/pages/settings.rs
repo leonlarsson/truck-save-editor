@@ -240,15 +240,30 @@ impl Render for SettingsPage {
                                     .child(t!(cx, "settings-not-affiliated")),
                             )
                             .child(
-                                h_flex().child(
-                                    Button::new("source")
-                                        .small()
-                                        .ghost()
-                                        .label(t!(cx, "settings-source"))
-                                        .on_click(|_, _, cx| {
-                                            cx.open_url(env!("CARGO_PKG_REPOSITORY"))
-                                        }),
-                                ),
+                                h_flex()
+                                    .gap_2()
+                                    .child(
+                                        Button::new("report")
+                                            .small()
+                                            .outline()
+                                            .label(t!(cx, "report-problem"))
+                                            .on_click(|_, _, cx| crate::report::open(cx, None)),
+                                    )
+                                    .child(
+                                        Button::new("source")
+                                            .small()
+                                            .ghost()
+                                            .label(t!(cx, "settings-source"))
+                                            .on_click(|_, _, cx| {
+                                                cx.open_url(env!("CARGO_PKG_REPOSITORY"))
+                                            }),
+                                    ),
+                            )
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(muted)
+                                    .child(t!(cx, "report-description")),
                             ),
                     ),
                 ),

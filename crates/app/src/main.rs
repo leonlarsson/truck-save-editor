@@ -13,6 +13,7 @@ mod labels;
 mod pages;
 mod palette;
 mod quick_start;
+mod report;
 mod session;
 mod settings;
 #[cfg(test)]

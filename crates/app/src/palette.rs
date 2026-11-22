@@ -41,6 +41,8 @@ pub enum PaletteCommand {
     Backups,
     SwitchSave,
     ToggleTheme,
+    /// Opens a new GitHub issue in the browser (`report.rs`).
+    ReportProblem,
 }
 
 /// The palette's commands, in groups: pages, then actions. `has_coaches` hides coach commands for
@@ -77,6 +79,7 @@ fn groups(has_coaches: bool) -> Vec<Vec<PaletteCommand>> {
         PaletteCommand::Backups,
         PaletteCommand::SwitchSave,
         PaletteCommand::ToggleTheme,
+        PaletteCommand::ReportProblem,
     ];
     vec![pages, actions, app]
 }
@@ -185,6 +188,11 @@ fn item(command: PaletteCommand, cx: &App) -> CommandItem {
             t!(cx, "palette-theme"),
             IconName::Moon,
             &["dark", "light", "theme"],
+        ),
+        PaletteCommand::ReportProblem => (
+            t!(cx, "palette-report"),
+            IconName::ExternalLink,
+            &["bug", "issue", "github", "feedback", "help"],
         ),
     };
     let item = CommandItem::new()
