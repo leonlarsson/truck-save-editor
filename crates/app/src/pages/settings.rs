@@ -1,10 +1,13 @@
-//! Settings: the app's language, light or dark, where the game is, where backups go, and what
-//! this app is. Changes apply at once and are kept for next time.
+//! Settings: the app's language, light or dark, where the game is, where backups go, whether a new
+//! version is out, and what this app is. Changes apply at once and are kept for next time.
 
 use gpui_kit::component::{
-    ActiveTheme as _, Selectable as _, Sizable as _,
+    ActiveTheme as _, Disableable as _, Selectable as _, Sizable as _,
     button::{Button, ButtonGroup, ButtonVariants as _},
-    h_flex, v_flex,
+    checkbox::Checkbox,
+    h_flex,
+    spinner::Spinner,
+    v_flex,
 };
 use gpui_kit::{
     AppContext as _, Context, IntoElement, ParentElement as _, PathPromptOptions, Render,
@@ -16,6 +19,7 @@ use crate::i18n::{Language, set_language, t};
 use crate::settings::{self, Appearance};
 use crate::theme;
 use crate::ui::{Section, page_body};
+use crate::updates::{self, UpdateState};
 use crate::workspace::backups_root;
 
 pub struct SettingsPage {
@@ -198,6 +202,7 @@ impl Render for SettingsPage {
                             ),
                         ),
                 )
+                .child(self.render_updates(cx))
                 .child(
                     Section::new(t!(cx, "settings-about")).child(
                         v_flex()
@@ -227,6 +232,82 @@ impl Render for SettingsPage {
                     ),
                 ),
         )
+    }
+}
+
+impl SettingsPage {
+    /// Whether a newer version is out, checking again, and turning the check off.
+    fn render_updates(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let muted = cx.theme().muted_foreground;
+        let state = updates::state(cx);
+        let is_on = settings::get(cx).check_for_updates;
+        let status = match &state {
+            UpdateState::NotChecked => div()
+                .text_color(muted)
+                .child(t!(cx, "updates-not-checked"))
+                .into_any_element(),
+            UpdateState::Checking => h_flex()
+                .gap_2()
+                .text_color(muted)
+                .child(Spinner::new().small())
+                .child(t!(cx, "updates-checking"))
+                .into_any_element(),
+            UpdateState::UpToDate => div()
+                .child(t!(
+                    cx,
+                    "updates-up-to-date",
+                    version = updates::CURRENT_VERSION
+                ))
+                .into_any_element(),
+            UpdateState::Available { version, url } => {
+                let url = url.clone();
+                h_flex()
+                    .gap_3()
+                    .flex_wrap()
+                    .child(t!(cx, "updates-available", version = version.clone()))
+                    .child(
+                        Button::new("download-update")
+                            .small()
+                            .primary()
+                            .label(t!(cx, "updates-download"))
+                            .on_click(move |_, _, cx| cx.open_url(&url)),
+                    )
+                    .into_any_element()
+            }
+            UpdateState::Failed => div()
+                .text_color(muted)
+                .child(t!(cx, "updates-failed"))
+                .into_any_element(),
+        };
+        Section::new(t!(cx, "settings-updates"))
+            .description(t!(cx, "settings-updates-description"))
+            .child(
+                v_flex().gap_3().child(div().text_sm().child(status)).child(
+                    h_flex()
+                        .gap_4()
+                        .flex_wrap()
+                        .child(
+                            Button::new("check-updates")
+                                .small()
+                                .outline()
+                                .label(t!(cx, "updates-check-now"))
+                                .disabled(state == UpdateState::Checking)
+                                .on_click(|_, _, cx| updates::check(cx)),
+                        )
+                        .child(
+                            Checkbox::new("check-on-start")
+                                .label(t!(cx, "updates-check-on-start"))
+                                .checked(is_on)
+                                .on_change(|checked: &bool, _, cx| {
+                                    let checked = *checked;
+                                    settings::update(cx, |settings| {
+                                        settings.check_for_updates = checked
+                                    });
+                                    cx.refresh_windows();
+                                }),
+                        ),
+                ),
+            )
     }
 }
 

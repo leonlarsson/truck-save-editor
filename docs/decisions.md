@@ -172,3 +172,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** the in-game check refused the save with the cancelled job: "There are multiple unit trees in the file … Unable to create economy unit!". The game reads a save as one tree from the economy and treats unreferenced units as a second tree. A fixture test confirms every save the game wrote is exactly one tree (all units reachable), so removing only what's cut off makes the file look like the game's own after a finished job.
 
 **Considered:** keeping the units and pointing something at them (there's nothing in the game that would); refusing edits that cut units off (cancelling a job has to).
+
+## 2026-11-22: The editor checks GitHub for a newer version
+
+**Decided:** when it starts, the editor asks GitHub's API for the repository's latest release (`updates.rs`, with `ureq`) and, if it's newer, says so on the start screen, in the sidebar and in Settings, with a link to the release. It's on by default and can be turned off in Settings. Updating stays a download and a swap of the .exe.
+
+**Why:** a game update can change the save format, and then players need the fixed editor quickly; a portable .exe can't tell them otherwise, and a version without the check can never learn of the next one, so it ships in the first release. One request to GitHub is the only network use; it sends the editor's name and version as its agent and nothing about the player or their saves.
+
+**Considered:** updating in place with one click (download, check the release's checksums, swap the .exe and restart: a likely next step); an installer with automatic updates (Velopack; would replace the portable zip); no check (players wouldn't know).

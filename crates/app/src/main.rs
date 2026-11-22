@@ -19,6 +19,7 @@ mod settings;
 mod tests;
 mod theme;
 mod ui;
+mod updates;
 mod workspace;
 
 use gpui_kit::{AppContext as _, Bounds, TitlebarOptions, WindowBounds, WindowOptions, px, size};
@@ -78,6 +79,7 @@ fn main() {
             gpui_kit::init(cx);
             settings::init(cx);
             i18n::init(cx);
+            updates::init(cx);
             theme::init(cx);
             game_data::init(cx);
             bind_keys(cx);

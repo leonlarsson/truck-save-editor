@@ -20,6 +20,8 @@ The .exe carries its version, product name and copyright in its file details (`c
 5. **Try the draft**: when the workflow finishes, download the zip from the draft release on a Windows PC, unzip it, open a save and look around.
 6. **Edit the notes and publish.** A version with a dash (`0.2.0-beta.1`) is marked as a pre-release.
 
+Once published, a release reaches people through the editor: it asks GitHub for the latest release when it starts (`crates/app/src/updates.rs`) and offers the download. GitHub's "latest release" leaves out drafts and pre-releases, so only a full release is announced.
+
 To try the whole thing without releasing, run the workflow by hand (Actions → Release → Run workflow): it builds, packages and writes the notes as for a release and keeps them as a workflow artifact, with no release and no attestation.
 
 ## Repository settings

@@ -836,56 +836,59 @@ impl Workspace {
             )
             .footer(
                 // Plain content, not `SidebarFooter` (a menu trigger that lights up on hover).
-                h_flex()
-                    .p_2()
-                    .w_full()
-                    .justify_between()
-                    .child(
-                        h_flex()
-                            .gap_1()
-                            .child(
-                                Button::new("switch-save")
-                                    .ghost()
-                                    .small()
-                                    .icon(Icon::new(IconName::FolderOpen))
-                                    .label(t!(cx, "switch-save"))
-                                    .on_click(
-                                        cx.listener(|this, _, window, cx| this.close(window, cx)),
-                                    ),
-                            )
-                            .child(
-                                Button::new("backups")
-                                    .ghost()
-                                    .small()
-                                    .icon(Icon::new(IconName::ArchiveRestore))
-                                    .tooltip(t!(cx, "backups"))
-                                    .accessibility_label(t!(cx, "backups"))
-                                    .on_click(cx.listener(|this, _, window, cx| {
-                                        this.open_backups(window, cx)
-                                    })),
-                            ),
-                    )
-                    .child(
-                        Button::new("toggle-theme")
-                            .ghost()
-                            .small()
-                            .icon(Icon::new(if is_dark {
-                                IconName::Sun
-                            } else {
-                                IconName::Moon
-                            }))
-                            .tooltip(if is_dark {
-                                t!(cx, "theme-light")
-                            } else {
-                                t!(cx, "theme-dark")
-                            })
-                            .accessibility_label(if is_dark {
-                                t!(cx, "theme-light")
-                            } else {
-                                t!(cx, "theme-dark")
-                            })
-                            .on_click(|_, window, cx| theme::toggle_mode(window, cx)),
-                    ),
+                // A newer version, when there is one, sits above the footer's buttons.
+                v_flex().w_full().children(update_notice(cx)).child(
+                    h_flex()
+                        .p_2()
+                        .w_full()
+                        .justify_between()
+                        .child(
+                            h_flex()
+                                .gap_1()
+                                .child(
+                                    Button::new("switch-save")
+                                        .ghost()
+                                        .small()
+                                        .icon(Icon::new(IconName::FolderOpen))
+                                        .label(t!(cx, "switch-save"))
+                                        .on_click(cx.listener(|this, _, window, cx| {
+                                            this.close(window, cx)
+                                        })),
+                                )
+                                .child(
+                                    Button::new("backups")
+                                        .ghost()
+                                        .small()
+                                        .icon(Icon::new(IconName::ArchiveRestore))
+                                        .tooltip(t!(cx, "backups"))
+                                        .accessibility_label(t!(cx, "backups"))
+                                        .on_click(cx.listener(|this, _, window, cx| {
+                                            this.open_backups(window, cx)
+                                        })),
+                                ),
+                        )
+                        .child(
+                            Button::new("toggle-theme")
+                                .ghost()
+                                .small()
+                                .icon(Icon::new(if is_dark {
+                                    IconName::Sun
+                                } else {
+                                    IconName::Moon
+                                }))
+                                .tooltip(if is_dark {
+                                    t!(cx, "theme-light")
+                                } else {
+                                    t!(cx, "theme-dark")
+                                })
+                                .accessibility_label(if is_dark {
+                                    t!(cx, "theme-light")
+                                } else {
+                                    t!(cx, "theme-dark")
+                                })
+                                .on_click(|_, window, cx| theme::toggle_mode(window, cx)),
+                        ),
+                ),
             )
     }
 
@@ -1410,4 +1413,20 @@ fn dev_start_slot() -> Option<(Profile, Slot)> {
 
 fn sii_info(bytes: &[u8]) -> Option<save::SlotInfo> {
     save::read_info(bytes)
+}
+
+/// "Version 0.2.0 is available", when a newer version is out: opens its release page.
+fn update_notice(cx: &App) -> Option<impl IntoElement> {
+    let (version, url) = crate::updates::available(cx)?;
+    Some(
+        h_flex().px_2().child(
+            Button::new("update-available")
+                .ghost()
+                .small()
+                .icon(Icon::new(IconName::ArrowDown))
+                .label(t!(cx, "updates-banner", version = version))
+                .tooltip(t!(cx, "updates-download"))
+                .on_click(move |_, _, cx| cx.open_url(&url)),
+        ),
+    )
 }

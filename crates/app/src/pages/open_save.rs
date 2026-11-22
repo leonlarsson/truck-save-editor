@@ -394,6 +394,24 @@ impl Render for OpenSavePage {
                     // Everything on the slot rows' text edge: the rows pad their content so their
                     // hover fill reaches past it; the header and the rest line up with that text.
                     .child(div().px_3().child(header))
+                    .children(crate::updates::available(cx).map(|(version, url)| {
+                        // A newer version: one quiet line with the way to get it.
+                        h_flex()
+                            .px_3()
+                            .gap_3()
+                            .flex_wrap()
+                            .items_center()
+                            .text_sm()
+                            .child(t!(cx, "updates-available", version = version))
+                            .child(
+                                Button::new("start-update")
+                                    .small()
+                                    .outline()
+                                    .icon(Icon::new(IconName::ArrowDown))
+                                    .label(t!(cx, "updates-download"))
+                                    .on_click(move |_, _, cx| cx.open_url(&url)),
+                            )
+                    }))
                     .child(body),
             )
     }

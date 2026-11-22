@@ -1,5 +1,5 @@
-//! The app's settings: language, light or dark, and where the game is when it isn't found by
-//! itself. Kept in a small text file (`settings.txt`, one `name = value` a line) in the user's
+//! The app's settings: language, light or dark, where the game is when it isn't found by itself,
+//! and whether to check for a new version. Kept in a small text file (`settings.txt`, one `name = value` a line) in the user's
 //! config folder, so they're easy to read or reset by hand.
 
 use std::path::PathBuf;
@@ -37,12 +37,26 @@ impl Appearance {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Settings {
     pub language: Language,
     pub appearance: Appearance,
     /// The game's folder, when the player picked it (otherwise it's found through Steam).
     pub game_dir: Option<PathBuf>,
+    /// Whether to ask GitHub for the latest version when the editor starts (`updates.rs`).
+    pub check_for_updates: bool,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            language: Language::default(),
+            appearance: Appearance::default(),
+            game_dir: None,
+            // On unless turned off: a game update can need a new version of the editor.
+            check_for_updates: true,
+        }
+    }
 }
 
 impl Global for Settings {}
@@ -68,6 +82,7 @@ impl Settings {
                     }
                 }
                 "game_dir" if !value.is_empty() => settings.game_dir = Some(PathBuf::from(value)),
+                "check_for_updates" => settings.check_for_updates = value != "false",
                 _ => {}
             }
         }
@@ -81,9 +96,10 @@ impl Settings {
             .map(|dir| dir.to_string_lossy().into_owned())
             .unwrap_or_default();
         format!(
-            "language = {}\nappearance = {}\ngame_dir = {game_dir}\n",
+            "language = {}\nappearance = {}\ngame_dir = {game_dir}\ncheck_for_updates = {}\n",
             self.language.code(),
-            self.appearance.code()
+            self.appearance.code(),
+            self.check_for_updates
         )
     }
 }
@@ -132,10 +148,13 @@ mod tests {
             language: Language::Swedish,
             appearance: Appearance::Dark,
             game_dir: Some(PathBuf::from("/games/ets2")),
+            check_for_updates: false,
         };
         assert_eq!(Settings::parse(&settings.to_text()), settings);
         let odd = Settings::parse("language = klingon\nwhatever\nappearance=light\n");
         assert_eq!(odd.language, Language::English);
         assert_eq!(odd.appearance, Appearance::Light);
+        // Checking for updates is on unless the file says otherwise.
+        assert!(odd.check_for_updates);
     }
 }
