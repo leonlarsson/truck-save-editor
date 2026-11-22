@@ -1363,13 +1363,30 @@ fn other_slots(session: &Entity<Session>, cx: &App) -> Vec<save::Slot> {
 fn choose_slot_to_save_over(session: Entity<Session>, window: &mut Window, cx: &mut App) {
     let slots = other_slots(&session, cx);
     let original = labels::slot_name(cx, session.read(cx).slot());
+    let currency = session.read(cx).game().currency_symbol();
     window.open_alert_dialog(cx, move |alert, _, cx| {
-        let rows = slots.iter().enumerate().map(|(index, slot)| {
+        // The player's own saves first, then the game's (which it overwrites as it goes), each
+        // with what tells them apart: the slot, the money, when.
+        let (own, game_made): (Vec<(usize, &save::Slot)>, Vec<(usize, &save::Slot)>) = slots
+            .iter()
+            .enumerate()
+            .partition(|(_, slot)| slot.kind.is_manual());
+        let muted = cx.theme().muted_foreground;
+        let row = |index: usize, slot: &save::Slot, cx: &mut App| {
             let name = labels::slot_name(cx, slot);
-            let when = slot
-                .modified
-                .map(|modified| labels::ago(cx, modified))
-                .unwrap_or_default();
+            let mut detail: Vec<String> = Vec::new();
+            if let Some(money) = slot.info.money {
+                detail.push(format!("{currency} {}", crate::format::thousands(money)));
+            }
+            if let Some(modified) = slot.modified {
+                detail.push(labels::ago(cx, modified).to_string());
+            }
+            let number = match slot.kind {
+                save::SlotKind::Manual(number) => {
+                    Some(t!(cx, "start-slot-number", number = number))
+                }
+                _ => None,
+            };
             let session = session.clone();
             let slot = slot.clone();
             let original = original.clone();
@@ -1381,12 +1398,20 @@ fn choose_slot_to_save_over(session: Entity<Session>, window: &mut Window, cx: &
                         .w_full()
                         .justify_between()
                         .gap_4()
-                        .child(div().truncate().child(name.clone()))
+                        .child(
+                            h_flex()
+                                .min_w_0()
+                                .gap_2()
+                                .child(div().truncate().child(name.clone()))
+                                .children(number.map(|number| {
+                                    div().flex_shrink_0().text_color(muted).child(number)
+                                })),
+                        )
                         .child(
                             div()
                                 .flex_shrink_0()
-                                .text_color(cx.theme().muted_foreground)
-                                .child(when),
+                                .text_color(muted)
+                                .child(detail.join(" · ")),
                         ),
                 )
                 .on_click(move |_, window, cx| {
@@ -1400,7 +1425,31 @@ fn choose_slot_to_save_over(session: Entity<Session>, window: &mut Window, cx: &
                         cx,
                     );
                 })
-        });
+                .into_any_element()
+        };
+        let heading = |title: SharedString| {
+            div()
+                .px_3()
+                .pt_2()
+                .text_xs()
+                .font_weight(gpui_kit::FontWeight::MEDIUM)
+                .text_color(muted)
+                .child(title)
+                .into_any_element()
+        };
+        let mut rows: Vec<gpui_kit::AnyElement> = Vec::new();
+        if !own.is_empty() {
+            rows.push(heading(t!(cx, "start-your-saves")));
+            for (index, slot) in own {
+                rows.push(row(index, slot, cx));
+            }
+        }
+        if !game_made.is_empty() {
+            rows.push(heading(t!(cx, "start-game-saves")));
+            for (index, slot) in game_made {
+                rows.push(row(index, slot, cx));
+            }
+        }
         alert
             .title(t!(cx, "save-over-pick-title"))
             .description(
@@ -1421,7 +1470,7 @@ fn choose_slot_to_save_over(session: Entity<Session>, window: &mut Window, cx: &
                             .children(rows),
                     ),
             )
-            .width(px(480.))
+            .width(px(560.))
             .footer(
                 h_flex().w_full().justify_end().child(
                     Button::new("cancel-save-over")

@@ -35,7 +35,8 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [ ] In game: Clear the record, Repair the cargo (none to try yet), Pull it yourself.
 - [ ] Report a problem: Settings → About, the palette, the no-saves screen, and the button on error messages open a filled-in GitHub issue (2026-11-22, check on Windows that the browser opens with the text).
 - [x] In game (2026-11-22): Max their skills on two picked drivers.
-- [ ] In game: picked rows (bulk Repair, Fill the tanks, Move to garage, Remove, Make them large) and Save over another… on a Steam Cloud profile (2026-11-22, not tried in game yet).
+- [x] In game (2026-11-22): Save over another… on a Steam Cloud profile (the chosen save got the changes and kept its name; the original stayed; no cloud prompt).
+- [ ] In game: picked rows (bulk Repair, Fill the tanks, Move to garage, Remove, Make them large) (2026-11-22, not tried in game yet).
 
 ## 4. Picking a save
 
