@@ -676,6 +676,13 @@ remove-why-not-empty = Move or remove its trucks, drivers and trailers first.
 remove-why-unknown = This save's lists aren't in a shape the editor knows (a newer game version?), so it won't guess.
 removal-before = In your company
 removal-after = Removed
+change-career = Career
+change-you = You
+change-cities = Cities
+change-km = { $km } km
+change-tonnes = { $tonnes } t
+change-wear = { $part } wear
+change-on = On
 roads-what = Visited roads
 roads-count = { $count ->
     [one] One road piece

@@ -412,10 +412,7 @@ fn vehicle_panel_edits_read_like_the_panel_in_the_change_list(cx: &mut TestAppCo
             "The game's own plate".to_string(),
             "White on blue".to_string(),
         );
-        let odometer = (
-            "1,000 km on the odometer".to_string(),
-            "1,337 km on the odometer".to_string(),
-        );
+        let odometer = ("1,000 km".to_string(), "1,337 km".to_string());
         assert!(lines.contains(&plate), "{lines:?}");
         assert!(lines.contains(&odometer), "{lines:?}");
     });

@@ -2,6 +2,7 @@
 //! whole app shares one look. A component a screen is missing goes here, not into the screen.
 
 mod amount_field;
+mod change_list;
 mod empty_state;
 mod fill_table;
 mod filter_bar;
@@ -15,6 +16,7 @@ mod step_buttons;
 mod text_table;
 
 pub use amount_field::{AmountChanged, AmountField};
+pub use change_list::ChangeList;
 pub use empty_state::EmptyState;
 pub use fill_table::{FillsWidth, fill_table, fill_widths};
 pub use filter_bar::{FilterBar, FilterChanged, fold, table_or_empty};

@@ -194,9 +194,19 @@ fn plate_text(value: &str) -> String {
 }
 
 pub struct Change {
+    /// What it belongs to, the list's heading: the career, a truck, a driver, the map …
+    pub subject: SharedString,
+    /// What about it changed ("Money", "Engine"); empty when it's removed as a whole.
     pub what: SharedString,
     pub before: SharedString,
     pub after: SharedString,
+}
+
+impl Change {
+    /// Taken out of the company (a truck, driver, trailer or garage), shown as one line.
+    pub fn is_removal(&self) -> bool {
+        self.what.is_empty()
+    }
 }
 
 impl Session {
@@ -207,9 +217,9 @@ impl Session {
         cx: &App,
         path: &FieldPath,
         text: &str,
-    ) -> Option<(SharedString, SharedString, SharedString)> {
+    ) -> Option<(SharedString, SharedString, SharedString, SharedString)> {
         let vehicle = self.saved_vehicles.iter().find(|v| v.id == path.unit)?;
-        let what = t!(
+        let subject = t!(
             cx,
             "move-what-truck",
             model = crate::game_data::model_name(cx, vehicle).unwrap_or_default(),
@@ -222,6 +232,12 @@ impl Session {
                 crate::labels::plate_scheme_name(cx, crate::labels::plate_scheme_of(value))
             };
             let (old_text, new_text) = (plate_text(&saved), plate_text(text));
+            // Only the colours changed: say so; otherwise it's the plate.
+            let what = if old_text == new_text {
+                t!(cx, "plate-colours")
+            } else {
+                t!(cx, "column-plate")
+            };
             let (old_scheme, new_scheme) = (scheme(&saved), scheme(text));
             let (old, new) = if old_text == new_text {
                 (old_scheme, new_scheme)
@@ -233,14 +249,15 @@ impl Session {
                     t!(cx, "edit-plate", plate = new_text, colours = new_scheme),
                 )
             };
-            return Some((what, old, new));
+            return Some((subject, what, old, new));
         }
         if field == "odometer" {
             let km = |value: &str| thousands(sii::value::parse_i64(value).unwrap_or(0));
             return Some((
-                what,
-                t!(cx, "edit-odometer", km = km(&saved)),
-                t!(cx, "edit-odometer", km = km(text)),
+                subject,
+                t!(cx, "column-odometer"),
+                t!(cx, "change-km", km = km(&saved)),
+                t!(cx, "change-km", km = km(text)),
             ));
         }
         if VEHICLE_WEAR_FIELDS.contains(&field) {
@@ -267,19 +284,10 @@ impl Session {
                 _ => t!(cx, "part-wheels"),
             };
             return Some((
-                what,
-                t!(
-                    cx,
-                    "edit-wear",
-                    part = part.clone(),
-                    percent = worst(&self.loaded.game)
-                ),
-                t!(
-                    cx,
-                    "edit-wear",
-                    part = part,
-                    percent = worst(&self.preview())
-                ),
+                subject,
+                t!(cx, "change-wear", part = part),
+                t!(cx, "percent", amount = worst(&self.loaded.game)),
+                t!(cx, "percent", amount = worst(&self.preview())),
             ));
         }
         None
@@ -971,22 +979,61 @@ impl Session {
         let currency = self.game.currency_symbol();
         let money = |amount: i64| format!("{currency} {}", thousands(amount));
         let mut changes = Vec::new();
-        let mut add = |what: SharedString, before: SharedString, after: SharedString| {
+        // Under `subject`, `what` went from `before` to `after` (nothing when they're the same).
+        let mut add = |subject: &SharedString,
+                       what: SharedString,
+                       before: SharedString,
+                       after: SharedString| {
             if before != after {
                 changes.push(Change {
+                    subject: subject.clone(),
                     what,
                     before,
                     after,
                 });
             }
         };
+        // Headings for what isn't one truck, driver or garage.
+        let career = t!(cx, "change-career");
+        let your_day = t!(cx, "day-section");
+        let you = t!(cx, "change-you");
+        let company = t!(cx, "company-section");
+        let map = t!(cx, "page-map");
+        let jobs = t!(cx, "page-jobs");
+        let all_data = t!(cx, "page-all-data");
+        // A truck or trailer by model and plate, a driver by hometown, a garage by city.
+        let vehicle_subject = |id: &str| -> SharedString {
+            match self.saved_vehicles.iter().find(|v| v.id == id) {
+                Some(vehicle) => {
+                    let model = crate::game_data::model_name(cx, vehicle).unwrap_or_default();
+                    t!(
+                        cx,
+                        "move-what-truck",
+                        model = model,
+                        plate = vehicle.plate.clone()
+                    )
+                }
+                None => id.to_string().into(),
+            }
+        };
+        let driver_subject = |id: &str| -> SharedString {
+            let hometown = self
+                .saved_drivers
+                .iter()
+                .find(|driver| driver.id == id)
+                .map(|driver| crate::game_data::city_name(cx, &driver.hometown))
+                .unwrap_or_default();
+            t!(cx, "move-what-driver", city = hometown)
+        };
 
         add(
+            &career,
             t!(cx, "money"),
             money(before.money).into(),
             money(after.money).into(),
         );
         add(
+            &career,
             t!(cx, "experience"),
             t!(
                 cx,
@@ -1001,6 +1048,7 @@ impl Session {
         );
         if let (Some(old), Some(new)) = (before.coach_experience, after.coach_experience) {
             add(
+                &career,
                 t!(cx, "coach-experience"),
                 t!(cx, "experience-amount", amount = thousands(old)),
                 t!(cx, "experience-amount", amount = thousands(new)),
@@ -1008,6 +1056,7 @@ impl Session {
         }
         for index in 0..before.skills.levels().len() {
             add(
+                &career,
                 skill_name(cx, index),
                 t!(cx, "skill-level", level = before.skills.levels()[index].1),
                 t!(cx, "skill-level", level = after.skills.levels()[index].1),
@@ -1016,6 +1065,7 @@ impl Session {
         if let (Some(old), Some(new)) = (before.coach_skills, after.coach_skills) {
             for index in 0..old.levels().len() {
                 add(
+                    &career,
                     coach_skill_name(cx, index),
                     t!(cx, "skill-level", level = old.levels()[index].1),
                     t!(cx, "skill-level", level = new.levels()[index].1),
@@ -1023,11 +1073,13 @@ impl Session {
             }
         }
         add(
+            &career,
             t!(cx, "adr"),
             adr_summary(cx, before.skills.adr),
             adr_summary(cx, after.skills.adr),
         );
         add(
+            &career,
             t!(cx, "hq"),
             game_data::city_name(cx, &before.hq_city).into(),
             game_data::city_name(cx, &after.hq_city).into(),
@@ -1037,13 +1089,13 @@ impl Session {
         let mut described_wear: std::collections::HashSet<(&str, &str)> =
             std::collections::HashSet::new();
         for (path, text) in &self.pending.raw_edits {
-            if let Some((what, old, new)) = self.describe_vehicle_field(cx, path, text) {
+            if let Some((subject, what, old, new)) = self.describe_vehicle_field(cx, path, text) {
                 if VEHICLE_WEAR_FIELDS.contains(&path.field.as_str())
                     && !described_wear.insert((path.unit.as_str(), path.field.as_str()))
                 {
                     continue;
                 }
-                add(what, old, new);
+                add(&subject, what, old, new);
                 continue;
             }
             let before = self
@@ -1063,6 +1115,7 @@ impl Session {
                 .map(|unit| unit.kind.clone())
                 .unwrap_or_default();
             add(
+                &all_data,
                 format!("{kind} › {}", path.field_name()).into(),
                 before.into(),
                 text.clone().into(),
@@ -1074,7 +1127,8 @@ impl Session {
                 .filter(|city| city.visits == 0)
                 .count();
             add(
-                t!(cx, "page-map"),
+                &map,
+                t!(cx, "change-cities"),
                 t!(cx, "garages-before"),
                 t!(cx, "map-visited-all", count = unvisited),
             );
@@ -1093,6 +1147,7 @@ impl Session {
             // Counted as the Map page counts them: only where the game has one, of how many.
             match game_data::place_cities(cx, place) {
                 Some(cities) => add(
+                    &map,
                     what,
                     t!(
                         cx,
@@ -1108,6 +1163,7 @@ impl Session {
                     ),
                 ),
                 None => add(
+                    &map,
                     what,
                     t!(cx, "map-unlocked-count", count = saved.len()),
                     t!(cx, "map-unlocked-count", count = after.len()),
@@ -1116,6 +1172,7 @@ impl Session {
         }
         if !self.pending.maxed_drivers.is_empty() {
             add(
+                &company,
                 t!(cx, "page-drivers"),
                 t!(cx, "garages-before"),
                 t!(
@@ -1132,6 +1189,7 @@ impl Session {
                 .filter(|g| self.pending.upgraded_garages.contains(&g.id))
                 .partition(|g| !g.is_owned);
             add(
+                &company,
                 t!(cx, "garages"),
                 t!(cx, "garages-before"),
                 t!(
@@ -1142,59 +1200,28 @@ impl Session {
                 ),
             );
         }
-        // One line per truck or driver moved: what it is, and from which garage to which.
+        // Each truck or driver moved: under it, from which garage to which.
         for (id, from, to) in self.moved() {
-            let what: SharedString = match self.saved_vehicles.iter().find(|v| v.id == id) {
-                Some(vehicle) => {
-                    let model = crate::game_data::model_name(cx, vehicle).unwrap_or_default();
-                    t!(
-                        cx,
-                        "move-what-truck",
-                        model = model,
-                        plate = vehicle.plate.clone()
-                    )
-                }
-                None => {
-                    let hometown = self
-                        .saved_drivers
-                        .iter()
-                        .find(|driver| driver.id == id)
-                        .map(|driver| crate::game_data::city_name(cx, &driver.hometown))
-                        .unwrap_or_default();
-                    t!(cx, "move-what-driver", city = hometown)
-                }
+            let subject = if self.saved_vehicles.iter().any(|v| v.id == id) {
+                vehicle_subject(&id)
+            } else {
+                driver_subject(&id)
             };
             let city = |garage: &str| {
                 crate::game_data::city_name(cx, garage.strip_prefix("garage.").unwrap_or(garage))
             };
-            add(what, city(&from).into(), city(&to).into());
+            add(
+                &subject,
+                t!(cx, "column-garage"),
+                city(&from).into(),
+                city(&to).into(),
+            );
         }
+        // Each truck, trailer, driver or garage taken out: one line under it.
         for removal in &self.pending.removed {
-            let what: SharedString = match removal {
-                save::Removal::Truck(id) | save::Removal::Trailer(id) => {
-                    match self.saved_vehicles.iter().find(|v| &v.id == id) {
-                        Some(vehicle) => {
-                            let model =
-                                crate::game_data::model_name(cx, vehicle).unwrap_or_default();
-                            t!(
-                                cx,
-                                "move-what-truck",
-                                model = model,
-                                plate = vehicle.plate.clone()
-                            )
-                        }
-                        None => id.clone().into(),
-                    }
-                }
-                save::Removal::Driver(id) => {
-                    let hometown = self
-                        .saved_drivers
-                        .iter()
-                        .find(|driver| &driver.id == id)
-                        .map(|driver| crate::game_data::city_name(cx, &driver.hometown))
-                        .unwrap_or_default();
-                    t!(cx, "move-what-driver", city = hometown)
-                }
+            let subject: SharedString = match removal {
+                save::Removal::Truck(id) | save::Removal::Trailer(id) => vehicle_subject(id),
+                save::Removal::Driver(id) => driver_subject(id),
                 save::Removal::Garage(id) => t!(
                     cx,
                     "detail-garage-in",
@@ -1202,44 +1229,42 @@ impl Session {
                         crate::game_data::city_name(cx, id.strip_prefix("garage.").unwrap_or(id))
                 ),
             };
-            add(what, t!(cx, "removal-before"), t!(cx, "removal-after"));
+            add(
+                &subject,
+                SharedString::default(),
+                t!(cx, "removal-before"),
+                t!(cx, "removal-after"),
+            );
         }
         for edit in &self.pending.vehicle_edits {
             let id = edit.vehicle();
-            let what: SharedString = match self.saved_vehicles.iter().find(|v| v.id == id) {
-                Some(vehicle) => {
-                    let model = crate::game_data::model_name(cx, vehicle).unwrap_or_default();
-                    t!(
-                        cx,
-                        "move-what-truck",
-                        model = model,
-                        plate = vehicle.plate.clone()
-                    )
-                }
-                None => id.to_string().into(),
-            };
+            let subject = vehicle_subject(id);
             let saved = save::trailer_load(&self.loaded.game, id);
             let tonnes = |kg: f64| crate::format::decimal(kg / 1000.0, 1);
-            let (before, after) = match edit {
+            let (what, before, after) = match edit {
                 save::VehicleEdit::CargoMass { kg, .. } => (
+                    t!(cx, "trailer-cargo"),
                     t!(
                         cx,
-                        "edit-cargo",
+                        "change-tonnes",
                         tonnes = tonnes(saved.as_ref().map_or(0.0, |l| l.cargo_kg))
                     ),
-                    t!(cx, "edit-cargo", tonnes = tonnes(*kg)),
+                    t!(cx, "change-tonnes", tonnes = tonnes(*kg)),
                 ),
                 save::VehicleEdit::EmptyMass { kg, .. } => (
+                    t!(cx, "trailer-empty-weight"),
                     t!(
                         cx,
-                        "edit-empty",
+                        "change-tonnes",
                         tonnes = tonnes(saved.as_ref().map_or(0.0, |l| l.empty_kg))
                     ),
-                    t!(cx, "edit-empty", tonnes = tonnes(*kg)),
+                    t!(cx, "change-tonnes", tonnes = tonnes(*kg)),
                 ),
-                save::VehicleEdit::Unrestrict { .. } => {
-                    (t!(cx, "edit-restricted"), t!(cx, "edit-unrestricted"))
-                }
+                save::VehicleEdit::Unrestrict { .. } => (
+                    t!(cx, "trailer-countries"),
+                    t!(cx, "edit-restricted"),
+                    t!(cx, "edit-unrestricted"),
+                ),
                 save::VehicleEdit::Fuel { ratio, .. } => {
                     let saved_ratio = self
                         .saved_vehicles
@@ -1248,50 +1273,46 @@ impl Session {
                         .and_then(|v| v.fuel)
                         .unwrap_or(0.0);
                     (
+                        t!(cx, "column-fuel"),
                         t!(
                             cx,
-                            "edit-fuel",
-                            percent = (f64::from(saved_ratio) * 100.0).round() as i64
+                            "percent",
+                            amount = (f64::from(saved_ratio) * 100.0).round() as i64
                         ),
-                        t!(cx, "edit-fuel", percent = (ratio * 100.0).round() as i64),
+                        t!(cx, "percent", amount = (ratio * 100.0).round() as i64),
                     )
                 }
-                save::VehicleEdit::RemoveBadge { .. } => {
-                    (t!(cx, "edit-badge"), t!(cx, "edit-no-badge"))
-                }
+                save::VehicleEdit::RemoveBadge { .. } => (
+                    t!(cx, "truck-badge"),
+                    t!(cx, "change-on"),
+                    t!(cx, "removal-after"),
+                ),
                 save::VehicleEdit::Part {
                     part, data_path, ..
                 } => {
                     let saved = save::vehicle_part(&self.loaded.game, id, part)
                         .map(|(_, path)| crate::game_data::part_name(cx, &path))
                         .unwrap_or_default();
+                    let what = if part == "engine" {
+                        t!(cx, "truck-engine")
+                    } else {
+                        t!(cx, "truck-transmission")
+                    };
                     (
+                        what,
                         saved.into(),
                         crate::game_data::part_name(cx, data_path).into(),
                     )
                 }
             };
-            add(what, before, after);
+            add(&subject, what, before, after);
         }
-        let vehicle_name = |id: &str| -> SharedString {
-            match self.saved_vehicles.iter().find(|v| v.id == id) {
-                Some(vehicle) => {
-                    let model = crate::game_data::model_name(cx, vehicle).unwrap_or_default();
-                    t!(
-                        cx,
-                        "move-what-truck",
-                        model = model,
-                        plate = vehicle.plate.clone()
-                    )
-                }
-                None => id.to_string().into(),
-            }
-        };
+        let vehicle_name = vehicle_subject;
         if let Some(truck) = &self.pending.drive_truck {
             let before = save::own_truck(&self.loaded.game)
                 .map(|id| vehicle_name(&id))
                 .unwrap_or_default();
-            add(t!(cx, "player-truck"), before, vehicle_name(truck));
+            add(&you, t!(cx, "player-truck"), before, vehicle_name(truck));
         }
         if let Some((to, from)) = &self.pending.move_to {
             let place = |position: &save::Position| -> SharedString {
@@ -1304,6 +1325,7 @@ impl Session {
                 .map(|position| place(&position))
                 .unwrap_or_default();
             add(
+                &you,
                 t!(cx, "player-position"),
                 before,
                 t!(cx, "player-position-from", place = place(to), save = from),
@@ -1360,7 +1382,12 @@ impl Session {
                     vehicle_name(trailer),
                 ),
             };
-            add(what, before, after);
+            let subject = if matches!(edit, save::PlayerEdit::TakeTrailer { .. }) {
+                &you
+            } else {
+                &your_day
+            };
+            add(subject, what, before, after);
         }
         if self.pending.quick_travel {
             let before = save::position(&self.loaded.game)
@@ -1368,6 +1395,7 @@ impl Session {
                 .map(|city| SharedString::from(crate::game_data::city_name(cx, &city)))
                 .unwrap_or_else(|| t!(cx, "player-position-somewhere"));
             add(
+                &you,
                 t!(cx, "player-position"),
                 before,
                 t!(cx, "player-quick-travel-after"),
@@ -1376,6 +1404,7 @@ impl Session {
         if self.pending.forget_roads {
             let (saved, _) = self.discovered_roads();
             add(
+                &map,
                 t!(cx, "roads-what"),
                 t!(
                     cx,
@@ -1400,6 +1429,7 @@ impl Session {
                 .unwrap_or_default();
             if self.pending.remove_job_deadline {
                 add(
+                    &jobs,
                     t!(cx, "current-job"),
                     before.clone(),
                     t!(cx, "current-job-no-deadline"),
@@ -1407,6 +1437,7 @@ impl Session {
             }
             if self.pending.cancel_job {
                 add(
+                    &jobs,
                     t!(cx, "current-job"),
                     before,
                     t!(cx, "current-job-cancelled"),
@@ -1419,7 +1450,12 @@ impl Session {
                 .as_ref()
                 .and_then(save::profile_name)
                 .unwrap_or_default();
-            add(t!(cx, "profile-name"), before.into(), name.clone().into());
+            add(
+                &company,
+                t!(cx, "profile-name"),
+                before.into(),
+                name.clone().into(),
+            );
         }
         if let Some(name) = &self.pending.company_name {
             let before = self
@@ -1427,10 +1463,16 @@ impl Session {
                 .as_ref()
                 .and_then(save::company_name)
                 .unwrap_or_default();
-            add(t!(cx, "company-name"), before.into(), name.clone().into());
+            add(
+                &company,
+                t!(cx, "company-name"),
+                before.into(),
+                name.clone().into(),
+            );
         }
         if self.pending.keep_offers {
             add(
+                &jobs,
                 t!(cx, "jobs-offers"),
                 t!(cx, "garages-before"),
                 t!(cx, "jobs-kept-week"),
@@ -1438,6 +1480,7 @@ impl Session {
         }
         if !self.pending.refueled.is_empty() {
             add(
+                &company,
                 t!(cx, "fuel"),
                 t!(cx, "fuel-before"),
                 t!(cx, "fuel-after", count = self.pending.refueled.len()),
@@ -1445,6 +1488,7 @@ impl Session {
         }
         if !self.pending.repaired.is_empty() {
             add(
+                &company,
                 t!(cx, "repairs"),
                 t!(cx, "repairs-before"),
                 t!(cx, "repairs-after", count = self.pending.repaired.len()),

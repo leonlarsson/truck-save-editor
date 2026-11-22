@@ -20,7 +20,7 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [ ] In game: a save on a local (non-cloud) profile written as a new slot.
 - [x] In game (2026-11-22): moving a truck with its driver (Move to garage), removing a driver, a trailer and a garage, and forgetting the roads, on a Steam Cloud profile.
 - [ ] In game: removing a truck.
-- [ ] The save dialog: one heading per vehicle with its changes under it, instead of the vehicle's name over each change.
+- [x] The save dialog groups changes under what they belong to (the career, each truck, driver or garage, you, the map …), one labelled row per change (2026-11-22).
 - [x] In game (2026-11-22): fuel over 100 % (150 % gave about 1.5 tanks of range); removing the side (engine) badge.
 - [x] In game (2026-11-22): coloured plates (as Belgian plates), front and back, and plate text; the truck carrying the World of Trucks plate always gets that plate back on load, so its plate fields are off with the reason.
 - [ ] In game: trailer cargo weight (only shows while the trailer is on a job) and empty weight; whether a coloured plate can keep its own country.

@@ -676,6 +676,13 @@ remove-why-not-empty = Flytta eller ta bort dess lastbilar, förare och trailrar
 remove-why-unknown = Den här sparfilens listor har en form redigeraren inte känner till (en nyare version av spelet?), så den gissar inte.
 removal-before = I ditt företag
 removal-after = Borttagen
+change-career = Karriär
+change-you = Du
+change-cities = Städer
+change-km = { $km } km
+change-tonnes = { $tonnes } t
+change-wear = Slitage: { $part }
+change-on = På
 roads-what = Besökta vägar
 roads-count = { $count ->
     [one] En vägbit

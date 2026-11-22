@@ -665,35 +665,11 @@ impl Workspace {
             // opened, and that change belongs in the list.
             let changes = session.read(cx).changes(cx);
             // A long list (a big Quick start) scrolls, so the buttons stay in view.
-            let list = v_flex()
+            let list = div()
                 .id("save-changes")
                 .max_h(rems(18.))
                 .overflow_y_scroll()
-                .gap_2()
-                // What changed on one line, before → after below it: names of any length
-                // (a truck and its plate) read whole instead of wrapping in a narrow column.
-                .children(changes.iter().map(|change| {
-                    // `min_w_0` and wrapping: a long value (a plate with the game's markup, say)
-                    // stays inside the dialog.
-                    v_flex()
-                        .text_sm()
-                        .min_w_0()
-                        .child(div().font_medium().child(change.what.clone()))
-                        .child(
-                            h_flex()
-                                .flex_wrap()
-                                .gap_x_2()
-                                .min_w_0()
-                                .child(
-                                    div()
-                                        .min_w_0()
-                                        .text_color(cx.theme().muted_foreground)
-                                        .child(change.before.clone()),
-                                )
-                                .child(div().text_color(cx.theme().muted_foreground).child("→"))
-                                .child(div().min_w_0().child(change.after.clone())),
-                        )
-                }));
+                .child(crate::ui::ChangeList::new(changes));
             alert
                 .title(t!(cx, "save-confirm-title", name = &name))
                 .description(

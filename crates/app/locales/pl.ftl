@@ -712,6 +712,13 @@ remove-why-not-empty = Najpierw przenieś lub usuń jego ciężarówki, kierowc�
 remove-why-unknown = Listy w tym zapisie mają kształt, którego edytor nie zna (nowsza wersja gry?), więc nie będzie zgadywać.
 removal-before = W twojej firmie
 removal-after = Usunięte
+change-career = Kariera
+change-you = Ty
+change-cities = Miasta
+change-km = { $km } km
+change-tonnes = { $tonnes } t
+change-wear = Zużycie: { $part }
+change-on = Jest
 roads-what = Odwiedzone drogi
 roads-count = { $count ->
     [one] Jeden odcinek drogi

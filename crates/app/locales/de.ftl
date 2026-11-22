@@ -680,6 +680,13 @@ remove-why-not-empty = Verlege oder entferne zuerst ihre Lkw, Fahrer und Auflieg
 remove-why-unknown = Die Listen dieses Spielstands haben eine Form, die der Editor nicht kennt (eine neuere Spielversion?), daher rät er nicht.
 removal-before = In deinem Unternehmen
 removal-after = Entfernt
+change-career = Karriere
+change-you = Du
+change-cities = Städte
+change-km = { $km } km
+change-tonnes = { $tonnes } t
+change-wear = Verschleiß: { $part }
+change-on = An
 roads-what = Befahrene Straßen
 roads-count = { $count ->
     [one] Ein Straßenstück
