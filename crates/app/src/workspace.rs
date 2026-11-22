@@ -558,6 +558,8 @@ impl Workspace {
                 .title(t!(cx, "close-unsaved-title", name = &name))
                 .description(t!(cx, "close-unsaved-body", count = changes))
                 .confirm()
+                // The kit's own Cancel is English; ours follows the app's language.
+                .cancel_text(t!(cx, "cancel"))
                 .ok_text(t!(cx, "close-unsaved-confirm"))
                 .ok_variant(gpui_kit::component::button::ButtonVariant::Danger)
                 .on_ok(move |_, _, cx| {
@@ -589,6 +591,8 @@ impl Workspace {
                 .title(t!(cx, "quit-unsaved-title", name = &name))
                 .description(t!(cx, "close-unsaved-body", count = changes))
                 .confirm()
+                // The kit's own Cancel is English; ours follows the app's language.
+                .cancel_text(t!(cx, "cancel"))
                 .ok_text(t!(cx, "quit-unsaved-confirm"))
                 .ok_variant(gpui_kit::component::button::ButtonVariant::Danger)
                 .on_ok(|_, window, _| {
@@ -642,6 +646,7 @@ impl Workspace {
                 session.profile().location == save::Location::SteamCloud,
             )
         };
+        let has_other_slots = !other_slots(&session, cx).is_empty();
 
         window.open_alert_dialog(cx, move |alert, _, cx| {
             let session = session.clone();
@@ -704,6 +709,7 @@ impl Workspace {
                 .footer({
                     let as_new = session.clone();
                     let over = session.clone();
+                    let over_other = session.clone();
                     h_flex()
                         .w_full()
                         .justify_end()
@@ -725,6 +731,18 @@ impl Workspace {
                                 .on_click(move |_, window, cx| {
                                     window.close_dialog(cx);
                                     start_save_as_new_slot(as_new.clone(), window, cx);
+                                }),
+                        )
+                        .child(
+                            // Works for Steam Cloud too: the game already knows the other slot.
+                            Button::new("save-over-other")
+                                .outline()
+                                .label(t!(cx, "save-over-other"))
+                                .disabled(!has_other_slots)
+                                .tooltip(t!(cx, "save-over-other-tooltip"))
+                                .on_click(move |_, window, cx| {
+                                    window.close_dialog(cx);
+                                    choose_slot_to_save_over(over_other.clone(), window, cx);
                                 }),
                         )
                         .child(
@@ -1284,6 +1302,221 @@ fn start_save_as_new_slot(session: Entity<Session>, window: &mut Window, cx: &mu
         .detach();
 }
 
+/// The open profile's other slots, newest first: the ones the changes can be saved over.
+fn other_slots(session: &Entity<Session>, cx: &App) -> Vec<save::Slot> {
+    let session = session.read(cx);
+    let open = session.slot().dir.clone();
+    let mut slots: Vec<save::Slot> = save::profile_slots(&session.profile().dir)
+        .into_iter()
+        .filter(|slot| slot.dir != open)
+        .collect();
+    slots.sort_by_key(|slot| std::cmp::Reverse(slot.modified));
+    slots
+}
+
+/// Asks which of the profile's other slots to save over, then to confirm it.
+fn choose_slot_to_save_over(session: Entity<Session>, window: &mut Window, cx: &mut App) {
+    let slots = other_slots(&session, cx);
+    let original = labels::slot_name(cx, session.read(cx).slot());
+    window.open_alert_dialog(cx, move |alert, _, cx| {
+        let rows = slots.iter().enumerate().map(|(index, slot)| {
+            let name = labels::slot_name(cx, slot);
+            let when = slot
+                .modified
+                .map(|modified| labels::ago(cx, modified))
+                .unwrap_or_default();
+            let session = session.clone();
+            let slot = slot.clone();
+            let original = original.clone();
+            Button::new(("save-over-slot", index))
+                .ghost()
+                .w_full()
+                .child(
+                    h_flex()
+                        .w_full()
+                        .justify_between()
+                        .gap_4()
+                        .child(div().truncate().child(name.clone()))
+                        .child(
+                            div()
+                                .flex_shrink_0()
+                                .text_color(cx.theme().muted_foreground)
+                                .child(when),
+                        ),
+                )
+                .on_click(move |_, window, cx| {
+                    window.close_dialog(cx);
+                    confirm_save_over(
+                        session.clone(),
+                        slot.clone(),
+                        name.clone(),
+                        original.clone(),
+                        window,
+                        cx,
+                    );
+                })
+        });
+        alert
+            .title(t!(cx, "save-over-pick-title"))
+            .description(
+                v_flex()
+                    .gap_3()
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(cx.theme().muted_foreground)
+                            .child(t!(cx, "save-over-pick-body", original = &original)),
+                    )
+                    .child(
+                        v_flex()
+                            .id("save-over-slots")
+                            .max_h(rems(18.))
+                            .overflow_y_scroll()
+                            .gap_1()
+                            .children(rows),
+                    ),
+            )
+            .width(px(480.))
+            .footer(
+                h_flex().w_full().justify_end().child(
+                    Button::new("cancel-save-over")
+                        .outline()
+                        .label(t!(cx, "cancel"))
+                        .on_click(|_, window, cx| window.close_dialog(cx)),
+                ),
+            )
+    });
+}
+
+fn confirm_save_over(
+    session: Entity<Session>,
+    target: save::Slot,
+    target_name: SharedString,
+    original: SharedString,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    window.open_alert_dialog(cx, move |alert, _, cx| {
+        let session = session.clone();
+        let target = target.clone();
+        let target_name = target_name.clone();
+        alert
+            .title(t!(cx, "save-over-confirm-title", name = &target_name))
+            .description(t!(
+                cx,
+                "save-over-confirm-body",
+                name = &target_name,
+                original = &original
+            ))
+            .confirm()
+            // The kit's own Cancel is English; ours follows the app's language.
+            .cancel_text(t!(cx, "cancel"))
+            .ok_text(t!(cx, "save-over-confirm"))
+            .on_ok(move |_, window, cx| {
+                start_save_over(
+                    session.clone(),
+                    target.clone(),
+                    target_name.clone(),
+                    window,
+                    cx,
+                );
+                true
+            })
+    });
+}
+
+/// Writes the session's changes over another slot of the profile (backed up first); the open
+/// slot stays as it was, and the editor carries on with the other one.
+fn start_save_over(
+    session: Entity<Session>,
+    target: save::Slot,
+    target_name: SharedString,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    let slot = match session.read(cx).prepared() {
+        Ok(slot) => slot,
+        Err(error) => {
+            window.push_notification(
+                Notification::new()
+                    .with_type(NotificationType::Error)
+                    .title(t!(cx, "save-prepare-failed"))
+                    .message(error.to_string()),
+                cx,
+            );
+            return;
+        }
+    };
+    let Some(backups_root) = backups_root() else {
+        window.push_notification(
+            Notification::new()
+                .with_type(NotificationType::Error)
+                .title(t!(cx, "save-failed", name = &target_name))
+                .message(t!(cx, "save-over-no-backups")),
+            cx,
+        );
+        return;
+    };
+    let (game, original_name, profile, profile_dir, profile_folder) = {
+        let session = session.read(cx);
+        (
+            session.game(),
+            labels::slot_name(cx, session.slot()),
+            session.prepared_profile(),
+            session.profile().dir.clone(),
+            session.profile_folder(),
+        )
+    };
+    session.update(cx, |session, cx| session.set_saving(true, cx));
+    let dir = target.dir.clone();
+    window
+        .spawn(cx, async move |cx| {
+            let result = cx
+                .background_spawn(async move {
+                    save::save_over(game, &slot, &dir, &backups_root, &profile_folder)?;
+                    let written = save::load(&dir)?;
+                    // The company's name is the profile's, so it's written for this one too.
+                    let profile = profile.map(|document| {
+                        save::save_profile_file(
+                            game,
+                            &profile_dir,
+                            &document,
+                            &backups_root,
+                            &profile_folder,
+                        )
+                    });
+                    Ok::<_, save::Error>((dir, written, profile))
+                })
+                .await;
+            let _ = cx.update(|window, cx| match result {
+                Ok((dir, written, profile)) => {
+                    let profile_written = report_profile(profile, window, cx);
+                    session.update(cx, |session, cx| {
+                        session.moved_to(dir, written, profile_written, cx)
+                    });
+                    window.push_notification(
+                        Notification::new()
+                            .with_type(NotificationType::Success)
+                            .title(t!(cx, "saved-over-title", name = &target_name))
+                            .message(t!(cx, "saved-over-body", original = &original_name)),
+                        cx,
+                    );
+                }
+                Err(error) => {
+                    session.update(cx, |session, cx| session.set_saving(false, cx));
+                    window.push_notification(
+                        Notification::new()
+                            .with_type(NotificationType::Error)
+                            .title(t!(cx, "save-failed", name = &target_name))
+                            .message(error.to_string()),
+                        cx,
+                    );
+                }
+            });
+        })
+        .detach();
+}
+
 /// Asks before restoring a backup (what's in the slot now is backed up first, and unsaved changes
 /// are dropped), then restores it in the background and opens the slot again.
 fn confirm_restore(
@@ -1308,6 +1541,8 @@ fn confirm_restore(
             .title(t!(cx, "restore-title", name = &name))
             .description(t!(cx, "restore-body", changes = changes))
             .confirm()
+            // The kit's own Cancel is English; ours follows the app's language.
+            .cancel_text(t!(cx, "cancel"))
             .ok_text(t!(cx, "backup-restore"))
             .on_ok(move |_, window, cx| {
                 start_restore(

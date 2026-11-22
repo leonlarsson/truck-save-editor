@@ -212,3 +212,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** they're two of the game's largest player languages, and a draft that uses the game's words is more useful than English while a native review is pending.
 
 **Considered:** waiting for native translators (no one to ask yet); leaving the game's terms to the translation (the first draft guessed several wrong, such as Anhänger for Auflieger).
+
+## 2026-11-22: Keeping an edited copy by saving over another slot
+
+**Decided:** the save dialog has Save over another…, next to Save as new slot: it lists the profile's other saves (newest first), asks to confirm, backs the chosen one up, writes the edited save into it under that save's own name (with the original's preview pictures), checks it, and carries on editing it. The open save stays as it was. It works for Steam Cloud profiles, where Save as new slot is off.
+
+**Why:** researching how to make a new save the game loads: a local profile lists any slot folder on disk, but a Steam Cloud profile lists only files Steam knows (`remotecache.vdf`), and Steam learns of files only when the game writes them. So in the cloud the editor can't create a save, but it can fill one the game made: the player saves to a new slot in the game (or uses one they don't need), then saves over it here. A local copy of the whole profile (Profile tools) is the other way.
+
+**Considered:** adding entries to `remotecache.vdf` (Steam's own bookkeeping, undocumented, and a wrong entry could make Steam delete or overwrite saves); building a save from nothing (a new career needs the game's own starting state, which only the game writes).
