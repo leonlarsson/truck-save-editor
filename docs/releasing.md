@@ -18,7 +18,7 @@ The .exe carries its version, product name and copyright in its file details (`c
 3. **Preview the notes**: `mise run release-notes`.
 4. **Commit and tag**: `git commit -am "chore: release 0.1.0"`, `git tag v0.1.0`, `git push origin main v0.1.0`. The workflow refuses a tag that doesn't match the version.
 5. **Try the draft**: when the workflow finishes, download the zip from the draft release on a Windows PC, unzip it, open a save and look around.
-6. **Edit the notes and publish.** A version with a dash (`0.2.0-beta.1`) is marked as a pre-release.
+6. **Edit the notes and publish.** Hand-written notes for a version go in `docs/release-notes/<version>.md`, to paste over the drafted ones (the download and checksum sections stay). A version with a dash (`0.2.0-beta.1`) is marked as a pre-release.
 
 Once published, a release reaches people through the editor: it asks GitHub for the latest release when it starts (`crates/app/src/updates.rs`) and offers the download. GitHub's "latest release" leaves out drafts and pre-releases, so only a full release is announced.
 
