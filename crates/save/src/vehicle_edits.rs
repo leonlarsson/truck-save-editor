@@ -296,35 +296,50 @@ pub fn apply_vehicle_edit(document: &mut Document, edit: &VehicleEdit) -> bool {
     }
 }
 
-/// A plate's text in two colours (`[red, green, blue]`): a filled background with the text
-/// centred on it, in the game's markup. Characters the markup uses (`<`, `>`, `|`) are left out of
-/// the text.
-pub fn coloured_plate(text: &str, country: &str, background: [u8; 3], letters: [u8; 3]) -> String {
-    // The game's colour order: alpha, blue, green, red.
-    let colour = |[red, green, blue]: [u8; 3]| format!("FF{blue:02X}{green:02X}{red:02X}");
+/// A plate's text in two colours (`[red, green, blue]`): the whole plate filled with the
+/// background colour and the text centred on it, in the game's markup. Characters the markup uses
+/// (`<`, `>`, `|`) are left out of the text.
+///
+/// What the game draws (found in game, 2026-11-22): the colour is set before the background
+/// image, which takes it (the image's own `color=` was ignored on a Swedish plate); a negative
+/// margin lets the fill cover the plate's edge; and the plate is written as a Belgian one, whose
+/// definition adds no layout of its own (Sweden's, for one, offsets and aligns the text, which
+/// pushes a fill out of place). So a coloured plate's country is Belgium.
+pub fn coloured_plate(text: &str, background: [u8; 3], letters: [u8; 3]) -> String {
     let text: String = text
         .chars()
         .filter(|c| !matches!(c, '<' | '>' | '|'))
         .collect();
-    let plate = format!(
-        "<img src=/material/ui/white.mat color={} xscale=stretch yscale=stretch><ret><align hstyle=center vstyle=center><color value={}>{text}</align>",
-        colour(background),
-        colour(letters),
-    );
-    if country.is_empty() {
-        plate
-    } else {
-        format!("{plate}|{country}")
-    }
+    format!(
+        "<color value={}><margin left=-15><img src=/material/ui/white.mat xscale=stretch yscale=stretch><ret><align hstyle=center vstyle=center><font xscale=1 yscale=1><color value={}>{text}</font></align></margin>|{COLOURED_PLATE_COUNTRY}",
+        game_colour(background),
+        game_colour(letters),
+    )
+}
+
+/// The country a coloured plate is written as (see `coloured_plate`).
+pub const COLOURED_PLATE_COUNTRY: &str = "belgium";
+
+/// A colour as the game writes it: alpha, blue, green, red.
+fn game_colour([red, green, blue]: [u8; 3]) -> String {
+    format!("FF{blue:02X}{green:02X}{red:02X}")
 }
 
 /// The colours of a plate `coloured_plate` wrote, as (background, letters) in red, green, blue;
 /// `None` for any other plate (the game's own, whatever its markup). `plate` is the field's value,
-/// quoted or not, with or without its country.
+/// quoted or not, with or without its country. Reads the first form too (the background as the
+/// image's `color=`), which earlier versions wrote.
 pub fn plate_colours(plate: &str) -> Option<([u8; 3], [u8; 3])> {
     let text = value::parse_string(plate);
-    let rest = text.strip_prefix("<img src=/material/ui/white.mat color=")?;
-    let background = rest.get(..8)?;
+    let (background, rest) = if let Some(rest) = text.strip_prefix("<color value=") {
+        (rest.get(..8)?, rest.get(8..)?)
+    } else {
+        let rest = text.strip_prefix("<img src=/material/ui/white.mat color=")?;
+        (rest.get(..8)?, rest.get(8..)?)
+    };
+    if !rest.contains("/material/ui/white.mat") && !text.starts_with("<img") {
+        return None;
+    }
     let (_, after) = rest.split_once("<color value=")?;
     let letters = after.get(..8)?;
     // The game's order: alpha, blue, green, red.
@@ -341,11 +356,14 @@ mod tests {
 
     #[test]
     fn reads_back_the_colours_of_a_coloured_plate() {
-        let plate = coloured_plate("AB 123", "sweden", [0, 51, 153], [255, 255, 255]);
+        let plate = coloured_plate("AB 123", [0, 51, 153], [255, 255, 255]);
         assert_eq!(
             plate_colours(&format!("\"{plate}\"")),
             Some(([0, 51, 153], [255, 255, 255]))
         );
+        // The first form, as earlier versions wrote it.
+        let old = "<img src=/material/ui/white.mat color=FF993300 xscale=stretch yscale=stretch><ret><align hstyle=center vstyle=center><color value=FFFFFFFF>AB 123</align>|sweden";
+        assert_eq!(plate_colours(old), Some(([0, 51, 153], [255, 255, 255])));
         assert_eq!(plate_colours("\"AB 123|sweden\""), None);
     }
 
@@ -488,10 +506,10 @@ mod tests {
 
     #[test]
     fn colours_a_plate_in_the_games_order() {
-        let plate = coloured_plate("AB|1<2>3", "sweden", [255, 204, 0], [0, 0, 0]);
-        // Yellow: red FF, green CC, blue 00, written blue first.
-        assert!(plate.contains("color=FF00CCFF"));
-        assert!(plate.contains("<color value=FF000000>AB123</align>"));
-        assert!(plate.ends_with("|sweden"));
+        let plate = coloured_plate("AB|1<2>3", [255, 204, 0], [0, 0, 0]);
+        // Yellow: red FF, green CC, blue 00, written blue first, before the background image.
+        assert!(plate.starts_with("<color value=FF00CCFF><margin left=-15><img "));
+        assert!(plate.contains("<color value=FF000000>AB123</font>"));
+        assert!(plate.ends_with("|belgium"));
     }
 }

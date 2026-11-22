@@ -388,7 +388,7 @@ fn vehicle_panel_edits_read_like_the_panel_in_the_change_list(cx: &mut TestAppCo
     let slot = TempSlot::new("plate");
     let (_, workspace) = open(cx, &slot);
     let session = session(&workspace, cx);
-    let plate = save::coloured_plate("AB 123", "france", [0, 51, 153], [255, 255, 255]);
+    let plate = save::coloured_plate("AB 123", [0, 51, 153], [255, 255, 255]);
     session.update(cx, |session, cx| {
         session.set_field(
             "_nameless.4",

@@ -283,15 +283,17 @@ impl VehicleDetail {
         cx.notify();
     }
 
-    /// Writes the plate in a colour scheme (or plain again), keeping its text and country.
+    /// Writes the plate in a colour scheme (or plain again), keeping its text. A coloured plate is a
+    /// Belgian one; plain again, it keeps the country it has (Belgian, after colouring).
     fn write_plate_colours(&mut self, key: &str, cx: &mut Context<Self>) {
         let Some(vehicle) = find(&self.session, &self.id, cx) else {
             return;
         };
         let country = vehicle.plate_country.clone().unwrap_or_default();
         let plate = match PlateColours::colours(key) {
+            // Written as a Belgian plate: the one the game colours (see `coloured_plate`).
             Some((background, letters)) => {
-                save::coloured_plate(&vehicle.plate, &country, background, letters)
+                save::coloured_plate(&vehicle.plate, background, letters)
             }
             None if country.is_empty() => vehicle.plate.clone(),
             None => format!("{}|{country}", vehicle.plate),

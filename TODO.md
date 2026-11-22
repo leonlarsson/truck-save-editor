@@ -20,7 +20,9 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [ ] In game: a save on a local (non-cloud) profile written as a new slot.
 - [x] In game (2026-11-22): moving a truck with its driver (Move to garage), removing a driver, a trailer and a garage, and forgetting the roads, on a Steam Cloud profile.
 - [ ] In game: removing a truck.
-- [ ] In game: trailer cargo and empty weight, Allow everywhere, fuel over 100 %, Remove badge, coloured plates (2026-11-22, not tried in game yet).
+- [x] In game (2026-11-22): fuel over 100 % (150 % gave about 1.5 tanks of range); removing the side (engine) badge.
+- [ ] In game: coloured plates, now written as Belgian plates with the colour before the background image (the first form showed a plain plate); trailer cargo weight (only shows while the trailer is on a job) and empty weight.
+- [ ] A picker for each badge spot (front `f_badge`, sides `badge`, chassis logo `f_chs_logo`, others) from the game's own accessories, with "none" where the game has one, instead of only removing the side badge.
 - [ ] In game: a renamed profile, a copied profile in the game's list, copied settings, the developer console and 128-truck convoys (2026-11-22, not tried in game yet).
 - [x] Engines and transmissions from the game's data for a truck's model (2026-11-22; not tried in game yet).
 - [x] Make another truck your own; take the player to a city, the headquarters or another save's spot (2026-11-22).
