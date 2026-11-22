@@ -1,8 +1,10 @@
 //! One hired driver: face, where they're from and are now, experience, skills and ADR classes.
 
 use gpui_kit::component::{
-    ActiveTheme as _, Disableable as _, Sizable as _, WindowExt as _, button::Button,
-    checkbox::Checkbox, h_flex, v_flex,
+    ActiveTheme as _, Disableable as _, Sizable as _, WindowExt as _,
+    button::{Button, ButtonVariants as _},
+    checkbox::Checkbox,
+    h_flex, v_flex,
 };
 use gpui_kit::{
     AppContext as _, Context, Entity, IntoElement, ParentElement as _, Render, Styled as _,
@@ -87,11 +89,48 @@ fn find(session: &Entity<Session>, id: &str, cx: &gpui_kit::App) -> Option<Drive
         .find(|driver| driver.id == id)
 }
 
+impl DriverDetail {
+    /// The truck the driver drives, by model and plate, opening its panel; or that there's none.
+    fn render_truck(&self, driver: &Driver, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
+        let vehicle = driver.truck.as_ref().and_then(|id| {
+            self.session
+                .read(cx)
+                .vehicles()
+                .into_iter()
+                .find(|vehicle| &vehicle.id == id)
+        });
+        let Some(vehicle) = vehicle else {
+            return div()
+                .text_sm()
+                .text_color(cx.theme().muted_foreground)
+                .child(t!(cx, "driver-truck-none"))
+                .into_any_element();
+        };
+        let label = t!(
+            cx,
+            "move-what-truck",
+            model = game_data::model_name(cx, &vehicle).unwrap_or_default(),
+            plate = vehicle.plate.clone()
+        );
+        let session = self.session.clone();
+        Button::new("driver-truck")
+            .small()
+            .ghost()
+            .label(label)
+            .tooltip(t!(cx, "driver-truck-open"))
+            .on_click(move |_, window, cx| {
+                super::open_vehicle(session.clone(), &vehicle, window, cx)
+            })
+            .into_any_element()
+    }
+}
+
 impl Render for DriverDetail {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let Some(driver) = find(&self.session, &self.id, cx) else {
             return div().child(t!(cx, "detail-gone")).into_any_element();
         };
+        let truck = self.render_truck(&driver, cx);
         let face = game_data::driver_face(cx, &driver.id);
         let skills = driver.skills;
         let rows = skills
@@ -174,6 +213,7 @@ impl Render for DriverDetail {
                 v_flex()
                     .gap_1()
                     .child(fact(t!(cx, "column-garage"), self.garage.clone(), cx))
+                    .child(fact(t!(cx, "driver-truck"), truck, cx))
                     .child(fact(
                         t!(cx, "column-experience"),
                         div().w(rems(11.)).child(self.experience.clone()),

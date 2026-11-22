@@ -28,6 +28,15 @@ pub fn drivers(document: &Document) -> Vec<Driver> {
     else {
         return Vec::new();
     };
+    // A garage's `vehicles[i]` and `drivers[i]` are one slot: the driver drives that truck.
+    let mut slot_trucks: std::collections::HashMap<&str, String> = std::collections::HashMap::new();
+    for garage in document.units_of_kind("garage") {
+        for (truck, driver) in garage.items("vehicles").iter().zip(garage.items("drivers")) {
+            if truck != "null" && driver != "null" {
+                slot_trucks.insert(driver.as_str(), truck.clone());
+            }
+        }
+    }
     player
         .items("drivers")
         .iter()
@@ -44,11 +53,15 @@ pub fn drivers(document: &Document) -> Vec<Driver> {
                     .map(|text| value::parse_string(text).into_owned())
                     .unwrap_or_default()
             };
-            let truck = ["assigned_truck", "adopted_truck"]
-                .iter()
-                .filter_map(|field| unit.single(field))
-                .find(|id| *id != "null")
-                .map(str::to_string);
+            // The truck in the driver's garage slot (that's what the game shows); the driver's own
+            // fields when they aren't in a garage (they're often empty in current saves).
+            let truck = slot_trucks.get(unit.id.as_str()).cloned().or_else(|| {
+                ["assigned_truck", "adopted_truck"]
+                    .iter()
+                    .filter_map(|field| unit.single(field))
+                    .find(|id| *id != "null")
+                    .map(str::to_string)
+            });
             Driver {
                 id: unit.id.clone(),
                 hometown: city("hometown"),
@@ -113,6 +126,19 @@ mod tests {
         assert_eq!(driver.skills.adr, 7);
         assert_eq!(driver.skills.ecodriving, 3);
         assert_eq!(driver.truck.as_deref(), Some("_nameless.10"));
+    }
+
+    #[test]
+    fn a_drivers_truck_is_the_one_in_their_garage_slot() {
+        let save = SAVE.replace(
+            " adopted_truck: _nameless.10\r\n",
+            " adopted_truck: null\r\n",
+        ) .replace(
+            "}\r\n\r\n}\r\n",
+            "}\r\n\r\ngarage : garage.lyon {\r\n vehicles: 2\r\n vehicles[0]: truck.a\r\n vehicles[1]: truck.b\r\n drivers: 2\r\n drivers[0]: null\r\n drivers[1]: driver.12\r\n}\r\n\r\n}\r\n",
+        );
+        let document = sii::parse_text(&save).expect("parses");
+        assert_eq!(drivers(&document)[0].truck.as_deref(), Some("truck.b"));
     }
 
     #[test]
