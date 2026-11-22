@@ -20,11 +20,13 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [ ] In game: a save on a local (non-cloud) profile written as a new slot.
 - [x] In game (2026-11-22): moving a truck with its driver (Move to garage), removing a driver, a trailer and a garage, and forgetting the roads, on a Steam Cloud profile.
 - [ ] In game: removing a truck.
+- [ ] The save dialog: one heading per vehicle with its changes under it, instead of the vehicle's name over each change.
 - [x] In game (2026-11-22): fuel over 100 % (150 % gave about 1.5 tanks of range); removing the side (engine) badge.
 - [x] In game (2026-11-22): coloured plates (as Belgian plates), front and back, and plate text; the truck carrying the World of Trucks plate always gets that plate back on load, so its plate fields are off with the reason.
 - [ ] In game: trailer cargo weight (only shows while the trailer is on a job) and empty weight; whether a coloured plate can keep its own country.
 - [ ] A picker for each badge spot (front `f_badge`, sides `badge`, chassis logo `f_chs_logo`, others) from the game's own accessories, with "none" where the game has one, instead of only removing the side badge.
-- [ ] In game: a renamed profile, a copied profile in the game's list, copied settings, the developer console and 128-truck convoys (2026-11-22, not tried in game yet).
+- [x] In game (2026-11-22): backing up a profile, a copied profile in the game's list (no World of Trucks link, as meant), copied settings (an option changed in the copy went back), the developer console.
+- [ ] In game: a renamed profile, 128-truck convoys.
 - [x] Engines and transmissions from the game's data for a truck's model (2026-11-22; works in game).
 - [x] Make another truck your own; take the player to a city, the headquarters or another save's spot (2026-11-22).
 - [x] In game (2026-11-22): Drive it yourself (the truck appears where the player was), with an engine and transmission swap.
@@ -33,10 +35,11 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [x] Make another trailer your own (Pull it yourself, 2026-11-22; not tried in game yet).
 - [x] In game (2026-11-22): Rest and the clock (Evening) on a Steam Cloud profile.
 - [ ] In game: Clear the record, Repair the cargo (none to try yet), Pull it yourself.
-- [ ] Report a problem: Settings → About, the palette, the no-saves screen, and the button on error messages open a filled-in GitHub issue (2026-11-22, check on Windows that the browser opens with the text).
+- [x] Report a problem opens a filled-in GitHub issue on Windows (2026-11-22).
 - [x] In game (2026-11-22): Max their skills on two picked drivers.
 - [x] In game (2026-11-22): Save over another… on a Steam Cloud profile (the chosen save got the changes and kept its name; the original stayed; no cloud prompt).
-- [ ] In game: picked rows (bulk Repair, Fill the tanks, Move to garage, Remove, Make them large) (2026-11-22, not tried in game yet).
+- [x] In game (2026-11-22): picked rows: Max their skills, Move to garage.
+- [ ] In game: picked rows: Repair, Fill the tanks, Remove, Make them large (nothing to repair, fill or enlarge on the test save) (2026-11-22, not tried in game yet).
 
 ## 4. Picking a save
 
@@ -45,7 +48,7 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [x] Say what's shown and where from: the profile's saves, where they're kept and their folder; every folder looked in and what it held; the game's own saves folded to the newest three (2026-11-22).
 - [x] No saves, or a profile without saves: say what to do. Add a folder (chosen or dropped on the window: a profiles folder, a profile, one save, or the game's folder in Documents), kept in the settings (2026-11-22).
 - [x] A save on its own (outside a profile), dropped or chosen, opens and saves where it is (2026-11-22).
-- [ ] On Windows: Add a folder… and dropping a folder on the window (the dialog and drag and drop only run for real there), and Show the folder opening Explorer.
+- [x] On Windows (2026-11-22): Add a folder…, dropping a folder (a loose save opens where it is), Show the folder.
 
 ## 5. Overview
 
