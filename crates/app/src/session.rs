@@ -968,6 +968,17 @@ impl Session {
                 save::VehicleEdit::RemoveBadge { .. } => {
                     (t!(cx, "edit-badge"), t!(cx, "edit-no-badge"))
                 }
+                save::VehicleEdit::Part {
+                    part, data_path, ..
+                } => {
+                    let saved = save::vehicle_part(&self.loaded.game, id, part)
+                        .map(|(_, path)| crate::game_data::part_name(cx, &path))
+                        .unwrap_or_default();
+                    (
+                        saved.into(),
+                        crate::game_data::part_name(cx, data_path).into(),
+                    )
+                }
             };
             add(what, before, after);
         }

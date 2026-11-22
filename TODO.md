@@ -21,7 +21,7 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [ ] In game: removing a driver, a truck, a trailer and a garage; forgetting the roads (2026-11-22, not tried in game yet).
 - [ ] In game: trailer cargo and empty weight, Allow everywhere, fuel over 100 %, Remove badge, coloured plates (2026-11-22, not tried in game yet).
 - [ ] In game: a renamed profile, a copied profile in the game's list, copied settings, the developer console and 128-truck convoys (2026-11-22, not tried in game yet).
-- [ ] Engines and transmissions from the game's data for a truck's model.
+- [x] Engines and transmissions from the game's data for a truck's model (2026-11-22; not tried in game yet).
 - [ ] Make another truck or trailer your own; move yourself to another save's position.
 
 ## 4. Picking a save

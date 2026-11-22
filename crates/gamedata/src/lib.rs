@@ -21,6 +21,7 @@ use save::{Game, LevelTable};
 pub use icon::{ALPHA, BLUE, GREEN, GameIcon, RED};
 pub use install::find_install;
 pub use texture::{decode_rgba, distance_field_coverage};
+pub use vehicles::{Part, PartKind, model_parts};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -212,7 +213,23 @@ impl GameData {
         Some(text)
     }
 
-    /// A city's name as the game shows it (`malmo` → `Malmö`): its `city_name_localized` text.
+    /// A line of the game's text with `@@key@@`s in it (`750 @@hp@@ (551@@kw@@)`), in the game's
+    /// language. A key it doesn't know is left out.
+    pub fn resolve(&self, raw: &str) -> String {
+        let mut text = raw.to_string();
+        // Each pass replaces one key; a line has a handful at most.
+        for _ in 0..16 {
+            let Some(start) = text.find("@@") else { break };
+            let Some(length) = text[start + 2..].find("@@") else {
+                break;
+            };
+            let key = text[start + 2..start + 2 + length].to_string();
+            let replacement = self.text(&key).unwrap_or_default();
+            text.replace_range(start..start + 4 + length, &replacement);
+        }
+        text
+    }
+
     /// A country's name in the game's language (`Italia` → `Italy`), by its token (`italy`).
     pub fn country_name(&self, token: &str) -> Option<String> {
         let key = self.country_names.get(token)?;
@@ -224,6 +241,7 @@ impl GameData {
         self.city_country_codes.get(token).map(String::as_str)
     }
 
+    /// A city's name as the game shows it (`malmo` → `Malmö`): its `city_name_localized` text.
     pub fn city_name(&self, token: &str) -> Option<String> {
         let key = self.city_names.get(token).map_or(token, String::as_str);
         self.text(key).filter(|name| !name.is_empty())
@@ -306,7 +324,7 @@ fn rank(ranks: &[(i64, String)], level: i64) -> Option<&str> {
 }
 
 /// The archives that hold definitions: `def.scs`, then every DLC archive (`dlc_*.scs`), sorted.
-fn def_archives(install_dir: &Path) -> Vec<PathBuf> {
+pub(crate) fn def_archives(install_dir: &Path) -> Vec<PathBuf> {
     archives_after(install_dir, "def.scs")
 }
 

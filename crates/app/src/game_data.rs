@@ -267,3 +267,84 @@ pub fn cargo_name(cx: &App, token: &str) -> String {
         .and_then(|d| d.cargo_name(token))
         .unwrap_or_else(|| save::city_display_name(token))
 }
+
+/// One engine or transmission a truck can have, in the app's language.
+#[derive(Clone, Debug, PartialEq)]
+pub struct PartChoice {
+    /// Its definition, what the truck's accessory points at.
+    pub path: String,
+    pub name: String,
+    /// What it's like (`750 hp (551 kW)`, `3,550 Nm`).
+    pub details: String,
+    pub price: i64,
+    pub unlock: i64,
+}
+
+/// The engines and transmissions of truck models, loaded when a truck's panel first asks.
+#[derive(Default)]
+struct Parts(HashMap<(String, gamedata::PartKind), Option<Arc<Vec<gamedata::Part>>>>);
+
+impl Global for Parts {}
+
+/// The engines or transmissions a truck model can have (`volvo.fh16_2012`). The first ask starts
+/// reading them in the background and returns `None`; the window redraws when they're there.
+pub fn model_parts(cx: &mut App, model: &str, kind: gamedata::PartKind) -> Option<Vec<PartChoice>> {
+    if !cx.has_global::<Parts>() {
+        cx.set_global(Parts::default());
+    }
+    let key = (model.to_string(), kind);
+    if let Some(parts) = cx.global::<Parts>().0.get(&key) {
+        let data = data(cx)?;
+        return parts.as_ref().map(|parts| {
+            parts
+                .iter()
+                .map(|part| PartChoice {
+                    path: part.path.clone(),
+                    name: data.resolve(&part.name),
+                    details: part
+                        .info
+                        .iter()
+                        .map(|line| data.resolve(line))
+                        .filter(|line| !line.is_empty())
+                        .collect::<Vec<_>>()
+                        .join(" · "),
+                    price: part.price,
+                    unlock: part.unlock,
+                })
+                .collect()
+        });
+    }
+    let install_dir = data(cx)?.install_dir.clone();
+    cx.global_mut::<Parts>().0.insert(key.clone(), None);
+    let model = model.to_string();
+    cx.spawn(async move |cx| {
+        let parts = cx
+            .background_spawn(async move { gamedata::model_parts(&install_dir, &model, kind) })
+            .await;
+        cx.update(|cx| {
+            cx.global_mut::<Parts>()
+                .0
+                .insert(key, Some(Arc::new(parts)));
+            cx.refresh_windows();
+        });
+    })
+    .detach();
+    None
+}
+
+/// An engine's or transmission's name by its definition, from those already read (else from the
+/// file's name: `d16g750.sii` → `D16G750`).
+pub fn part_name(cx: &App, path: &str) -> String {
+    let known = cx.try_global::<Parts>().and_then(|parts| {
+        parts.0.values().flatten().find_map(|list| {
+            let part = list.iter().find(|part| part.path == path)?;
+            Some(data(cx)?.resolve(&part.name))
+        })
+    });
+    known.filter(|name| !name.is_empty()).unwrap_or_else(|| {
+        std::path::Path::new(path)
+            .file_stem()
+            .map(|stem| stem.to_string_lossy().to_uppercase())
+            .unwrap_or_default()
+    })
+}

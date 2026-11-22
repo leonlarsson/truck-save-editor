@@ -26,6 +26,14 @@ pub enum VehicleEdit {
     Fuel { vehicle: String, ratio: f64 },
     /// No badge on the truck.
     RemoveBadge { vehicle: String },
+    /// Another engine or transmission (`part` is `engine` or `transmission`): the accessory
+    /// points at another of the model's definitions, and its refund is that one's price.
+    Part {
+        vehicle: String,
+        part: String,
+        data_path: String,
+        price: i64,
+    },
 }
 
 impl VehicleEdit {
@@ -35,14 +43,21 @@ impl VehicleEdit {
             VehicleEdit::CargoMass { trailer, .. }
             | VehicleEdit::EmptyMass { trailer, .. }
             | VehicleEdit::Unrestrict { trailer } => trailer,
-            VehicleEdit::Fuel { vehicle, .. } | VehicleEdit::RemoveBadge { vehicle } => vehicle,
+            VehicleEdit::Fuel { vehicle, .. }
+            | VehicleEdit::RemoveBadge { vehicle }
+            | VehicleEdit::Part { vehicle, .. } => vehicle,
         }
     }
 
     /// Whether it changes the same thing as `other` (a later one replaces it).
     pub fn same_kind(&self, other: &VehicleEdit) -> bool {
+        let same_part = match (self, other) {
+            (VehicleEdit::Part { part: a, .. }, VehicleEdit::Part { part: b, .. }) => a == b,
+            _ => true,
+        };
         std::mem::discriminant(self) == std::mem::discriminant(other)
             && self.vehicle() == other.vehicle()
+            && same_part
     }
 }
 
@@ -168,6 +183,19 @@ pub fn badge(document: &Document, vehicle: &str) -> Option<String> {
         .cloned()
 }
 
+/// A truck's engine or transmission (`part`: `engine`, `transmission`): its accessory's id and
+/// the definition it points at.
+pub fn vehicle_part(document: &Document, vehicle: &str, part: &str) -> Option<(String, String)> {
+    let unit = document.unit(vehicle)?;
+    let folder = format!("/{part}/");
+    unit.items("accessories").iter().find_map(|accessory| {
+        let path = document.unit(accessory)?.single("data_path")?;
+        let path = value::parse_string(path);
+        path.contains(&folder)
+            .then(|| (accessory.clone(), path.to_string()))
+    })
+}
+
 /// Makes one change (see `VehicleEdit`). `false` if there's no such truck or trailer.
 pub fn apply_vehicle_edit(document: &mut Document, edit: &VehicleEdit) -> bool {
     match edit {
@@ -220,6 +248,30 @@ pub fn apply_vehicle_edit(document: &mut Document, edit: &VehicleEdit) -> bool {
                 vehicle,
                 "fuel_relative",
                 Value::single(value::format_f32(ratio.max(0.0) as f32)),
+            );
+            true
+        }
+        VehicleEdit::Part {
+            vehicle,
+            part,
+            data_path,
+            price,
+        } => {
+            let Some((accessory, _)) = vehicle_part(document, vehicle, part) else {
+                return false;
+            };
+            let clean: String = data_path.chars().filter(|c| *c != '"').collect();
+            set_if_present(
+                document,
+                &accessory,
+                "data_path",
+                Value::single(format!("\"{clean}\"")),
+            );
+            set_if_present(
+                document,
+                &accessory,
+                "refund",
+                Value::single(price.max(&0).to_string()),
             );
             true
         }
@@ -364,6 +416,47 @@ mod tests {
             "its accessory is gone"
         );
         assert!(document.unit("acc.data").is_some());
+    }
+
+    #[test]
+    fn swaps_an_engine() {
+        let with_engine = SAVE.replace(
+            "accessories: 2\r\n accessories[0]: acc.data\r\n accessories[1]: acc.badge\r\n",
+            "accessories: 3\r\n accessories[0]: acc.data\r\n accessories[1]: acc.badge\r\n accessories[2]: acc.engine\r\n",
+        );
+        // The engine's unit goes in before the document's last closing brace.
+        let end = with_engine.rfind("}\r\n").expect("the document's end");
+        let text = format!(
+            "{}vehicle_accessory : acc.engine {{\r\n data_path: \"/def/vehicle/truck/volvo.fh16_2012/engine/d13c420.sii\"\r\n refund: 10000\r\n}}\r\n\r\n{}",
+            &with_engine[..end],
+            &with_engine[end..]
+        );
+        let mut document = sii::parse_text(&text).expect("parses");
+        assert_eq!(
+            vehicle_part(&document, "truck.1", "engine").map(|(_, path)| path),
+            Some("/def/vehicle/truck/volvo.fh16_2012/engine/d13c420.sii".to_string())
+        );
+        let edit = VehicleEdit::Part {
+            vehicle: "truck.1".into(),
+            part: "engine".into(),
+            data_path: "/def/vehicle/truck/volvo.fh16_2012/engine/d16g750.sii".into(),
+            price: 25560,
+        };
+        assert!(apply_vehicle_edit(&mut document, &edit));
+        let engine = document.unit("acc.engine").expect("the engine");
+        assert_eq!(
+            engine.single("data_path"),
+            Some("\"/def/vehicle/truck/volvo.fh16_2012/engine/d16g750.sii\"")
+        );
+        assert_eq!(engine.single("refund"), Some("25560"));
+        // An engine change doesn't replace a transmission change.
+        let gearbox = VehicleEdit::Part {
+            vehicle: "truck.1".into(),
+            part: "transmission".into(),
+            data_path: String::new(),
+            price: 0,
+        };
+        assert!(!edit.same_kind(&gearbox));
     }
 
     #[test]

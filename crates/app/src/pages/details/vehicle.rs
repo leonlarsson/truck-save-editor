@@ -47,6 +47,9 @@ pub struct VehicleDetail {
     empty_weight: Option<Entity<AmountField>>,
     /// Colour schemes for the plate.
     plate_colours: Entity<SelectState<SearchableVec<PlateColours>>>,
+    /// The engine and transmission (trucks and coaches with a known model), filled in once the
+    /// model's parts are read from the game.
+    parts: Vec<PartPicker>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -119,6 +122,30 @@ impl VehicleDetail {
         let plate_colours = cx.new(|cx| {
             SelectState::new(SearchableVec::new(PlateColours::all(cx)), None, window, cx)
         });
+        let model = vehicle
+            .as_ref()
+            .filter(|v| matches!(v.kind, VehicleKind::Truck | VehicleKind::Coach))
+            .and_then(|v| v.model_id.clone());
+        let mut parts = Vec::new();
+        if let Some(model) = model {
+            for (kind, part) in [
+                (gamedata::PartKind::Engine, "engine"),
+                (gamedata::PartKind::Transmission, "transmission"),
+            ] {
+                let select = cx.new(|cx| {
+                    SelectState::new(SearchableVec::new(Vec::new()), None, window, cx)
+                        .searchable(true)
+                });
+                parts.push(PartPicker {
+                    kind,
+                    part,
+                    model: model.clone(),
+                    select,
+                    choices: Vec::new(),
+                    is_filled: false,
+                });
+            }
+        }
         let mut _subscriptions = vec![
             cx.subscribe_in(
                 &plate_colours,
@@ -149,6 +176,32 @@ impl VehicleDetail {
                 this.sync(window, cx)
             }),
         ];
+        for (index, picker) in parts.iter().enumerate() {
+            _subscriptions.push(cx.subscribe_in(
+                &picker.select,
+                window,
+                move |this, _, event: &SelectEvent<SearchableVec<PartOption>>, _, cx| {
+                    let SelectEvent::Confirm(Some(path)) = event else {
+                        return;
+                    };
+                    let Some(picker) = this.parts.get(index) else {
+                        return;
+                    };
+                    let Some(choice) = picker.choices.iter().find(|c| c.path == path.as_ref())
+                    else {
+                        return;
+                    };
+                    let edit = save::VehicleEdit::Part {
+                        vehicle: this.id.clone(),
+                        part: picker.part.to_string(),
+                        data_path: choice.path.clone(),
+                        price: choice.price,
+                    };
+                    this.session
+                        .update(cx, |session, cx| session.edit_vehicle(edit, cx));
+                },
+            ));
+        }
         if let Some(field) = &fuel {
             _subscriptions.push(cx.subscribe(field, |this, _, AmountChanged(percent), cx| {
                 let edit = save::VehicleEdit::Fuel {
@@ -189,6 +242,7 @@ impl VehicleDetail {
             cargo,
             empty_weight,
             plate_colours,
+            parts,
             _subscriptions,
         }
     }
@@ -319,8 +373,47 @@ fn part_wear(unit: &sii::Unit, field: &str) -> Option<f32> {
     }
 }
 
+impl VehicleDetail {
+    /// Fills the engine and transmission lists once the model's parts are read (the first ask
+    /// starts reading; the window redraws when they're there), with the truck's own selected.
+    fn fill_parts(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let preview = self.session.read(cx).preview();
+        for picker in &mut self.parts {
+            if picker.is_filled {
+                continue;
+            }
+            let Some(choices) = game_data::model_parts(cx, &picker.model, picker.kind) else {
+                continue;
+            };
+            let current = save::vehicle_part(&preview, &self.id, picker.part).map(|(_, path)| path);
+            let items: Vec<PartOption> = choices
+                .iter()
+                .map(|choice| PartOption {
+                    path: choice.path.clone().into(),
+                    title: if choice.details.is_empty() {
+                        choice.name.clone().into()
+                    } else {
+                        // The first detail says the most (an engine's power).
+                        let first = choice.details.split(" · ").next().unwrap_or_default();
+                        format!("{} · {first}", choice.name).into()
+                    },
+                })
+                .collect();
+            picker.select.update(cx, |select, cx| {
+                select.set_items(SearchableVec::new(items), window, cx);
+                if let Some(current) = &current {
+                    select.set_selected_value(&SharedString::from(current.clone()), window, cx);
+                }
+            });
+            picker.choices = choices;
+            picker.is_filled = true;
+        }
+    }
+}
+
 impl Render for VehicleDetail {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.fill_parts(window, cx);
         let Some(vehicle) = find(&self.session, &self.id, cx) else {
             return div().child(t!(cx, "detail-gone")).into_any_element();
         };
@@ -442,6 +535,27 @@ impl Render for VehicleDetail {
                         div().w(rems(11.)).child(self.odometer.clone()),
                         cx,
                     ))
+                    .children(self.parts.iter().map(|picker| {
+                        let label = match picker.kind {
+                            gamedata::PartKind::Engine => t!(cx, "truck-engine"),
+                            gamedata::PartKind::Transmission => t!(cx, "truck-transmission"),
+                        };
+                        let placeholder = if picker.is_filled {
+                            t!(cx, "truck-part-pick")
+                        } else {
+                            t!(cx, "truck-part-loading")
+                        };
+                        fact(
+                            label,
+                            div().w(rems(15.)).child(
+                                Select::new(&picker.select)
+                                    .small()
+                                    .placeholder(placeholder)
+                                    .disabled(!picker.is_filled),
+                            ),
+                            cx,
+                        )
+                    }))
                     .children(self.fuel.clone().map(|field| {
                         let is_full = vehicle.fuel.is_some_and(|fuel| fuel >= 1.0);
                         fact(
@@ -655,5 +769,36 @@ impl SelectItem for PlateColours {
 
     fn value(&self) -> &Self::Value {
         &self.key
+    }
+}
+
+/// An engine or transmission list in a truck's panel.
+struct PartPicker {
+    kind: gamedata::PartKind,
+    /// The accessory folder it's about (`engine`, `transmission`).
+    part: &'static str,
+    model: String,
+    select: Entity<SelectState<SearchableVec<PartOption>>>,
+    choices: Vec<game_data::PartChoice>,
+    is_filled: bool,
+}
+
+/// One engine or transmission in a list: shown by its name and what it's like, chosen by its
+/// definition.
+#[derive(Clone)]
+struct PartOption {
+    path: SharedString,
+    title: SharedString,
+}
+
+impl SelectItem for PartOption {
+    type Value = SharedString;
+
+    fn title(&self) -> SharedString {
+        self.title.clone()
+    }
+
+    fn value(&self) -> &Self::Value {
+        &self.path
     }
 }

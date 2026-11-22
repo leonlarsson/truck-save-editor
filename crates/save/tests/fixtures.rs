@@ -431,3 +431,39 @@ fn real_vehicle_edits_keep_the_save_whole() {
         );
     }
 }
+
+/// Every real truck has an engine and a transmission the editor finds, and swapping one keeps
+/// the save whole.
+#[test]
+fn real_trucks_have_parts_to_swap() {
+    for (index, dir) in slot_dirs().into_iter().enumerate() {
+        let mut slot = save::load(&dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display()));
+        let trucks: Vec<save::Vehicle> = save::vehicles(&slot.game)
+            .into_iter()
+            .filter(|v| v.kind == save::VehicleKind::Truck)
+            .collect();
+        for truck in &trucks {
+            for part in ["engine", "transmission"] {
+                assert!(
+                    save::vehicle_part(&slot.game, &truck.id, part).is_some(),
+                    "slot {index}: a truck without its {part}"
+                );
+            }
+        }
+        if let Some(truck) = trucks.first() {
+            let (_, path) = save::vehicle_part(&slot.game, &truck.id, "engine").expect("an engine");
+            let edit = save::VehicleEdit::Part {
+                vehicle: truck.id.clone(),
+                part: "engine".into(),
+                data_path: path,
+                price: 1,
+            };
+            assert!(save::apply_vehicle_edit(&mut slot.game, &edit));
+            let text = sii::to_text(&slot.game);
+            assert_eq!(
+                sii::to_text(&sii::parse_text(&text).expect("reads back")),
+                text
+            );
+        }
+    }
+}
