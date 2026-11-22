@@ -256,6 +256,7 @@ pub struct RoadMap {
     drag: Option<(Point<Pixels>, View)>,
     places: Option<Arc<Places>>,
     shows_names: bool,
+    shows_garages: bool,
     _work: Vec<Task<()>>,
 }
 
@@ -276,6 +277,7 @@ impl RoadMap {
             drag: None,
             places: None,
             shows_names: true,
+            shows_garages: true,
             _work: Vec::new(),
         }
     }
@@ -546,6 +548,9 @@ impl RoadMap {
         else {
             return Vec::new();
         };
+        if !self.shows_garages {
+            return Vec::new();
+        }
         let session = self.session.read(cx);
         let headquarters = session.career().hq_city.clone();
         session
@@ -758,10 +763,21 @@ impl Render for RoadMap {
                 t!(cx, "road-map-not-driven"),
             ))
             .child(swatch(theme.danger, t!(cx, "road-map-truck")))
+            // What can be hidden: garages (with their square, to say which they are) and names.
             .child(
                 h_flex()
                     .gap_1p5()
                     .items_center()
+                    .child(
+                        Checkbox::new("road-map-garages")
+                            .small()
+                            .checked(self.shows_garages)
+                            .accessibility_label(t!(cx, "road-map-garages"))
+                            .on_click(cx.listener(|this, checked: &bool, _, cx| {
+                                this.shows_garages = *checked;
+                                cx.notify();
+                            })),
+                    )
                     .child(
                         div()
                             .size(rems(0.6))
@@ -772,14 +788,20 @@ impl Render for RoadMap {
                     .child(t!(cx, "road-map-garages")),
             )
             .child(
-                Checkbox::new("road-map-names")
-                    .small()
-                    .label(t!(cx, "road-map-names"))
-                    .checked(self.shows_names)
-                    .on_click(cx.listener(|this, checked: &bool, _, cx| {
-                        this.shows_names = *checked;
-                        cx.notify();
-                    })),
+                h_flex()
+                    .gap_1p5()
+                    .items_center()
+                    .child(
+                        Checkbox::new("road-map-names")
+                            .small()
+                            .checked(self.shows_names)
+                            .accessibility_label(t!(cx, "road-map-names"))
+                            .on_click(cx.listener(|this, checked: &bool, _, cx| {
+                                this.shows_names = *checked;
+                                cx.notify();
+                            })),
+                    )
+                    .child(t!(cx, "road-map-names")),
             )
             .child(div().flex_1())
             .child(t!(cx, "road-map-hint"))
