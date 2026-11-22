@@ -19,6 +19,7 @@ mod preview;
 mod profile_file;
 #[cfg(feature = "native")]
 mod profiles;
+mod removals;
 #[cfg(feature = "native")]
 mod store;
 #[cfg(feature = "native")]
@@ -49,6 +50,7 @@ pub use profiles::{
     Location, PROFILE_DIRS_VARIABLE, Profile, Slot, SlotKind, decode_profile_folder, find_profiles,
     profile_slots,
 };
+pub use removals::{Removal, RemoveProblem, can_remove, discovered_roads, forget_roads, remove};
 #[cfg(feature = "native")]
 pub use store::{
     Backup, LoadedSlot, back_up, backups, is_game_running, load, restore, save, save_as_new_slot,

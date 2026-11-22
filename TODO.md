@@ -18,6 +18,8 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [x] Write a save back as text and load it in game (2026-11-22: money and XP changed, Steam Cloud profile; the first try found the rotation format, now fixed and tested).
 - [x] In game (2026-11-22): a truck moved to another garage with its driver, and a cancelled freight market job (after the fix that removes its units), both on a Steam Cloud profile.
 - [ ] In game: a save on a local (non-cloud) profile written as a new slot.
+- [ ] In game: removing a driver, a truck, a trailer and a garage; forgetting the roads (2026-11-22, not tried in game yet).
+- [ ] Generate a job (the owner asked): what the game needs for a player_job, and whether it can be made safely.
 
 ## 4. Picking a save
 

@@ -584,3 +584,27 @@ current-job-external = An external contract, in your truck with the company's tr
 current-job-quick-job = A quick job in the company's truck. The editor can't cancel those yet: cancel it in the game.
 current-job-own-trailer = A cargo market job in your own trailer. The editor can't cancel those yet: cancel it in the game.
 current-job-special = A special transport. The editor can't cancel those: cancel it in the game.
+
+# Removing from the company; roads
+remove-truck = Remove truck
+remove-trailer = Remove trailer
+remove-driver = Remove driver
+remove-garage = Remove garage
+remove-tooltip = Takes it out of your company when you save. Unlike selling in the game, you get no money for it. Undo brings it back.
+remove-why-yours = You drive this one: it stays.
+remove-why-your-trailer = You're pulling this trailer: it stays.
+remove-why-has-driver = A driver drives this truck. Remove the driver, or move them, first.
+remove-why-in-use = This trailer is on the job in progress.
+remove-why-headquarters = This is your headquarters. Make another garage the headquarters first.
+remove-why-not-empty = Move or remove its trucks, drivers and trailers first.
+remove-why-unknown = This save's lists aren't in a shape the editor knows (a newer game version?), so it won't guess.
+removal-before = In your company
+removal-after = Removed
+roads-what = Visited roads
+roads-count = { $count ->
+    [one] One road piece
+   *[other] { $amount } road pieces
+}
+roads-none = None
+map-forget-roads = Forget visited roads
+map-forget-roads-tooltip = The map's discovered roads start over, as on a new profile. Cities you've visited stay visited.

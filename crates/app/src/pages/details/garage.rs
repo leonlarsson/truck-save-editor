@@ -181,20 +181,26 @@ impl Render for GarageDetail {
                     v_flex().gap_1().children(driver_rows).into_any_element()
                 },
             ))
-            .child(
-                h_flex().child(
-                    Button::new("upgrade-garage")
-                        .small()
-                        .outline()
-                        .label(label)
-                        .disabled(garage.is_owned && garage.is_large())
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            let id = id.clone();
-                            this.session
-                                .update(cx, |session, cx| session.upgrade_garage(&id, cx));
-                        })),
-                ),
-            )
+            .child(super::actions_row(
+                Button::new("upgrade-garage")
+                    .small()
+                    .outline()
+                    .label(label)
+                    .disabled(garage.is_owned && garage.is_large())
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        let id = id.clone();
+                        this.session
+                            .update(cx, |session, cx| session.upgrade_garage(&id, cx));
+                    })),
+                &self.session,
+                garage.is_owned.then(|| {
+                    (
+                        save::Removal::Garage(self.id.clone()),
+                        t!(cx, "remove-garage"),
+                    )
+                }),
+                cx,
+            ))
             .into_any_element()
     }
 }

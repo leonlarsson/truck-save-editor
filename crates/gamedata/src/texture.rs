@@ -10,7 +10,17 @@ pub fn decode_rgba(texture: &Texture) -> Option<Vec<u8>> {
     let mut rgba = vec![0u8; width * height * 4];
     match texture.format {
         TextureFormat::Rgba8 => {
-            rgba.copy_from_slice(texture.data.get(..width * height * 4)?);
+            // Uncompressed textures are stored blue, green, red, alpha (Direct3D's B8G8R8A8):
+            // read as red-first, faces came out blue and oranges sky blue.
+            let data = texture.data.get(..width * height * 4)?;
+            for (pixel, stored) in rgba
+                .as_chunks_mut::<4>()
+                .0
+                .iter_mut()
+                .zip(data.as_chunks::<4>().0)
+            {
+                *pixel = [stored[2], stored[1], stored[0], stored[3]];
+            }
         }
         TextureFormat::R8 => {
             for (pixel, value) in rgba.as_chunks_mut::<4>().0.iter_mut().zip(&texture.data) {

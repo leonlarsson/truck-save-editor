@@ -276,6 +276,18 @@ impl Render for MapPage {
                             .flex_shrink_0()
                             .gap_2()
                             .child(
+                                Button::new("forget-roads")
+                                    .small()
+                                    .outline()
+                                    .label(t!(cx, "map-forget-roads"))
+                                    .tooltip(t!(cx, "map-forget-roads-tooltip"))
+                                    .disabled(self.session.read(cx).discovered_roads().1 == 0)
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        this.session
+                                            .update(cx, |session, cx| session.forget_roads(cx));
+                                    })),
+                            )
+                            .child(
                                 Button::new("visit-all")
                                     .small()
                                     .outline()

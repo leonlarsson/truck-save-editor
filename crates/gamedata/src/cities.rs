@@ -1,6 +1,7 @@
 //! The installed game's cities, from its city definitions (`def/city.sii` and the `city.*.sii`
-//! files each map DLC adds): every city's token, the text key of its proper name, and which have a
-//! truck dealer (`vehicle_brands[]`).
+//! files each map DLC adds): every city's token, the text key of its proper name, its country,
+//! and which have a truck dealer (`vehicle_brands[]`). And the countries (`def/country.sii` and
+//! its includes): each one's short code as the game shows it after a city (`Verona (I)`).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -10,6 +11,10 @@ pub(crate) struct Cities {
     pub names: BTreeMap<String, String>,
     /// Tokens of the cities with a truck dealer.
     pub dealers: BTreeSet<String>,
+    /// City token → its country's token (`verona` → `italy`).
+    pub countries: BTreeMap<String, String>,
+    /// Country token → its short code (`italy` → `I`).
+    pub country_codes: BTreeMap<String, String>,
 }
 
 impl Cities {
@@ -25,8 +30,29 @@ impl Cities {
                 .filter(|key| !key.is_empty())
                 .unwrap_or_else(|| token.to_string());
             self.names.insert(token.to_string(), name_key);
+            if let Some(country) = unit.single("country") {
+                let country = sii::value::parse_string(country).to_string();
+                if !country.is_empty() {
+                    self.countries.insert(token.to_string(), country);
+                }
+            }
             if !unit.items("vehicle_brands").is_empty() {
                 self.dealers.insert(token.to_string());
+            }
+        }
+    }
+
+    /// Adds the countries a `country.sii` (or a DLC's `country.*.sii`) defines.
+    pub(crate) fn add_countries(&mut self, document: &sii::Document) {
+        for unit in document.units_of_kind("country_data") {
+            let Some(token) = unit.id.strip_prefix("country.data.") else {
+                continue;
+            };
+            if let Some(code) = unit.single("country_code") {
+                let code = sii::value::parse_string(code).to_string();
+                if !code.is_empty() {
+                    self.country_codes.insert(token.to_string(), code);
+                }
             }
         }
     }

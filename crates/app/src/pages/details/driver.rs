@@ -185,20 +185,24 @@ impl Render for DriverDetail {
                 v_flex().gap_2().children(rows),
             ))
             .child(group(t!(cx, "adr"), v_flex().gap_2().children(adr)))
-            .child(
-                h_flex().child(
-                    Button::new("max-driver")
-                        .small()
-                        .outline()
-                        .label(t!(cx, "driver-max"))
-                        .disabled(is_maxed)
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            let id = id.clone();
-                            this.session
-                                .update(cx, |session, cx| session.max_driver(&id, cx));
-                        })),
-                ),
-            )
+            .child(super::actions_row(
+                Button::new("max-driver")
+                    .small()
+                    .outline()
+                    .label(t!(cx, "driver-max"))
+                    .disabled(is_maxed)
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        let id = id.clone();
+                        this.session
+                            .update(cx, |session, cx| session.max_driver(&id, cx));
+                    })),
+                &self.session,
+                Some((
+                    save::Removal::Driver(self.id.clone()),
+                    t!(cx, "remove-driver"),
+                )),
+                cx,
+            ))
             .into_any_element()
     }
 }

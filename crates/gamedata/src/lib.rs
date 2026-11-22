@@ -12,7 +12,7 @@ mod recruitment;
 mod texture;
 mod vehicles;
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -57,6 +57,8 @@ pub struct GameData {
     city_names: std::collections::BTreeMap<String, String>,
     /// Cities with a truck dealer.
     dealer_cities: BTreeSet<String>,
+    /// City token → its country's short code (`verona` → `I`).
+    city_country_codes: BTreeMap<String, String>,
     /// Cities with a recruitment agency (of those the installed game has).
     recruitment_cities: BTreeSet<String>,
     /// Vehicle models: model id → (brand text key, series text key).
@@ -137,6 +139,9 @@ impl GameData {
             };
             vehicles::add_models(&mut archive, &mut data.models);
             for_each_definition(&mut archive, "city", |document| cities.add(document));
+            for_each_definition(&mut archive, "country", |document| {
+                cities.add_countries(document)
+            });
             for_each_definition(&mut archive, "company", |document| {
                 for unit in document.units_of_kind("company_permanent") {
                     let (Some(token), Some(name)) = (
@@ -170,6 +175,14 @@ impl GameData {
             .collect();
         data.dealer_cities = cities.dealers;
         data.city_names = cities.names;
+        data.city_country_codes = cities
+            .countries
+            .iter()
+            .filter_map(|(city, country)| {
+                let code = cities.country_codes.get(country)?;
+                Some((city.clone(), code.clone()))
+            })
+            .collect();
 
         if let Ok(mut locale) = hashfs::Archive::open(install_dir.join("locale.scs")) {
             data.strings = read_strings(&mut locale, language)
@@ -197,6 +210,11 @@ impl GameData {
     }
 
     /// A city's name as the game shows it (`malmo` → `Malmö`): its `city_name_localized` text.
+    /// The short code of a city's country, as the game shows it after the city's name (`I`).
+    pub fn city_country_code(&self, token: &str) -> Option<&str> {
+        self.city_country_codes.get(token).map(String::as_str)
+    }
+
     pub fn city_name(&self, token: &str) -> Option<String> {
         let key = self.city_names.get(token).map_or(token, String::as_str);
         self.text(key).filter(|name| !name.is_empty())

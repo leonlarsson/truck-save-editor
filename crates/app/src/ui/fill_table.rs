@@ -28,7 +28,7 @@ pub fn fill_widths(columns: &[(f32, bool)], table_width: Option<Pixels>) -> Vec<
         .map(|(width, _)| width)
         .sum();
     let spare = table_width.map(f32::from).unwrap_or(0.) - total;
-    columns
+    let mut widths: Vec<f32> = columns
         .iter()
         .map(|&(width, grows)| {
             if grows && spare > 0. && growing > 0. {
@@ -37,7 +37,19 @@ pub fn fill_widths(columns: &[(f32, bool)], table_width: Option<Pixels>) -> Vec<
                 width
             }
         })
-        .collect()
+        .collect();
+    // The pixels rounding left over go to the last growing column, so the columns end exactly at
+    // the table's edge (a sliver left over showed as an extra, empty column).
+    if spare > 0.
+        && let Some(table_width) = table_width
+        && let Some(last) = columns.iter().rposition(|(_, grows)| *grows)
+    {
+        let left_over = (f32::from(table_width) - widths.iter().sum::<f32>()).floor();
+        if left_over > 0. {
+            widths[last] += left_over;
+        }
+    }
+    widths
 }
 
 /// The table, measured: when its width changes, its delegate hears the new width and its
@@ -98,6 +110,14 @@ mod tests {
         let columns = [(200., true), (100., false)];
         assert_eq!(fill_widths(&columns, Some(px(250.))), vec![200., 100.]);
         assert_eq!(fill_widths(&columns, None), vec![200., 100.]);
+    }
+
+    #[test]
+    fn a_wider_table_is_filled_to_the_pixel() {
+        let columns = [(130., true), (70., true), (45., false)];
+        let widths = fill_widths(&columns, Some(px(1001.)));
+        assert_eq!(widths.iter().sum::<f32>(), 1001.);
+        assert_eq!(widths[2], 45.);
     }
 
     #[test]

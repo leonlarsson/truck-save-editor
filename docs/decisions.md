@@ -180,3 +180,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** a game update can change the save format, and then players need the fixed editor quickly; a portable .exe can't tell them otherwise, and a version without the check can never learn of the next one, so it ships in the first release. One request to GitHub is the only network use; it sends the editor's name and version as its agent and nothing about the player or their saves.
 
 **Considered:** updating in place with one click (download, check the release's checksums, swap the .exe and restart: a likely next step); an installer with automatic updates (Velopack; would replace the portable zip); no check (players wouldn't know).
+
+## 2026-11-22: Removing from the company
+
+**Decided:** a hired driver, a truck without a driver, a trailer not in use and an empty garage (not the headquarters) can be removed, and the roads driven forgotten (`save::remove`, `save::forget_roads`). Each removes its entry from the player's list and the lists that run alongside it (named explicitly per kind; an unknown list of the same length stops the removal instead of guessing), clears it from garages, removes a driver's scheduled events, and leaves what nothing points at any more to `drop_unreachable`. A removed garage takes the shape of the unowned ones. Nothing pays: they're called Remove, not Sell. "Discover every road" isn't offered.
+
+**Why:** players asked to tidy fleets and maps. The lists alongside differ by game version (`driver_flags` and `driver_undrivable_truck_timers` in 1.62, `driver_quit_warned` in older saves, sometimes kept empty), so they're named, and checked on every real save by a fixture test. Every discovered road is a map item id; listing all of them means reading the map's binary sector files, whose format changes with game versions.
+
+**Considered:** paying like the game's sale (its price rules aren't in the save); removing a truck with its driver in one go (two clear steps are easier to undo and to explain); discovering roads from the map sectors (fragile).

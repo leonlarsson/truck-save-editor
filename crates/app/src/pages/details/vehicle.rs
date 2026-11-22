@@ -256,6 +256,18 @@ impl Render for VehicleDetail {
                 .into_any_element(),
             };
 
+        // Trucks and trailers can be removed from the company; coaches aren't part of it.
+        let removal = match vehicle.kind {
+            VehicleKind::Truck => Some((
+                save::Removal::Truck(self.id.clone()),
+                t!(cx, "remove-truck"),
+            )),
+            VehicleKind::Trailer => Some((
+                save::Removal::Trailer(self.id.clone()),
+                t!(cx, "remove-trailer"),
+            )),
+            VehicleKind::Coach => None,
+        };
         let id = self.id.clone();
         let refuel_id = self.id.clone();
         v_flex()
@@ -306,20 +318,21 @@ impl Render for VehicleDetail {
                     })),
             ))
             .child(group(t!(cx, "column-wear"), wear))
-            .child(
-                h_flex().child(
-                    Button::new("repair-vehicle")
-                        .small()
-                        .outline()
-                        .label(t!(cx, "repair-all-parts"))
-                        .disabled(vehicle.wear.worst() == 0.0)
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            let id = id.clone();
-                            this.session
-                                .update(cx, |session, cx| session.repair(&id, cx));
-                        })),
-                ),
-            )
+            .child(super::actions_row(
+                Button::new("repair-vehicle")
+                    .small()
+                    .outline()
+                    .label(t!(cx, "repair-all-parts"))
+                    .disabled(vehicle.wear.worst() == 0.0)
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        let id = id.clone();
+                        this.session
+                            .update(cx, |session, cx| session.repair(&id, cx));
+                    })),
+                &self.session,
+                removal,
+                cx,
+            ))
             .into_any_element()
     }
 }

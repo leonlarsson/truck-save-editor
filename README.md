@@ -9,7 +9,7 @@ A save editor for **Euro Truck Simulator 2** and **American Truck Simulator**: f
 - **Finds your saves by itself**: Steam Cloud and local profiles, every slot with when it was saved and its money.
 - **The big levers first**: money, truck and coach experience shown as levels with the game's own rank names, every truck and coach skill, ADR classes.
 - **Coaches as a first-class career**: coach experience, coach skills, and coaches in the fleet.
-- **Your company**: every truck and coach (repair them all), every garage (buy them all, upgrade to large), your headquarters, every hired driver (max them all), and moving a truck and its driver to another garage.
+- **Your company**: every truck and coach (repair them all), every garage (buy them all, upgrade to large), your headquarters, every hired driver (max them all), moving a truck and its driver to another garage, and removing drivers, trucks, trailers and empty garages.
 - **Jobs**: the job you're driving (cancel it with no fee, or remove its deadline) and every offer on the market (keep them all a week).
 - **Everything else**: All data shows every unit and value in the save, editable, with checks so a typo can't break the save.
 - **Never lose a save**: every change listed before saving, a backup of the slot before every write (kept outside the game's folders), Save as new slot to leave the original untouched (local profiles; Steam Cloud only shows saves the game made), and no writing while the game is running.

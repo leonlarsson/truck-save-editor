@@ -430,3 +430,30 @@ fn a_truck_moves_to_another_garage_with_its_driver(cx: &mut TestAppContext) {
     let options = cx.update(|cx| session.read(cx).move_options("driver.7").expect("movable"));
     assert_eq!(options.from, "garage.paris");
 }
+
+#[gpui_kit::test]
+fn a_driver_can_be_removed_and_then_their_truck(cx: &mut TestAppContext) {
+    let slot = TempSlot::new("remove-driver");
+    let (_handle, workspace) = open(cx, &slot);
+    let session = session(&workspace, cx);
+    let truck = save::Removal::Truck("_nameless.4".into());
+    let driver = save::Removal::Driver("driver.7".into());
+    // The truck has a driver: it stays until the driver goes.
+    let truck_problem = cx.update(|cx| session.read(cx).can_remove(&truck));
+    assert_eq!(truck_problem, Err(save::RemoveProblem::HasDriver));
+
+    cx.update(|cx| session.update(cx, |session, cx| session.remove(driver, cx)));
+    cx.run_until_parked();
+    assert_eq!(change_count(&workspace, cx), 1);
+    assert!(cx.update(|cx| session.read(cx).can_remove(&truck)).is_ok());
+    let prepared = cx.update(|cx| session.read(cx).prepared().expect("prepares"));
+    assert!(prepared.game.unit("driver.7").is_none());
+    assert!(
+        prepared
+            .game
+            .unit("_nameless.3")
+            .expect("player")
+            .items("drivers")
+            .is_empty()
+    );
+}

@@ -78,6 +78,10 @@ struct Pending {
     cancel_job: bool,
     /// Whether to remove the job in progress's deadline when saving.
     remove_job_deadline: bool,
+    /// Drivers, trucks, trailers and garages to remove from the company, in the order asked.
+    removed: Vec<save::Removal>,
+    /// Whether to forget every road driven.
+    forget_roads: bool,
 }
 
 impl Pending {
@@ -98,6 +102,8 @@ impl Pending {
             garage_moves: Vec::new(),
             cancel_job: false,
             remove_job_deadline: false,
+            removed: Vec::new(),
+            forget_roads: false,
         }
     }
 
@@ -459,6 +465,8 @@ impl Session {
             + self.moved().len()
             + usize::from(self.pending.cancel_job)
             + usize::from(self.pending.remove_job_deadline)
+            + self.pending.removed.len()
+            + usize::from(self.pending.forget_roads)
     }
 
     /// Every city with how often it was visited, as it'll be after saving.
@@ -552,6 +560,34 @@ impl Session {
     /// Where a truck or driver could move, as the save will be after the changes so far.
     pub fn move_options(&self, id: &str) -> Result<save::MoveOptions, save::MoveProblem> {
         save::move_options(&self.preview(), id)
+    }
+
+    /// Whether a driver, truck, trailer or garage can be removed, as the save will be after the
+    /// changes so far, and if not, why.
+    pub fn can_remove(&self, removal: &save::Removal) -> Result<(), save::RemoveProblem> {
+        save::can_remove(&self.preview(), removal)
+    }
+
+    /// Removes a driver, truck, trailer or garage from the company.
+    pub fn remove(&mut self, removal: save::Removal, cx: &mut Context<Self>) {
+        self.change(cx, |pending, _| {
+            if !pending.removed.contains(&removal) {
+                pending.removed.push(removal);
+            }
+        });
+    }
+
+    /// How many road pieces are discovered: (on disk, after saving).
+    pub fn discovered_roads(&self) -> (usize, usize) {
+        (
+            save::discovered_roads(&self.loaded.game),
+            save::discovered_roads(&self.preview()),
+        )
+    }
+
+    /// Forgets every road driven.
+    pub fn forget_roads(&mut self, cx: &mut Context<Self>) {
+        self.change(cx, |pending, _| pending.forget_roads = true);
     }
 
     /// The trucks and drivers asked to move that end up in another garage than on disk: (id,
@@ -786,6 +822,54 @@ impl Session {
             };
             add(what, city(&from).into(), city(&to).into());
         }
+        for removal in &self.pending.removed {
+            let what: SharedString = match removal {
+                save::Removal::Truck(id) | save::Removal::Trailer(id) => {
+                    match self.saved_vehicles.iter().find(|v| &v.id == id) {
+                        Some(vehicle) => {
+                            let model =
+                                crate::game_data::model_name(cx, vehicle).unwrap_or_default();
+                            t!(
+                                cx,
+                                "move-what-truck",
+                                model = model,
+                                plate = vehicle.plate.clone()
+                            )
+                        }
+                        None => id.clone().into(),
+                    }
+                }
+                save::Removal::Driver(id) => {
+                    let hometown = self
+                        .saved_drivers
+                        .iter()
+                        .find(|driver| &driver.id == id)
+                        .map(|driver| crate::game_data::city_name(cx, &driver.hometown))
+                        .unwrap_or_default();
+                    t!(cx, "move-what-driver", city = hometown)
+                }
+                save::Removal::Garage(id) => t!(
+                    cx,
+                    "detail-garage-in",
+                    city =
+                        crate::game_data::city_name(cx, id.strip_prefix("garage.").unwrap_or(id))
+                ),
+            };
+            add(what, t!(cx, "removal-before"), t!(cx, "removal-after"));
+        }
+        if self.pending.forget_roads {
+            let (saved, _) = self.discovered_roads();
+            add(
+                t!(cx, "roads-what"),
+                t!(
+                    cx,
+                    "roads-count",
+                    count = saved,
+                    amount = crate::format::thousands(saved as i64)
+                ),
+                t!(cx, "roads-none"),
+            );
+        }
         if self.pending.cancel_job || self.pending.remove_job_deadline {
             let saved = save::current_job(&self.loaded.game);
             let before = saved
@@ -879,6 +963,11 @@ impl Session {
             // only offers moves that fit the preview, which this builds.
             let _ = save::move_to_garage(&mut slot.game, id, garage);
         }
+        for removal in &self.pending.removed {
+            // One that no longer can (an earlier change took its place) is skipped; pages only
+            // offer what the preview, built from this, allows.
+            let _ = save::remove(&mut slot.game, removal);
+        }
         if self.pending.remove_job_deadline {
             save::remove_job_deadline(&mut slot.game);
         }
@@ -902,6 +991,9 @@ impl Session {
         save::drop_unreachable(&mut slot.game);
         if let Some(info) = &mut slot.info {
             save::update_info(info, &self.pending.career);
+        }
+        if self.pending.forget_roads {
+            save::forget_roads(&mut slot.game, slot.info.as_mut());
         }
         Ok(slot)
     }

@@ -264,3 +264,96 @@ fn real_saves_are_one_tree_from_the_economy() {
         );
     }
 }
+
+/// Removing a hired driver, a truck without a driver and a trailer from a real save keeps the
+/// player's lists in step and the save one tree; forgetting the roads empties them.
+#[test]
+fn real_removals_keep_the_save_whole() {
+    use save::Removal;
+    for (index, dir) in slot_dirs().into_iter().enumerate() {
+        let mut slot = save::load(&dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display()));
+        let game = &slot.game;
+        let player = game
+            .first_of_kind("economy")
+            .and_then(|economy| economy.single("player"))
+            .and_then(|id| game.unit(id))
+            .expect("a player");
+        let pick = |list: &str, make: fn(String) -> Removal| {
+            player
+                .items(list)
+                .iter()
+                .map(|id| make(id.clone()))
+                .find(|removal| save::can_remove(game, removal).is_ok())
+        };
+        let removals: Vec<Removal> = [
+            pick("drivers", Removal::Driver),
+            pick("trucks", Removal::Truck),
+            pick("trailers", Removal::Trailer),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+        // Each kind the save has a candidate for can be removed: here, a hired driver.
+        let has_hired = player
+            .items("drivers")
+            .iter()
+            .any(|id| game.unit(id).is_some_and(|unit| unit.kind == "driver_ai"));
+        assert!(
+            !has_hired || matches!(removals.first(), Some(Removal::Driver(_))),
+            "slot {index}: a hired driver can be removed"
+        );
+        let lengths = |document: &sii::Document| {
+            let player = document
+                .first_of_kind("economy")
+                .and_then(|economy| economy.single("player"))
+                .and_then(|id| document.unit(id))
+                .expect("a player");
+            [
+                "drivers",
+                "driver_readiness_timer",
+                "trucks",
+                "truck_profit_logs",
+                "trailers",
+                "trailer_utilization_logs",
+            ]
+            .map(|list| player.items(list).len())
+        };
+        let before = lengths(&slot.game);
+        for removal in &removals {
+            assert_eq!(
+                save::remove(&mut slot.game, removal),
+                Ok(()),
+                "slot {index}: {removal:?}"
+            );
+        }
+        let after = lengths(&slot.game);
+        // Each list lost exactly one entry when its kind was removed, and they stay in step.
+        assert_eq!(after[0], after[1], "slot {index}: drivers in step");
+        assert_eq!(after[2], after[3], "slot {index}: trucks in step");
+        assert_eq!(after[4], after[5], "slot {index}: trailers in step");
+        assert!(
+            after
+                .iter()
+                .zip(before)
+                .all(|(a, b)| *a == b || *a + 1 == b)
+        );
+
+        save::forget_roads(&mut slot.game, slot.info.as_mut());
+        assert_eq!(save::discovered_roads(&slot.game), 0);
+        let root = slot
+            .game
+            .first_of_kind("economy")
+            .map(|unit| unit.id.clone())
+            .expect("an economy unit");
+        assert_eq!(
+            slot.game.reachable_from(&root).len(),
+            slot.game.len(),
+            "slot {index}: one tree"
+        );
+        let text = sii::to_text(&slot.game);
+        assert_eq!(
+            sii::to_text(&sii::parse_text(&text).expect("reads back")),
+            text
+        );
+    }
+}

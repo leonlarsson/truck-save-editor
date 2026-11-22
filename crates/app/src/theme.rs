@@ -51,6 +51,9 @@ pub fn apply(appearance: Appearance, window: Option<&mut Window>, cx: &mut App) 
         Appearance::Light => Theme::change(ThemeMode::Light, window, cx),
         Appearance::Dark => Theme::change(ThemeMode::Dark, window, cx),
     }
+    // Side panels (sheets) reach the top of the window. The kit leaves room for a title bar
+    // drawn by the app; this app uses the system's, so that room was an empty strip.
+    Theme::global_mut(cx).sheet.margin_top = gpui_kit::px(0.);
 }
 
 /// Chooses an appearance and keeps it for next time.

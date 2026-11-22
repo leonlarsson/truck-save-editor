@@ -54,6 +54,16 @@ impl TextTable {
 }
 
 impl TableDelegate for TextTable {
+    /// No empty column after the last one: the columns fill the table (`ui::fill_table`), and the
+    /// kit's spare column showed as an odd extra heading.
+    fn render_last_empty_col(
+        &mut self,
+        _: &mut Window,
+        _: &mut Context<TableState<Self>>,
+    ) -> impl IntoElement {
+        gpui_kit::div()
+    }
+
     fn columns_count(&self, _: &App) -> usize {
         self.columns.len()
     }

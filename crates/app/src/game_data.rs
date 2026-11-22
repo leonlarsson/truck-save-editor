@@ -86,11 +86,19 @@ pub fn coach_rank(cx: &App, level: i64) -> Option<String> {
     data(cx)?.coach_rank(level)
 }
 
-/// A city's name: the game's own (`Malmö`), else made from its token (`Malmo`).
+/// A city's name: the game's own (`Malmö`), else made from its token (`Malmo`), with its
+/// country's short code as the game shows a city in jobs and the delivery log: `Verona (I)`,
+/// `Maribor (SLO)` (when the game's data is there).
 pub fn city_name(cx: &App, token: &str) -> String {
-    data(cx)
+    let data = data(cx);
+    let name = data
+        .as_ref()
         .and_then(|d| d.city_name(token))
-        .unwrap_or_else(|| save::city_display_name(token))
+        .unwrap_or_else(|| save::city_display_name(token));
+    match data.as_ref().and_then(|d| d.city_country_code(token)) {
+        Some(code) => format!("{name} ({code})"),
+        None => name,
+    }
 }
 
 /// A skill's icon from the game, by its save field name (`long_dist`, `long_duty` …).

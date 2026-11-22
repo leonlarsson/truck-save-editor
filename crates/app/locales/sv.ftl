@@ -584,3 +584,27 @@ current-job-external = Ett externt kontrakt, i din lastbil med företagets trail
 current-job-quick-job = Ett snabbuppdrag i företagets lastbil. Redigeraren kan inte avbryta sådana än: avbryt det i spelet.
 current-job-own-trailer = Ett uppdrag från lastmarknaden i din egen trailer. Redigeraren kan inte avbryta sådana än: avbryt det i spelet.
 current-job-special = En specialtransport. Redigeraren kan inte avbryta sådana: avbryt den i spelet.
+
+# Removing from the company; roads
+remove-truck = Ta bort lastbilen
+remove-trailer = Ta bort trailern
+remove-driver = Ta bort föraren
+remove-garage = Ta bort garaget
+remove-tooltip = Tas bort ur ditt företag när du sparar. Till skillnad från att sälja i spelet får du inga pengar för det. Ångra tar tillbaka det.
+remove-why-yours = Den här kör du själv: den blir kvar.
+remove-why-your-trailer = Du drar den här trailern: den blir kvar.
+remove-why-has-driver = En förare kör den här lastbilen. Ta bort föraren, eller flytta hen, först.
+remove-why-in-use = Den här trailern används i det pågående uppdraget.
+remove-why-headquarters = Det här är ditt huvudkontor. Gör ett annat garage till huvudkontor först.
+remove-why-not-empty = Flytta eller ta bort dess lastbilar, förare och trailrar först.
+remove-why-unknown = Den här sparfilens listor har en form redigeraren inte känner till (en nyare version av spelet?), så den gissar inte.
+removal-before = I ditt företag
+removal-after = Borttagen
+roads-what = Besökta vägar
+roads-count = { $count ->
+    [one] En vägbit
+   *[other] { $amount } vägbitar
+}
+roads-none = Inga
+map-forget-roads = Glöm besökta vägar
+map-forget-roads-tooltip = Kartans upptäckta vägar börjar om, som på en ny profil. Städer du har besökt förblir besökta.
