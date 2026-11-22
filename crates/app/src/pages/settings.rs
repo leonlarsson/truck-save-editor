@@ -25,12 +25,32 @@ use crate::workspace::backups_root;
 pub struct SettingsPage {
     /// Why the last folder picked wasn't taken, if it wasn't.
     folder_problem: Option<SharedString>,
+    /// The game's `config.cfg` (where it is, what it says), read when the page opens and after
+    /// each change.
+    game_config: Option<(std::path::PathBuf, String)>,
+    /// Why the last change to the game's settings didn't happen, if it didn't.
+    game_config_problem: Option<SharedString>,
+    /// Whether the game was running when last looked (looking lists processes, so not on every
+    /// redraw: when the page opens and when the window comes back to the front).
+    is_game_running: bool,
+    _activation: Option<gpui_kit::Subscription>,
 }
 
 impl SettingsPage {
-    pub fn new(_: &mut Window, _: &mut Context<Self>) -> Self {
+    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let activation = cx.observe_window_activation(window, |this, window, cx| {
+            if window.is_window_active() {
+                this.game_config = read_game_config();
+                this.is_game_running = save::is_game_running(save::Game::Ets2);
+                cx.notify();
+            }
+        });
         Self {
             folder_problem: None,
+            game_config: read_game_config(),
+            game_config_problem: None,
+            is_game_running: save::is_game_running(save::Game::Ets2),
+            _activation: Some(activation),
         }
     }
 
@@ -202,6 +222,7 @@ impl Render for SettingsPage {
                             ),
                         ),
                 )
+                .child(self.render_game_settings(cx))
                 .child(self.render_updates(cx))
                 .child(
                     Section::new(t!(cx, "settings-about")).child(
@@ -235,7 +256,99 @@ impl Render for SettingsPage {
     }
 }
 
+/// The game's `config.cfg`, if it has one.
+fn read_game_config() -> Option<(std::path::PathBuf, String)> {
+    let path = save::game_config_path(save::Game::Ets2)?;
+    let text = std::fs::read_to_string(&path).ok()?;
+    Some((path, text))
+}
+
 impl SettingsPage {
+    /// Writes a change to the game's own settings (backed up first), or says why it can't.
+    fn change_game_config(&mut self, change: impl FnOnce(&str) -> String, cx: &mut Context<Self>) {
+        let Some((path, text)) = read_game_config() else {
+            return;
+        };
+        let changed = change(&text);
+        let Some(backups) = backups_root() else {
+            return;
+        };
+        self.game_config_problem =
+            match save::write_game_config(save::Game::Ets2, &path, &changed, &backups) {
+                Ok(()) => None,
+                Err(save::Error::GameRunning) => Some(t!(cx, "game-settings-running")),
+                Err(error) => Some(t!(cx, "game-settings-failed", error = error.to_string())),
+            };
+        self.game_config = read_game_config();
+        self.is_game_running = save::is_game_running(save::Game::Ets2);
+        cx.notify();
+    }
+
+    /// The game's own settings the editor can change: the developer console and convoy size.
+    fn render_game_settings(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let muted = cx.theme().muted_foreground;
+        let body = match &self.game_config {
+            None => div()
+                .text_sm()
+                .text_color(muted)
+                .child(t!(cx, "game-settings-none"))
+                .into_any_element(),
+            Some((_, text)) => {
+                let settings = save::game_settings(text);
+                let is_running = self.is_game_running;
+                v_flex()
+                    .gap_2()
+                    .child(
+                        Checkbox::new("developer-console")
+                            .label(t!(cx, "game-settings-console"))
+                            .checked(settings.developer_console)
+                            .disabled(is_running)
+                            .on_change(cx.listener(|this, checked: &bool, _, cx| {
+                                let checked = *checked;
+                                this.change_game_config(
+                                    |text| save::with_developer_console(text, checked),
+                                    cx,
+                                );
+                            })),
+                    )
+                    .child(
+                        Checkbox::new("big-convoys")
+                            .label(t!(
+                                cx,
+                                "game-settings-convoy",
+                                count = save::MAX_CONVOY_SIZE
+                            ))
+                            .checked(settings.convoy_size >= save::MAX_CONVOY_SIZE)
+                            .disabled(is_running)
+                            .on_change(cx.listener(|this, checked: &bool, _, cx| {
+                                let size = if *checked {
+                                    save::MAX_CONVOY_SIZE
+                                } else {
+                                    save::DEFAULT_CONVOY_SIZE
+                                };
+                                this.change_game_config(
+                                    |text| save::with_convoy_size(text, size),
+                                    cx,
+                                );
+                            })),
+                    )
+                    .children(is_running.then(|| {
+                        div()
+                            .text_xs()
+                            .text_color(muted)
+                            .child(t!(cx, "game-settings-running"))
+                    }))
+                    .children(self.game_config_problem.clone().map(|problem| {
+                        div().text_xs().text_color(cx.theme().danger).child(problem)
+                    }))
+                    .into_any_element()
+            }
+        };
+        Section::new(t!(cx, "game-settings"))
+            .description(t!(cx, "game-settings-description"))
+            .child(body)
+    }
+
     /// Whether a newer version is out, checking again, and turning the check off.
     fn render_updates(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let muted = cx.theme().muted_foreground;

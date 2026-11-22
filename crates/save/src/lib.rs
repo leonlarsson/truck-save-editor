@@ -10,6 +10,7 @@ mod drivers;
 mod error;
 mod fleet;
 mod game;
+mod game_config;
 mod garages;
 mod info;
 mod jobs;
@@ -34,6 +35,12 @@ pub use fleet::{
     Vehicle, VehicleKind, Wear, model_display_name, refuel, repair, vehicles, wear_is_known,
 };
 pub use game::Game;
+pub use game_config::{
+    DEFAULT_CONVOY_SIZE, GameSettings, MAX_CONVOY_SIZE, config_value, game_settings,
+    with_config_value, with_convoy_size, with_developer_console,
+};
+#[cfg(feature = "native")]
+pub use game_config::{game_config_path, write_game_config};
 pub use garages::{
     Garage, LARGE_GARAGE_SLOTS, MoveOptions, MoveProblem, can_move_to_garage, garage_of, garages,
     move_options, move_to_garage, upgrade_garage,
