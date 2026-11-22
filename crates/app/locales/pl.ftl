@@ -733,6 +733,13 @@ map-discover-roads-tooltip = Oznacza każdą drogę i skrzyżowanie na mapie jak
 map-discover-roads-needs-game = Wymaga gry zainstalowanej na tym komputerze: jej mapa mówi, gdzie są drogi.
 map-discover-roads-confirm-title = Odkryć wszystkie drogi?
 map-discover-roads-confirm-body = Każda droga i skrzyżowanie na mapie, także w twoich DLC z mapami, zostaną oznaczone jako przejechane. Gra może zaliczyć te drogi do swoich osiągnięć, np. Pathfinder (40 000 km odkrytych dróg), ale nie wiadomo, czy i kiedy to zrobi. Cofnij odwraca zmianę do czasu zapisu, a zapis jest najpierw kopiowany.
+road-map-cities = Miasta
+road-map-roads = Mapa dróg
+road-map-driven = Przejechane
+road-map-not-driven = Jeszcze nie przejechane
+road-map-truck = Twoja ciężarówka
+road-map-drawing = Rysowanie mapy…
+road-map-needs-game = Wymaga gry zainstalowanej na tym komputerze: mapa pochodzi z jej plików.
 
 # Truck and trailer details
 plate-colours = Kolory tablicy

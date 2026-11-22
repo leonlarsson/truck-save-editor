@@ -11,6 +11,7 @@ pub mod open_save;
 pub mod overview;
 pub mod position;
 pub mod profile_tools;
+pub mod road_map;
 pub mod settings;
 pub mod statistics;
 

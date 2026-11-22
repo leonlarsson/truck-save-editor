@@ -5,15 +5,15 @@
 use std::collections::BTreeSet;
 
 use gpui_kit::component::{
-    ActiveTheme as _, Disableable as _, Sizable as _, WindowExt as _,
-    button::Button,
+    ActiveTheme as _, Disableable as _, Selectable as _, Sizable as _, WindowExt as _,
+    button::{Button, ButtonGroup},
     h_flex,
     table::{DataTable, TableState},
     v_flex,
 };
 use gpui_kit::{
     App, AppContext as _, Context, Entity, IntoElement, ParentElement as _, Render, SharedString,
-    Styled as _, Subscription, Window, div,
+    Styled as _, Subscription, Window, div, prelude::FluentBuilder as _,
 };
 use save::Place;
 
@@ -33,6 +33,9 @@ pub struct MapPage {
     filter: Entity<FilterBar>,
     /// Moving the player's truck to another save's spot.
     position: Entity<crate::pages::position::PositionPicker>,
+    /// The roads as a picture, shown instead of the cities when chosen.
+    road_map: Entity<crate::pages::road_map::RoadMap>,
+    shows_road_map: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -95,7 +98,13 @@ impl MapPage {
             let session = session.clone();
             cx.new(|cx| crate::pages::position::PositionPicker::new(session, window, cx))
         };
+        let road_map = {
+            let session = session.clone();
+            cx.new(|cx| crate::pages::road_map::RoadMap::new(session, cx))
+        };
         let mut page = Self {
+            road_map,
+            shows_road_map: false,
             session,
             table,
             visited: 0,
@@ -401,28 +410,53 @@ impl Render for MapPage {
                     )
                     .child(self.position.clone())
             })
-            .child(self.filter.clone())
-            // Not hidden, and not just a disabled button: say why, and what makes it work.
-            .children((!has_game_data).then(|| {
-                div()
-                    .text_sm()
-                    .text_color(cx.theme().muted_foreground)
-                    .child(t!(cx, "map-needs-game"))
-            }))
+            // The cities as a list, or the roads as a map.
             .child(
-                div().flex_1().min_h_0().child(crate::ui::table_or_empty(
-                    &self.filter,
-                    crate::ui::fill_table(
-                        &self.table,
-                        DataTable::new(&self.table)
-                            .stripe(true)
-                            .bordered(true)
-                            .accessibility_label(t!(cx, "map-table"))
-                            .into_any_element(),
-                    ),
-                    None,
-                    cx,
-                )),
+                ButtonGroup::new("map-view")
+                    .outline()
+                    .small()
+                    .child(
+                        Button::new("view-cities")
+                            .label(t!(cx, "road-map-cities"))
+                            .selected(!self.shows_road_map),
+                    )
+                    .child(
+                        Button::new("view-roads")
+                            .label(t!(cx, "road-map-roads"))
+                            .selected(self.shows_road_map),
+                    )
+                    .on_click(cx.listener(|this, clicked: &Vec<usize>, _, cx| {
+                        this.shows_road_map = clicked.first() == Some(&1);
+                        cx.notify();
+                    })),
             )
+            .map(|this| {
+                if self.shows_road_map {
+                    return this.child(div().flex_1().min_h_0().child(self.road_map.clone()));
+                }
+                this.child(self.filter.clone())
+                    // Not hidden, and not just a disabled button: say why, and what makes it work.
+                    .children((!has_game_data).then(|| {
+                        div()
+                            .text_sm()
+                            .text_color(cx.theme().muted_foreground)
+                            .child(t!(cx, "map-needs-game"))
+                    }))
+                    .child(
+                        div().flex_1().min_h_0().child(crate::ui::table_or_empty(
+                            &self.filter,
+                            crate::ui::fill_table(
+                                &self.table,
+                                DataTable::new(&self.table)
+                                    .stripe(true)
+                                    .bordered(true)
+                                    .accessibility_label(t!(cx, "map-table"))
+                                    .into_any_element(),
+                            ),
+                            None,
+                            cx,
+                        )),
+                    )
+            })
     }
 }

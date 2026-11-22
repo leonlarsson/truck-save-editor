@@ -696,6 +696,13 @@ map-discover-roads-tooltip = Markerar varje väg och korsning på kartan som kö
 map-discover-roads-needs-game = Kräver att spelet är installerat på den här datorn: dess karta säger var vägarna finns.
 map-discover-roads-confirm-title = Upptäcka alla vägar?
 map-discover-roads-confirm-body = Varje väg och korsning på kartan, även i dina kart-DLC, markeras som körd. Spelet kan räkna vägarna mot sina achievements, som Pathfinder (40 000 km upptäckta vägar), men om det gör det, eller när, vet man inte. Ångra tar tillbaka det tills du sparar, och sparfilen säkerhetskopieras först.
+road-map-cities = Städer
+road-map-roads = Vägkarta
+road-map-driven = Körda
+road-map-not-driven = Inte körda än
+road-map-truck = Din lastbil
+road-map-drawing = Ritar kartan…
+road-map-needs-game = Kräver att spelet är installerat på den här datorn: kartan kommer från dess filer.
 
 # Truck and trailer details
 plate-colours = Skyltens färger

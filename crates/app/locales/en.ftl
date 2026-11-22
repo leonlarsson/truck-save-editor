@@ -696,6 +696,13 @@ map-discover-roads-tooltip = Marks every road and junction on the map as driven,
 map-discover-roads-needs-game = Needs the game installed on this PC: its map says where the roads are.
 map-discover-roads-confirm-title = Discover every road?
 map-discover-roads-confirm-body = Every road and junction on the map, yours and your map DLCs', is marked as driven. The game may count these roads toward its achievements, such as Pathfinder (40,000 km of discovered roads), but whether it does, or when, isn't known. Undo takes it back until you save, and the save is backed up first.
+road-map-cities = Cities
+road-map-roads = Road map
+road-map-driven = Driven
+road-map-not-driven = Not driven yet
+road-map-truck = Your truck
+road-map-drawing = Drawing the map…
+road-map-needs-game = Needs the game installed on this PC: the map comes from its files.
 
 # Truck and trailer details
 plate-colours = Plate colours

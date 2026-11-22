@@ -17,16 +17,31 @@ struct Loaded {
     is_loading: bool,
 }
 
-/// Every road and junction on the game's map, by id (for Discover every road), read after the
-/// rest of the game's data so it never holds that up. `None` until read, or without the game.
+/// Every road and junction on the game's map (for the road map and Discover every road), read
+/// after the rest of the game's data so it never holds that up. `None` until read, or without the
+/// game.
 #[derive(Default)]
-struct RoadIds(Option<Arc<Vec<u64>>>);
+struct MapRoads(Option<RoadsRead>);
 
-impl Global for RoadIds {}
+/// The map's roads as read: with where they are (for the road map), and their ids alone (for
+/// Discover every road, kept apart so it isn't rebuilt from the roads each time).
+struct RoadsRead {
+    roads: Arc<Vec<gamedata::MapRoad>>,
+    ids: Arc<Vec<u64>>,
+}
 
-/// The map's roads and junctions, once read (`None` before, or without the game).
+impl Global for MapRoads {}
+
+/// The map's roads and junctions by id, once read (`None` before, or without the game).
 pub fn road_ids(cx: &App) -> Option<Arc<Vec<u64>>> {
-    cx.try_global::<RoadIds>().and_then(|roads| roads.0.clone())
+    cx.try_global::<MapRoads>()
+        .and_then(|read| read.0.as_ref().map(|read| read.ids.clone()))
+}
+
+/// The map's roads and junctions with where they are, once read.
+pub fn map_roads(cx: &App) -> Option<Arc<Vec<gamedata::MapRoad>>> {
+    cx.try_global::<MapRoads>()
+        .and_then(|read| read.0.as_ref().map(|read| read.roads.clone()))
 }
 
 impl Global for Loaded {}
@@ -78,12 +93,16 @@ pub fn reload(cx: &mut App) {
         // Then the map's roads: a second or two of reading, which only Discover every road needs.
         let roads = cx
             .background_spawn(async move {
-                let ids = gamedata::road_ids(Game::Ets2, roads_dir.as_deref()?);
-                (!ids.is_empty()).then(|| Arc::new(ids))
+                let roads = gamedata::map_roads(Game::Ets2, roads_dir.as_deref()?);
+                let ids: Vec<u64> = roads.iter().map(|road| road.id).collect();
+                (!roads.is_empty()).then(|| RoadsRead {
+                    roads: Arc::new(roads),
+                    ids: Arc::new(ids),
+                })
             })
             .await;
         cx.update(|cx| {
-            cx.set_global(RoadIds(roads));
+            cx.set_global(MapRoads(roads));
             cx.refresh_windows();
         });
     })

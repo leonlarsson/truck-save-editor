@@ -41,11 +41,28 @@ fn map_folder(game: Game) -> &'static str {
     }
 }
 
+/// A road or junction on the map: its id, and where it is (the middle of its box, in the game's
+/// metres: `x` east, `z` south).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MapRoad {
+    pub id: u64,
+    pub x: f32,
+    pub z: f32,
+}
+
 /// Every road and junction id on the map of the installed game and its map DLCs, sorted. Empty
 /// when the map can't be read (or its layout has changed so nothing is recognised).
 pub fn road_ids(game: Game, install_dir: &Path) -> Vec<u64> {
+    map_roads(game, install_dir)
+        .into_iter()
+        .map(|road| road.id)
+        .collect()
+}
+
+/// Every road and junction on the map of the installed game and its map DLCs, by id, each once.
+pub fn map_roads(game: Game, install_dir: &Path) -> Vec<MapRoad> {
     let folder = map_folder(game);
-    let mut ids: Vec<u64> = Vec::new();
+    let mut roads: Vec<MapRoad> = Vec::new();
     for path in crate::archives_after(install_dir, "base_map.scs") {
         let Ok(mut archive) = hashfs::Archive::open(&path) else {
             continue;
@@ -55,34 +72,34 @@ pub fn road_ids(game: Game, install_dir: &Path) -> Vec<u64> {
         };
         for file in listing.files.iter().filter(|name| name.ends_with(".base")) {
             if let Ok(Some(bytes)) = archive.read(&format!("{folder}/{file}")) {
-                ids.extend(sector_roads(&bytes));
+                roads.extend(sector_roads(&bytes));
             }
         }
     }
-    ids.sort_unstable();
-    ids.dedup();
-    ids
+    roads.sort_unstable_by_key(|road| road.id);
+    roads.dedup_by_key(|road| road.id);
+    roads
 }
 
-/// The road and junction ids in one sector's `.base` file.
-pub fn sector_roads(bytes: &[u8]) -> Vec<u64> {
+/// The roads and junctions in one sector's `.base` file.
+pub fn sector_roads(bytes: &[u8]) -> Vec<MapRoad> {
     let item_count = read_u32(bytes, ITEM_COUNT_AT).unwrap_or(0) as usize;
     let mut seen: HashSet<u64> = HashSet::new();
     let mut ids = Vec::new();
     let mut at = HEADER_LENGTH;
     while at + ITEM_HEAD_LENGTH <= bytes.len() && ids.len() < item_count {
-        if let Some(id) = road_at(bytes, at)
-            && seen.insert(id)
+        if let Some(road) = road_at(bytes, at)
+            && seen.insert(road.id)
         {
-            ids.push(id);
+            ids.push(road);
         }
         at += 1;
     }
     ids
 }
 
-/// The id of a road or junction starting at `at`, if one does.
-fn road_at(bytes: &[u8], at: usize) -> Option<u64> {
+/// The road or junction starting at `at`, if one does.
+fn road_at(bytes: &[u8], at: usize) -> Option<MapRoad> {
     let kind = read_u32(bytes, at)?;
     if kind != ROAD && kind != PREFAB {
         return None;
@@ -102,7 +119,11 @@ fn road_at(bytes: &[u8], at: usize) -> Option<u64> {
         (0..3).all(|axis| low[axis] <= high[axis] && high[axis] - low[axis] < LARGEST_ITEM);
     // Some extent on the ground: a box of a single point is no road.
     let has_area = (high[0] - low[0]) + (high[2] - low[2]) > 0.5;
-    (plausible && is_box && has_area).then_some(id)
+    (plausible && is_box && has_area).then(|| MapRoad {
+        id,
+        x: (low[0] + high[0]) / 2.0,
+        z: (low[2] + high[2]) / 2.0,
+    })
 }
 
 fn read_u32(bytes: &[u8], at: usize) -> Option<u32> {
@@ -155,7 +176,11 @@ mod tests {
             // Not a box: its low corner is above its high one.
             item(ROAD, 104, [10.0, 0.0, 10.0], [0.0, 0.0, 0.0]),
         ]);
-        assert_eq!(sector_roads(&bytes), [101, 103]);
+        let found: Vec<(u64, f32, f32)> = sector_roads(&bytes)
+            .iter()
+            .map(|road| (road.id, road.x, road.z))
+            .collect();
+        assert_eq!(found, [(101, -90.0, 70.0), (103, 22.5, 17.5)]);
     }
 
     #[test]
