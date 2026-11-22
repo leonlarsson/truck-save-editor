@@ -640,12 +640,13 @@ impl Workspace {
             return;
         };
         let session = opened.session.clone();
-        let (name, changes, is_cloud) = {
+        let (name, changes, is_cloud, is_loose) = {
             let session = session.read(cx);
             (
                 labels::slot_name(cx, session.slot()),
                 session.changes(cx),
                 session.profile().location == save::Location::SteamCloud,
+                session.profile().location == save::Location::Loose,
             )
         };
         let has_other_slots = !other_slots(&session, cx).is_empty();
@@ -724,12 +725,17 @@ impl Workspace {
                         )
                         .child(
                             // Off for Steam Cloud: the game lists only saves Steam knows, and
-                            // Steam only knows the ones the game made (the dialog says so).
+                            // Steam only knows the ones the game made (the dialog says so). Off
+                            // for a save on its own: there's no profile to add a slot to.
                             Button::new("save-as-new")
                                 .outline()
                                 .label(t!(cx, "save-as-new-slot"))
-                                .disabled(is_cloud)
-                                .tooltip(t!(cx, "save-as-new-slot-tooltip"))
+                                .disabled(is_cloud || is_loose)
+                                .tooltip(if is_loose {
+                                    t!(cx, "save-as-new-slot-loose")
+                                } else {
+                                    t!(cx, "save-as-new-slot-tooltip")
+                                })
                                 .on_click(move |_, window, cx| {
                                     window.close_dialog(cx);
                                     start_save_as_new_slot(as_new.clone(), window, cx);

@@ -35,6 +35,7 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [x] Load in the background with progress.
 - [x] Say what's shown and where from: the profile's saves, where they're kept and their folder; every folder looked in and what it held; the game's own saves folded to the newest three (2026-11-22).
 - [x] No saves, or a profile without saves: say what to do. Add a folder (chosen or dropped on the window: a profiles folder, a profile, one save, or the game's folder in Documents), kept in the settings (2026-11-22).
+- [x] A save on its own (outside a profile), dropped or chosen, opens and saves where it is (2026-11-22).
 - [ ] On Windows: Add a folder… and dropping a folder on the window (the dialog and drag and drop only run for real there), and Show the folder opening Explorer.
 
 ## 5. Overview

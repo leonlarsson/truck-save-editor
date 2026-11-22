@@ -50,7 +50,6 @@ start-folder-add = Add a folder…
 start-folder-drop = Or drop a save or profile folder on this window.
 start-folder-choose = Choose a folder with saves
 start-folder-not-saves = No saves or profiles in { $path }. Choose the game's profiles folder, one profile's folder, or one save's.
-start-folder-loose-save = { $path } is a save on its own, outside a profile. The editor works on saves in a profile (for backups and Save as): put the folder in a profile's save folder, or add the whole profile.
 start-slot-missing = { $count ->
     [one] Needs a DLC or mod that isn't installed
    *[other] Needs { $count } DLCs or mods that aren't installed
@@ -60,6 +59,7 @@ profile-place = { $name } · { $place }
 profile-game-place = { $name } · { $game } · { $place }
 location-steam-cloud = Steam Cloud
 location-this-pc = This PC
+location-loose = A save on its own
 
 ## Save slot names (for saves without a name of their own)
 
@@ -146,6 +146,7 @@ save-confirm-title = Save changes to “{ $name }”?
 cancel = Cancel
 save-as-new-slot = Save as new slot
 save-as-new-slot-tooltip = Write the changes into a new slot and keep this one as it is.
+save-as-new-slot-loose = This save is on its own, outside a profile, so there's no profile to add a slot to.
 new-slot-name = { $name } (edited)
 saved-as-new-title = Saved and checked as “{ $name }”
 saved-as-new-body = “{ $original }” is unchanged. You're now editing the new slot.

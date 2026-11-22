@@ -36,6 +36,9 @@ pub struct Profile {
 pub enum Location {
     SteamCloud,
     Local,
+    /// One save on its own, outside a profile (copied to the desktop, say): opened and saved
+    /// where it is, without the profile's other saves or its profile file.
+    Loose,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -300,27 +303,7 @@ fn location_of(root: &Path) -> Location {
 
 /// A profile's slots: the player's own saves first (newest first), then the game's.
 pub fn profile_slots(profile_dir: &Path) -> Vec<Slot> {
-    let mut slots: Vec<Slot> = slot_dirs(profile_dir)
-        .into_iter()
-        .map(|dir| {
-            let folder = dir
-                .file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or_default();
-            let info = std::fs::read(dir.join("info.sii"))
-                .ok()
-                .and_then(|bytes| sii::read(&bytes).ok())
-                .map(|document| SlotInfo::read(&document))
-                .unwrap_or_default();
-            Slot {
-                kind: SlotKind::from_folder(&folder),
-                modified: modified(&dir.join("game.sii")),
-                dir,
-                folder,
-                info,
-            }
-        })
-        .collect();
+    let mut slots: Vec<Slot> = slot_dirs(profile_dir).into_iter().map(read_slot).collect();
     slots.sort_by(|a, b| {
         b.kind
             .is_manual()
@@ -328,6 +311,44 @@ pub fn profile_slots(profile_dir: &Path) -> Vec<Slot> {
             .then(b.modified.cmp(&a.modified))
     });
     slots
+}
+
+/// A slot folder's summary: its kind, when it was saved, and its `info.sii`.
+fn read_slot(dir: PathBuf) -> Slot {
+    let folder = dir
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let info = std::fs::read(dir.join("info.sii"))
+        .ok()
+        .and_then(|bytes| sii::read(&bytes).ok())
+        .map(|document| SlotInfo::read(&document))
+        .unwrap_or_default();
+    Slot {
+        kind: SlotKind::from_folder(&folder),
+        modified: modified(&dir.join("game.sii")),
+        dir,
+        folder,
+        info,
+    }
+}
+
+/// A save on its own (`is_loose_save`), to open where it is: as a slot of a "profile" that is the
+/// save's own folder, so there's no profile file and no other slots, and its backups are kept
+/// under its folder's name. For ETS2 unless its path names ATS.
+pub fn loose_save(dir: &Path) -> Option<(Profile, Slot)> {
+    if !dir.join("game.sii").is_file() {
+        return None;
+    }
+    let slot = read_slot(dir.to_path_buf());
+    let profile = Profile {
+        game: game_of_folder(dir),
+        name: slot.folder.clone(),
+        dir: dir.to_path_buf(),
+        location: Location::Loose,
+        last_saved: slot.modified,
+    };
+    Some((profile, slot))
 }
 
 /// `416E6E61` → `Anna`. `None` when the folder name isn't hex text.
@@ -572,6 +593,11 @@ mod tests {
         std::fs::write(loose.join("game.sii"), "").expect("writes a save");
         assert!(profile_folders_at(&loose).is_empty());
         assert!(is_loose_save(&loose));
+        let (profile, slot) = loose_save(&loose).expect("opens on its own");
+        assert_eq!(profile.location, Location::Loose);
+        assert_eq!((slot.dir, slot.folder.as_str()), (loose.clone(), "13"));
+        assert!(profile_slots(&profile.dir).is_empty());
+        assert!(loose_save(&scratch.0).is_none());
         assert!(profile_folders_at(&scratch.0.join("not there")).is_empty());
 
         let mut found = profiles_in(Game::Ets2, &root, Location::Local);

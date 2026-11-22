@@ -54,7 +54,6 @@ start-folder-add = Dodaj folder…
 start-folder-drop = Albo upuść folder zapisu lub profilu na to okno.
 start-folder-choose = Wybierz folder z zapisami
 start-folder-not-saves = Brak zapisów lub profili w folderze: { $path }. Wybierz folder „profiles” gry, folder profilu albo zapisu.
-start-folder-loose-save = Ten folder to pojedynczy zapis poza profilem: { $path }. Edytor pracuje na zapisach w profilu (dla kopii zapasowych i zapisu w nowym slocie): przenieś folder do folderu save profilu albo dodaj cały profil.
 start-slot-missing = { $count ->
     [one] Wymaga DLC lub modyfikacji, której nie zainstalowano
     [few] Wymaga DLC lub modyfikacji, których nie zainstalowano: { $count }
@@ -65,6 +64,7 @@ profile-place = { $name } · { $place }
 profile-game-place = { $name } · { $game } · { $place }
 location-steam-cloud = Steam Cloud
 location-this-pc = Ten komputer
+location-loose = Pojedynczy zapis
 
 ## Save slot names (for saves without a name of their own)
 
@@ -159,6 +159,7 @@ save-confirm-title = Zapisać zmiany w zapisie „{ $name }”?
 cancel = Anuluj
 save-as-new-slot = Zapisz jako nowy slot
 save-as-new-slot-tooltip = Zapisz zmiany w nowym slocie, a ten zostaw bez zmian.
+save-as-new-slot-loose = Ten zapis jest poza profilem, więc nie ma profilu, do którego można dodać slot.
 new-slot-name = { $name } (edytowany)
 saved-as-new-title = Zapisano i sprawdzono jako nowy zapis „{ $name }”
 saved-as-new-body = Zapis „{ $original }” pozostał bez zmian. Teraz edytujesz nowy slot.

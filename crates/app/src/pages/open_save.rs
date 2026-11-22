@@ -219,7 +219,7 @@ impl OpenSavePage {
             return;
         };
         cx.spawn(async move |this, cx| {
-            let (chosen, roots, is_loose) = cx
+            let (chosen, roots, loose) = cx
                 .background_spawn(async move {
                     // A dropped file (a `game.sii`, say): the folder it's in.
                     let dir = if chosen.is_file() {
@@ -228,18 +228,25 @@ impl OpenSavePage {
                         chosen
                     };
                     let roots = save::profile_folders_at(&dir);
-                    let is_loose = save::is_loose_save(&dir);
-                    (dir, roots, is_loose)
+                    let loose = save::is_loose_save(&dir)
+                        .then(|| save::loose_save(&dir))
+                        .flatten();
+                    (dir, roots, loose)
                 })
                 .await;
             let _ = this.update(cx, |this, cx| {
+                // A save on its own: opened where it is (there are no folders to add).
+                if let Some((profile, slot)) = loose {
+                    this.add_problem = None;
+                    cx.emit(OpenSlot { profile, slot });
+                    return;
+                }
                 if roots.is_empty() {
-                    let path = chosen.to_string_lossy().into_owned();
-                    this.add_problem = Some(if is_loose {
-                        t!(cx, "start-folder-loose-save", path = path)
-                    } else {
-                        t!(cx, "start-folder-not-saves", path = path)
-                    });
+                    this.add_problem = Some(t!(
+                        cx,
+                        "start-folder-not-saves",
+                        path = chosen.to_string_lossy().into_owned()
+                    ));
                     cx.notify();
                     return;
                 }
@@ -352,7 +359,7 @@ impl OpenSavePage {
                 count = slots.len(),
                 name = &profile.name
             ),
-            save::Location::Local => t!(
+            save::Location::Local | save::Location::Loose => t!(
                 cx,
                 "start-showing-local",
                 count = slots.len(),
@@ -1066,15 +1073,24 @@ mod tests {
             assert!(crate::settings::get(cx).profile_dirs.is_empty());
         });
 
-        // A save on its own (copied to the desktop): said so, nothing added (not the folders
-        // around it).
+        // A save on its own (copied to the desktop): opened where it is, nothing added (not the
+        // folders around it).
+        let opened = std::rc::Rc::new(std::cell::RefCell::new(None));
+        cx.update(|cx| {
+            let opened = opened.clone();
+            cx.subscribe(&page, move |_, event: &OpenSlot, _| {
+                *opened.borrow_mut() = Some((event.profile.location, event.slot.dir.clone()));
+            })
+            .detach();
+        });
         let loose = scratch.0.join("desktop").join("13");
         std::fs::create_dir_all(&loose).expect("makes the loose save");
         std::fs::write(loose.join("game.sii"), "").expect("writes a save");
-        page.update(cx, |page, cx| page.add_folders(vec![loose], cx));
+        page.update(cx, |page, cx| page.add_folders(vec![loose.clone()], cx));
         cx.run_until_parked();
+        assert_eq!(*opened.borrow(), Some((save::Location::Loose, loose)));
         cx.update(|cx| {
-            assert!(page.read(cx).add_problem.is_some());
+            assert!(page.read(cx).add_problem.is_none());
             assert!(crate::settings::get(cx).profile_dirs.is_empty());
         });
 

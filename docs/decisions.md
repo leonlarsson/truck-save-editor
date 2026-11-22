@@ -236,3 +236,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** the editor already uses no account and sends nothing; a prefilled link keeps that, and puts what's needed to reproduce a problem in front of the player to check (an error can name a file) before they post it.
 
 **Considered:** sending reports from the editor (needs a server and consent, and would send data); an issue form template (its fields can't be filled from a link the same way).
+
+## 2026-11-22: A save on its own opens where it is
+
+**Decided:** a save folder outside any profile (copied to the desktop, downloaded), dropped on the start screen or chosen with Add a folder…, opens straight away and saves back where it is, backed up first like any save. It's a profile of its own (`Location::Loose`, "A save on its own"): no profile file, so no company name; no other slots, so Save as new slot is off with the reason and Save over another… has nothing to offer. A save inside a profile's `save` folder still adds that profile's folder instead.
+
+**Why:** the first version refused such saves because the editor was built around profiles, but nothing about editing a save needs one: the profile only adds the company name and the slots around it. Refusing sent people to move files around by hand.
+
+**Considered:** refusing with a message (the first version); copying the save into a profile first (writes where the player didn't ask).

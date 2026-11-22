@@ -108,6 +108,7 @@ pub fn location(cx: &App, location: Location) -> SharedString {
     match location {
         Location::SteamCloud => t!(cx, "location-steam-cloud"),
         Location::Local => t!(cx, "location-this-pc"),
+        Location::Loose => t!(cx, "location-loose"),
     }
 }
 
