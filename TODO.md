@@ -24,7 +24,9 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [x] Engines and transmissions from the game's data for a truck's model (2026-11-22; not tried in game yet).
 - [x] Make another truck your own; take the player to a city, the headquarters or another save's spot (2026-11-22).
 - [ ] In game: Drive it yourself, Take me to a city, Take me to headquarters, another save's spot. The trips rely on schedule_quick_travel and schedule_transfer_to_hq doing what their names say.
-- [ ] Make another trailer your own.
+- [x] Make another trailer your own (Pull it yourself, 2026-11-22; not tried in game yet).
+- [ ] In game: Your day (Rest, Clear the record, Repair the cargo, the clock buttons), Pull it yourself (2026-11-22, not tried in game yet).
+- [ ] In game: picked rows (bulk Repair, Fill the tanks, Move to garage, Remove, Max their skills, Make them large) and Save over another… on a Steam Cloud profile (2026-11-22, not tried in game yet).
 
 ## 4. Picking a save
 
@@ -60,7 +62,8 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [x] Company logos and cargo icons on Jobs (loaded as rows show, kept small).
 - [x] Pictures from DLC archives too (some cargo icons live there).
 - [x] Swedish, and the game's names in the app's language; Settings (language, appearance, game folder, backups).
-- [ ] More languages: a `Language`, a `locales/<code>.ftl` (the completeness test lists what's missing).
+- [x] German and Polish (2026-11-22), machine-drafted with the game's own terms.
+- [ ] A native speaker reviews `de.ftl` and `pl.ftl`. More languages: a `Language`, a `locales/<code>.ftl` (the completeness test lists what's missing).
 - [x] Coach garages: coaches have none. Fleet says where each is: driven now (`player.assigned_vehicles`) or parked in a city (`player.my_vehicles[]` → `stored_vehicle_city`).
 - [x] HQ city: pick from the cities the company has garages in (Garages page).
 - [x] City names from the game's city definitions (`city_name_localized`), not only by token: a few tokens (`vasteraas`) differ from their text keys.
@@ -80,6 +83,8 @@ Agreed work, in order. Each step should end with something the owner can see or 
 
 - [x] Save as a new slot: write the edited save into an empty slot instead of over the original.
 - [x] Quick start for a fresh career ("Rich start", "Everything unlocked", or your own picks), applied as one change to a new profile made in the game.
+- [x] Save over another save of the profile: the way to keep an edited copy in Steam Cloud, where new slots don't show (2026-11-22).
+- [ ] Experiment (owner, in game): the game starts a career from `def/initial_save/normal/game.sii` in `def.scs`, a few units with `economy.new_game: true` that the game fills in itself. Does a save made of just that template, saved over a spare slot of an existing profile, start a fresh career in that profile? If it does, "Start over" could be a button.
 
 ## Later
 
