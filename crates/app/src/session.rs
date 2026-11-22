@@ -91,8 +91,8 @@ struct Pending {
     drive_truck: Option<String>,
     /// Where to move the player's truck, and the save that position comes from (its name).
     move_to: Option<(save::Position, String)>,
-    /// A trip the game makes when the save loads (to a city, or to the headquarters).
-    trip: Option<save::Trip>,
+    /// Whether the game is asked for a free quick travel when the save loads.
+    quick_travel: bool,
     /// Changes to the player's day (rest, the police record, cargo damage, the clock, the
     /// trailer); a later one of the same kind replaces the earlier.
     player_edits: Vec<save::PlayerEdit>,
@@ -122,7 +122,7 @@ impl Pending {
             vehicle_edits: Vec::new(),
             drive_truck: None,
             move_to: None,
-            trip: None,
+            quick_travel: false,
             player_edits: Vec::new(),
         }
     }
@@ -648,7 +648,7 @@ impl Session {
             + self.pending.vehicle_edits.len()
             + usize::from(self.pending.drive_truck.is_some())
             + usize::from(self.pending.move_to.is_some())
-            + usize::from(self.pending.trip.is_some())
+            + usize::from(self.pending.quick_travel)
             + self.pending.player_edits.len()
             + usize::from(self.pending.forget_roads)
     }
@@ -786,7 +786,7 @@ impl Session {
     pub fn move_player(&mut self, to: save::Position, from: String, cx: &mut Context<Self>) {
         self.change(cx, |pending, _| {
             pending.move_to = Some((to, from));
-            pending.trip = None;
+            pending.quick_travel = false;
         });
     }
 
@@ -870,16 +870,24 @@ impl Session {
         save::can_take_trailer(&self.preview(), trailer)
     }
 
-    /// Whether the game can be asked to take the player somewhere.
+    /// Whether the game can be asked for a quick travel when the save loads.
     pub fn can_travel(&self) -> Result<(), save::PlayerProblem> {
         save::can_travel(&self.preview())
     }
 
-    /// Asks the game to take the player to a city or the headquarters when the save loads.
-    pub fn travel(&mut self, trip: save::Trip, cx: &mut Context<Self>) {
+    /// Whether a quick travel is asked for when the save loads.
+    pub fn quick_travel(&self) -> bool {
+        self.pending.quick_travel
+    }
+
+    /// Asks the game for a free quick travel when the save loads (or stops asking): the player
+    /// picks the city in the game (see `save::schedule_quick_travel`).
+    pub fn set_quick_travel(&mut self, on: bool, cx: &mut Context<Self>) {
         self.change(cx, |pending, _| {
-            pending.trip = Some(trip);
-            pending.move_to = None;
+            pending.quick_travel = on;
+            if on {
+                pending.move_to = None;
+            }
         });
     }
 
@@ -1354,20 +1362,16 @@ impl Session {
             };
             add(what, before, after);
         }
-        if let Some(trip) = &self.pending.trip {
+        if self.pending.quick_travel {
             let before = save::position(&self.loaded.game)
                 .and_then(|position| position.city)
                 .map(|city| SharedString::from(crate::game_data::city_name(cx, &city)))
                 .unwrap_or_else(|| t!(cx, "player-position-somewhere"));
-            let after = match trip {
-                save::Trip::City(city) => t!(
-                    cx,
-                    "player-trip-city",
-                    city = crate::game_data::city_name(cx, city)
-                ),
-                save::Trip::Headquarters => t!(cx, "player-trip-hq"),
-            };
-            add(t!(cx, "player-position"), before, after);
+            add(
+                t!(cx, "player-position"),
+                before,
+                t!(cx, "player-quick-travel-after"),
+            );
         }
         if self.pending.forget_roads {
             let (saved, _) = self.discovered_roads();
@@ -1492,8 +1496,8 @@ impl Session {
         if let Some((position, _)) = &self.pending.move_to {
             let _ = save::move_player(&mut slot.game, position);
         }
-        if let Some(trip) = &self.pending.trip {
-            let _ = save::schedule_trip(&mut slot.game, trip);
+        if self.pending.quick_travel {
+            let _ = save::schedule_quick_travel(&mut slot.game);
         }
         for edit in &self.pending.player_edits {
             save::apply_player_edit(&mut slot.game, edit);

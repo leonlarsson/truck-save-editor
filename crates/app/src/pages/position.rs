@@ -1,6 +1,6 @@
-//! Moving the player's truck, on the Map page: asking the game to take it to a city the player
-//! has been to or to the headquarters when the save loads (the game picks the spot), or to where
-//! it stands in another save of the same profile.
+//! Moving the player's truck, on the Map page: asking the game for a free quick travel when the
+//! save loads (the player picks any visited city in the game), or to where it stands in another
+//! save of the same profile.
 
 use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Sizable as _,
@@ -23,8 +23,6 @@ pub struct PositionPicker {
     /// The profile's other saves.
     slots: Vec<save::Slot>,
     select: Entity<SelectState<SearchableVec<SlotOption>>>,
-    /// The cities the player has been to, to travel to.
-    cities: Entity<SelectState<SearchableVec<SlotOption>>>,
     /// What's happening or what went wrong, if anything.
     status: Option<(SharedString, bool)>,
     _task: Option<Task<()>>,
@@ -52,34 +50,7 @@ impl PositionPicker {
         let select = cx.new(|cx| {
             SelectState::new(SearchableVec::new(items), None, window, cx).searchable(true)
         });
-        let mut visited: Vec<SlotOption> = session
-            .read(cx)
-            .cities()
-            .into_iter()
-            .filter(|city| city.visits > 0)
-            .map(|city| SlotOption {
-                name: crate::game_data::city_name(cx, &city.token).into(),
-                index: city.token.into(),
-            })
-            .collect();
-        visited.sort_by(|a, b| a.name.cmp(&b.name));
-        let cities = cx.new(|cx| {
-            SelectState::new(SearchableVec::new(visited), None, window, cx).searchable(true)
-        });
         let _subscriptions = vec![
-            cx.subscribe_in(
-                &cities,
-                window,
-                |this, _, event: &SelectEvent<SearchableVec<SlotOption>>, window, cx| {
-                    if let SelectEvent::Confirm(Some(city)) = event {
-                        let trip = save::Trip::City(city.to_string());
-                        this.session
-                            .update(cx, |session, cx| session.travel(trip, cx));
-                        this.cities
-                            .update(cx, |select, cx| select.set_selected_index(None, window, cx));
-                    }
-                },
-            ),
             cx.subscribe_in(
                 &select,
                 window,
@@ -100,7 +71,6 @@ impl PositionPicker {
             session,
             slots,
             select,
-            cities,
             status: None,
             _task: None,
             _subscriptions,
@@ -145,14 +115,20 @@ impl Render for PositionPicker {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let session = self.session.read(cx);
         let travel_problem = session.can_travel().err();
+        let is_travel_asked = session.quick_travel();
         let move_problem = session.can_move_player().err();
         let why = |problem: save::PlayerProblem, cx: &Context<Self>| match problem {
             save::PlayerProblem::OnJob => t!(cx, "player-why-on-job"),
             save::PlayerProblem::TrailerHitched => t!(cx, "player-move-hitched"),
-            _ => t!(cx, "player-trip-unavailable"),
+            _ => t!(cx, "player-quick-travel-unavailable"),
         };
         let muted = cx.theme().muted_foreground;
-        let note = travel_problem.map(|problem| why(problem, cx));
+        // Asked for: what happens when the save loads. Otherwise why it can't be, if it can't.
+        let note = if is_travel_asked {
+            Some(t!(cx, "player-quick-travel-asked"))
+        } else {
+            travel_problem.map(|problem| why(problem, cx))
+        };
         v_flex()
             .gap_1()
             .child(
@@ -160,25 +136,15 @@ impl Render for PositionPicker {
                     .gap_2()
                     .flex_wrap()
                     .child(
-                        div().w(rems(14.)).child(
-                            Select::new(&self.cities)
-                                .small()
-                                .placeholder(t!(cx, "player-trip-pick"))
-                                .disabled(travel_problem.is_some())
-                                .accessibility_label(t!(cx, "player-trip-pick")),
-                        ),
-                    )
-                    .child(
-                        Button::new("travel-hq")
+                        Button::new("quick-travel")
                             .small()
                             .outline()
-                            .label(t!(cx, "player-trip-hq-button"))
-                            .tooltip(t!(cx, "player-trip-tooltip"))
-                            .disabled(travel_problem.is_some())
+                            .label(t!(cx, "player-quick-travel"))
+                            .tooltip(t!(cx, "player-quick-travel-tooltip"))
+                            .disabled(travel_problem.is_some() || is_travel_asked)
                             .on_click(cx.listener(|this, _, _, cx| {
-                                this.session.update(cx, |session, cx| {
-                                    session.travel(save::Trip::Headquarters, cx)
-                                });
+                                this.session
+                                    .update(cx, |session, cx| session.set_quick_travel(true, cx));
                             })),
                     )
                     .child(

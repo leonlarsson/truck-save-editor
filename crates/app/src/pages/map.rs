@@ -338,15 +338,15 @@ impl Render for MapPage {
                     .and_then(|position| position.city)
                     .map(|city| game_data::city_name(cx, &city))
                     .unwrap_or_else(|| t!(cx, "player-position-somewhere").to_string());
-                h_flex()
-                    .gap_3()
-                    .flex_wrap()
+                // A column, so a note under the buttons doesn't move them.
+                v_flex()
+                    .gap_2()
                     .items_start()
-                    .child(div().pt_1().text_sm().child(t!(
-                        cx,
-                        "player-position-now",
-                        place = place
-                    )))
+                    .child(
+                        div()
+                            .text_sm()
+                            .child(t!(cx, "player-position-now", place = place)),
+                    )
                     .child(self.position.clone())
             })
             .child(self.filter.clone())

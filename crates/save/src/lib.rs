@@ -60,8 +60,8 @@ pub use player_state::{
     offences, time_of_day,
 };
 pub use player_vehicle::{
-    PlayerProblem, Position, Trip, can_drive, can_move_player, can_take_trailer, can_travel,
-    drive_truck, move_player, own_trailer, own_truck, position, schedule_trip,
+    PlayerProblem, Position, can_drive, can_move_player, can_take_trailer, can_travel, drive_truck,
+    move_player, own_trailer, own_truck, position, schedule_quick_travel,
 };
 pub use preview::{Picture, decode_tga};
 pub use profile_file::{

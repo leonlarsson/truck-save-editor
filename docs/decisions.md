@@ -244,3 +244,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** the first version refused such saves because the editor was built around profiles, but nothing about editing a save needs one: the profile only adds the company name and the slots around it. Refusing sent people to move files around by hand.
 
 **Considered:** refusing with a message (the first version); copying the save into a profile first (writes where the player didn't ask).
+
+## 2026-11-22: Quick travel when the save loads, instead of trips to a city or the headquarters
+
+**Decided:** the Map page has one button, Quick travel when the save loads, in place of Take me to a city… and Take me to headquarters. It sets the player's `schedule_quick_travel` (and turns `schedule_transfer_to_hq` off), and writes no city. It's off during a job, and for saves without the fields. This replaces the trip part of "The player's truck and where it stands" (2026-11-22).
+
+**Why:** tried in game on a Steam Cloud profile with a truck and a coach. With `schedule_quick_travel`, the game says "Game change detected" (unfinished deliveries cancelled without penalty, the vehicle moved to a safe place) and shows its quick travel map once for each of the player's vehicles, with every visited city to pick, at no cost. The city the editor wrote into the vehicle's `stored_vehicle_city` wasn't the destination: the player picks. `schedule_transfer_to_hq` did nothing at all (the player stayed where they were). So the honest feature is the game's own free quick travel, with the choice made in the game, and the button says what the player will see.
+
+**Considered:** keeping a city picker (the game ignores it); keeping Take me to headquarters (it does nothing).

@@ -298,18 +298,8 @@ pub fn move_player(document: &mut Document, to: &Position) -> Result<(), PlayerP
     Ok(())
 }
 
-/// A trip the game makes for the player when the save loads, as its own travel does: to a city
-/// (`schedule_quick_travel`, with the truck's city set to it) or to the headquarters
-/// (`schedule_transfer_to_hq`). The game picks the spot, so no position is guessed. Older saves
-/// without these fields can't.
-#[derive(Clone, Debug, PartialEq)]
-pub enum Trip {
-    /// To a city, by its token (`oslo`).
-    City(String),
-    Headquarters,
-}
-
-/// Whether the game can be asked for a trip, and if not, why.
+/// Whether the game can be asked for a quick travel when the save loads (see
+/// `schedule_quick_travel`), and if not, why.
 pub fn can_travel(document: &Document) -> Result<(), PlayerProblem> {
     if on_job(document) {
         return Err(PlayerProblem::OnJob);
@@ -326,29 +316,21 @@ pub fn can_travel(document: &Document) -> Result<(), PlayerProblem> {
     Ok(())
 }
 
-/// Asks the game for a trip when the save loads (see `Trip`).
-pub fn schedule_trip(document: &mut Document, trip: &Trip) -> Result<(), PlayerProblem> {
+/// Asks the game for a free quick travel when the save loads (`schedule_quick_travel`).
+///
+/// Found in game (2026-11-22): the game then says "Game change detected" (unfinished deliveries
+/// cancelled without penalty, the vehicle moved to a safe place) and shows its quick travel map
+/// once for each of the player's vehicles (the truck, then the coach with Coaches), with every
+/// visited city to pick from at no cost. The player picks: a city written into the vehicles'
+/// `stored_vehicle_city` isn't used, so none is written. Off during a job, which this would cancel.
+/// `schedule_transfer_to_hq` did nothing in the same test (the player stayed put), so it's only
+/// turned off here.
+pub fn schedule_quick_travel(document: &mut Document) -> Result<(), PlayerProblem> {
     can_travel(document)?;
     let player = player(document).ok_or(PlayerProblem::NoPosition)?;
-    match trip {
-        Trip::City(city) => {
-            if let Some(holder) = truck_vehicles(document)
-                && let Some(mut unit) = document.unit_mut(&holder)
-                && unit.get("stored_vehicle_city").is_some()
-            {
-                unit.set("stored_vehicle_city", Value::single(format!("city.{city}")));
-            }
-            if let Some(mut unit) = document.unit_mut(&player) {
-                unit.set("schedule_quick_travel", Value::single("true"));
-                unit.set("schedule_transfer_to_hq", Value::single("false"));
-            }
-        }
-        Trip::Headquarters => {
-            if let Some(mut unit) = document.unit_mut(&player) {
-                unit.set("schedule_transfer_to_hq", Value::single("true"));
-                unit.set("schedule_quick_travel", Value::single("false"));
-            }
-        }
+    if let Some(mut unit) = document.unit_mut(&player) {
+        unit.set("schedule_quick_travel", Value::single("true"));
+        unit.set("schedule_transfer_to_hq", Value::single("false"));
     }
     Ok(())
 }
@@ -393,32 +375,32 @@ mod tests {
     }
 
     #[test]
-    fn schedules_the_games_own_trips() {
+    fn asks_the_game_for_a_quick_travel() {
         let text = SAVE.replace(
             " current_job: null\r\n",
-            " current_job: null\r\n schedule_transfer_to_hq: false\r\n schedule_quick_travel: false\r\n",
+            " current_job: null\r\n schedule_transfer_to_hq: true\r\n schedule_quick_travel: false\r\n",
         );
         let mut document = sii::parse_text(&text).expect("parses");
-        assert_eq!(
-            schedule_trip(&mut document, &Trip::City("oslo".into())),
-            Ok(())
-        );
+        let city_before = document
+            .unit("pv.truck")
+            .and_then(|u| u.single("stored_vehicle_city"))
+            .map(str::to_string);
+        assert_eq!(schedule_quick_travel(&mut document), Ok(()));
         let player = document.unit("p").expect("player");
         assert_eq!(player.single("schedule_quick_travel"), Some("true"));
+        assert_eq!(player.single("schedule_transfer_to_hq"), Some("false"));
+        // No city is written: the player picks one in the game.
         assert_eq!(
             document
                 .unit("pv.truck")
-                .and_then(|u| u.single("stored_vehicle_city")),
-            Some("city.oslo")
+                .and_then(|u| u.single("stored_vehicle_city"))
+                .map(str::to_string),
+            city_before
         );
-        assert_eq!(schedule_trip(&mut document, &Trip::Headquarters), Ok(()));
-        let player = document.unit("p").expect("player");
-        assert_eq!(player.single("schedule_transfer_to_hq"), Some("true"));
-        assert_eq!(player.single("schedule_quick_travel"), Some("false"));
         // A save without the fields (older) says so instead of adding them.
         let mut older = sii::parse_text(SAVE).expect("parses");
         assert_eq!(
-            schedule_trip(&mut older, &Trip::Headquarters),
+            schedule_quick_travel(&mut older),
             Err(PlayerProblem::NoPosition)
         );
     }

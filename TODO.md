@@ -28,7 +28,8 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [x] Engines and transmissions from the game's data for a truck's model (2026-11-22; works in game).
 - [x] Make another truck your own; take the player to a city, the headquarters or another save's spot (2026-11-22).
 - [x] In game (2026-11-22): Drive it yourself (the truck appears where the player was), with an engine and transmission swap.
-- [ ] In game: Take me to a city, Take me to headquarters, another save's spot. The trips rely on schedule_quick_travel and schedule_transfer_to_hq doing what their names say.
+- [x] In game (2026-11-22): `schedule_quick_travel` makes the game say "Game change detected" and offer its quick travel map for each of the player's vehicles (any visited city, free); the city the editor wrote wasn't used. `schedule_transfer_to_hq` did nothing. Now one button, Quick travel when the save loads; Take me to a city and Take me to headquarters are gone.
+- [ ] In game: another save's spot (Where another save is…). Note it writes `my_vehicles`' truck entry, while the game's active one is `player.assigned_vehicles`, a separate unit: check it moves the truck.
 - [x] Make another trailer your own (Pull it yourself, 2026-11-22; not tried in game yet).
 - [x] In game (2026-11-22): Rest and the clock (Evening) on a Steam Cloud profile.
 - [ ] In game: Clear the record, Repair the cargo (none to try yet), Pull it yourself.
