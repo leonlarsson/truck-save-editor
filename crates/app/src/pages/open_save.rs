@@ -372,7 +372,7 @@ impl OpenSavePage {
                     .icon(Icon::new(IconName::FolderOpen))
                     .label(t!(cx, "start-folder-show"))
                     .tooltip(SharedString::from(folder.to_string_lossy().into_owned()))
-                    .on_click(move |_, _, cx| cx.reveal_path(&folder)),
+                    .on_click(move |_, _, cx| cx.open_with_system(&folder)),
             )
     }
 
@@ -963,7 +963,8 @@ fn path_text(path: &std::path::Path, cx: &Context<OpenSavePage>) -> impl IntoEle
         .child(path.to_string_lossy().into_owned())
 }
 
-/// Opens a folder in the system's file manager.
+/// Opens the folder itself in the system's file manager (revealing would open the one around
+/// it, with this one selected).
 fn show_folder_button(
     id: impl Into<gpui_kit::ElementId>,
     dir: PathBuf,
@@ -975,7 +976,7 @@ fn show_folder_button(
         .icon(Icon::new(IconName::FolderOpen))
         .tooltip(t!(cx, "start-folder-show"))
         .accessibility_label(t!(cx, "start-folder-show"))
-        .on_click(move |_, _, cx| cx.reveal_path(&dir))
+        .on_click(move |_, _, cx| cx.open_with_system(&dir))
 }
 
 /// One place looked in: whether it held profiles (a check, or a dash), its name, what was there,
