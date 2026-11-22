@@ -103,7 +103,7 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [x] Save over another save of the profile: the way to keep an edited copy in Steam Cloud, where new slots don't show (2026-11-22).
 - [ ] Experiment (owner, in game): the game starts a career from `def/initial_save/normal/game.sii` in `def.scs`, a few units with `economy.new_game: true` that the game fills in itself. Does a save made of just that template, saved over a spare slot of an existing profile, start a fresh career in that profile? If it does, "Start over" could be a button.
 
-- [ ] In game: Discover every road (2026-11-22). The map scan finds 335,623 roads and junctions (base map and map DLCs) while the save's explored ratio implies the game counts about 179,000, and 9,341 of a save's 53,344 discovered ids aren't among those found. Check the world map and the exploration percentage; narrow down which items count if it isn't about 100 %.
+- [x] In game (2026-11-22): Discover every road gives 100.00 % explored, in every country. The scan finds more items than the game counts (335,623 vs about 179,000); the extra ids are ignored.
 - [ ] A map of the roads in the app: a dot for each road or junction (from the same scan's boxes), coloured by discovered.
 
 ## Later
