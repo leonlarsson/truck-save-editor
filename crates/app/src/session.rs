@@ -939,13 +939,32 @@ impl Session {
 
     /// Forgets every road driven.
     pub fn forget_roads(&mut self, cx: &mut Context<Self>) {
-        self.change(cx, |pending, _| pending.roads = Some(RoadsChange::Forget));
+        // None driven on disk: forgetting them is no change (an earlier Discover is dropped).
+        let is_as_saved = save::discovered_roads(&self.loaded.game) == 0;
+        self.change(cx, |pending, _| {
+            pending.roads = (!is_as_saved).then_some(RoadsChange::Forget)
+        });
     }
 
     /// Marks every road and junction on the map (`ids`, from the game's map) as driven.
     pub fn discover_roads(&mut self, ids: Arc<Vec<u64>>, cx: &mut Context<Self>) {
+        // Every one already driven on disk: no change (an earlier Forget is dropped), so the save
+        // isn't counted as changed with nothing to show.
+        let saved: std::collections::HashSet<u64> = self
+            .loaded
+            .game
+            .first_of_kind("economy")
+            .map(|economy| {
+                economy
+                    .items("discovered_items")
+                    .iter()
+                    .filter_map(|id| id.parse().ok())
+                    .collect()
+            })
+            .unwrap_or_default();
+        let is_as_saved = ids.iter().all(|id| saved.contains(id));
         self.change(cx, |pending, _| {
-            pending.roads = Some(RoadsChange::DiscoverAll(ids))
+            pending.roads = (!is_as_saved).then_some(RoadsChange::DiscoverAll(ids))
         });
     }
 

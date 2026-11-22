@@ -719,6 +719,7 @@ change-km = { $km } km
 change-tonnes = { $tonnes } t
 change-wear = Zużycie: { $part }
 change-on = Jest
+changes-none = Nic nie różni się od zapisu na dysku.
 roads-what = Odwiedzone drogi
 roads-count = { $count ->
     [one] Jeden odcinek drogi

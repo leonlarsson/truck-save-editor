@@ -683,6 +683,7 @@ change-km = { $km } km
 change-tonnes = { $tonnes } t
 change-wear = { $part } wear
 change-on = On
+changes-none = Nothing differs from the save on disk.
 roads-what = Visited roads
 roads-count = { $count ->
     [one] One road piece

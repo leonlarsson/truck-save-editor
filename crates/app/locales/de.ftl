@@ -687,6 +687,7 @@ change-km = { $km } km
 change-tonnes = { $tonnes } t
 change-wear = Verschleiß: { $part }
 change-on = An
+changes-none = Nichts unterscheidet sich vom Spielstand auf der Festplatte.
 roads-what = Befahrene Straßen
 roads-count = { $count ->
     [one] Ein Straßenstück

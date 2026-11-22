@@ -580,3 +580,20 @@ fn picked_rows_are_acted_on_together_in_one_undo(cx: &mut TestAppContext) {
         "one Undo takes back the whole removal"
     );
 }
+
+#[gpui_kit::test]
+fn road_changes_that_leave_the_save_as_it_is_are_no_change(cx: &mut TestAppContext) {
+    let slot = TempSlot::new("roads");
+    let (_, workspace) = open(cx, &slot);
+    let session = session(&workspace, cx);
+    // The made-up save has no roads driven: forgetting them, or discovering none, changes nothing.
+    session.update(cx, |session, cx| session.forget_roads(cx));
+    cx.run_until_parked();
+    assert_eq!(change_count(&workspace, cx), 0);
+    session.update(cx, |session, cx| {
+        session.discover_roads(std::sync::Arc::new(Vec::new()), cx)
+    });
+    cx.run_until_parked();
+    assert_eq!(change_count(&workspace, cx), 0);
+    cx.update(|cx| assert!(session.read(cx).changes(cx).is_empty()));
+}

@@ -37,6 +37,14 @@ fn grouped(changes: Vec<Change>) -> Vec<(SharedString, Vec<Change>)> {
 
 impl RenderOnce for ChangeList {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
+        // Nothing to list (changes that undo each other): say so rather than show an empty frame.
+        if self.changes.is_empty() {
+            return div()
+                .text_sm()
+                .text_color(cx.theme().muted_foreground)
+                .child(crate::i18n::t!(cx, "changes-none"))
+                .into_any_element();
+        }
         let muted = cx.theme().muted_foreground;
         let foreground = cx.theme().foreground;
         let danger = cx.theme().danger;
@@ -94,6 +102,7 @@ impl RenderOnce for ChangeList {
                             .into_any_element()
                     }))
             }))
+            .into_any_element()
     }
 }
 

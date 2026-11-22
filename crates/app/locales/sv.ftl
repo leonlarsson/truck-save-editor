@@ -683,6 +683,7 @@ change-km = { $km } km
 change-tonnes = { $tonnes } t
 change-wear = Slitage: { $part }
 change-on = På
+changes-none = Inget skiljer sig från sparfilen på disken.
 roads-what = Besökta vägar
 roads-count = { $count ->
     [one] En vägbit
