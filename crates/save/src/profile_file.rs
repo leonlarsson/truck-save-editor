@@ -13,11 +13,27 @@ use sii::{Document, Value, value};
 const COMPANY_NAME: &str = "company_name";
 const PROFILE_NAME: &str = "profile_name";
 const CACHED_EXPERIENCE: &str = "cached_experience";
+/// Odds and ends the game keeps for the profile; `user_data[1]` is the plate set on World of
+/// Trucks (`TEXT|_sweden`), which the game puts back on the player's truck each time a save loads.
+const USER_DATA: &str = "user_data";
 
 fn user_profile_id(document: &Document) -> Option<String> {
     document
         .first_of_kind("user_profile")
         .map(|unit| unit.id.clone())
+}
+
+/// The plate set on World of Trucks, by its text (`None` when there's none). The game puts it on
+/// the truck that carries it each time a save loads, whatever the save says (found in game,
+/// 2026-11-22: a coloured plate on that truck came back plain, with the World of Trucks text and
+/// country, while other trucks kept theirs).
+pub fn world_of_trucks_plate(document: &Document) -> Option<String> {
+    let unit = document.first_of_kind("user_profile")?;
+    let entry = unit.items(USER_DATA).get(1)?.clone();
+    let entry = value::parse_string(&entry).into_owned();
+    let (text, _country) = entry.split_once('|')?;
+    let text = text.trim();
+    (!text.is_empty()).then(|| text.to_string())
 }
 
 /// The company's name, as the player typed it in the game.
@@ -134,6 +150,17 @@ pub use disk::{load_profile_file, save_profile_file};
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn reads_the_world_of_trucks_plate() {
+        let with = "SiiNunit\r\n{\r\nuser_profile : p {\r\n user_data: 2\r\n user_data[0]: \"\"\r\n user_data[1]: \"AB 12|_france\"\r\n}\r\n\r\n}\r\n";
+        let document = sii::parse_text(with).expect("parses");
+        assert_eq!(world_of_trucks_plate(&document).as_deref(), Some("AB 12"));
+        let without = with.replace("AB 12|_france", "");
+        let document = sii::parse_text(&without).expect("parses");
+        assert_eq!(world_of_trucks_plate(&document), None);
+    }
+
     use super::*;
 
     /// A made-up profile; the login fields hold invented placeholders.

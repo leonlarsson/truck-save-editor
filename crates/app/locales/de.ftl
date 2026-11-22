@@ -692,6 +692,7 @@ map-forget-roads-tooltip = Die entdeckten Straßen der Karte beginnen von vorn, 
 # Truck and trailer details
 plate-colours = Kennzeichenfarben
 plate-colours-pick = Wählen…
+plate-world-of-trucks = Dieser Lkw trägt dein World-of-Trucks-Kennzeichen, das das Spiel bei jedem Laden wieder anbringt. Ändere es auf World of Trucks: My page → Profile customization (Game default überlässt das Kennzeichen wieder dem Spiel).
 plate-plain = Das Kennzeichen des Spiels
 plate-black-on-yellow = Schwarz auf Gelb
 plate-black-on-white = Schwarz auf Weiß

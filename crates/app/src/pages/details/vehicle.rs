@@ -505,6 +505,13 @@ impl Render for VehicleDetail {
         let load = (vehicle.kind == VehicleKind::Trailer)
             .then(|| self.session.read(cx).trailer_load(&self.id))
             .flatten();
+        // The truck carrying the World of Trucks plate: the game puts that plate back on load.
+        let has_world_of_trucks_plate = vehicle.kind != VehicleKind::Trailer
+            && self
+                .session
+                .read(cx)
+                .world_of_trucks_plate()
+                .is_some_and(|plate| plate.trim().eq_ignore_ascii_case(vehicle.plate.trim()));
         v_flex()
             .pt_2()
             .gap_6()
@@ -514,7 +521,11 @@ impl Render for VehicleDetail {
                     .gap_1()
                     .child(fact(
                         t!(cx, "column-plate"),
-                        div().w(rems(11.)).child(Input::new(&self.plate).small()),
+                        div().w(rems(11.)).child(
+                            Input::new(&self.plate)
+                                .small()
+                                .disabled(has_world_of_trucks_plate),
+                        ),
                         cx,
                     ))
                     .child(fact(
@@ -522,10 +533,17 @@ impl Render for VehicleDetail {
                         div().w(rems(11.)).child(
                             Select::new(&self.plate_colours)
                                 .small()
+                                .disabled(has_world_of_trucks_plate)
                                 .placeholder(t!(cx, "plate-colours-pick")),
                         ),
                         cx,
                     ))
+                    .children(has_world_of_trucks_plate.then(|| {
+                        div()
+                            .text_xs()
+                            .text_color(cx.theme().muted_foreground)
+                            .child(t!(cx, "plate-world-of-trucks"))
+                    }))
                     .child(match &self.garage {
                         Some(picker) => {
                             fact(t!(cx, "column-garage"), picker.clone(), cx).into_any_element()

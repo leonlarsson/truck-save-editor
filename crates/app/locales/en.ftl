@@ -688,6 +688,7 @@ map-forget-roads-tooltip = The map's discovered roads start over, as on a new pr
 # Truck and trailer details
 plate-colours = Plate colours
 plate-colours-pick = Choose…
+plate-world-of-trucks = This truck carries your World of Trucks plate, which the game puts back every time a save loads. Change it on World of Trucks: My page → Profile customization (Game default gives the plate back to the game).
 plate-plain = The game's own plate
 plate-black-on-yellow = Black on yellow
 plate-black-on-white = Black on white

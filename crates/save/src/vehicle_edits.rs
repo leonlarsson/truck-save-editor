@@ -300,11 +300,12 @@ pub fn apply_vehicle_edit(document: &mut Document, edit: &VehicleEdit) -> bool {
 /// background colour and the text centred on it, in the game's markup. Characters the markup uses
 /// (`<`, `>`, `|`) are left out of the text.
 ///
-/// What the game draws (found in game, 2026-11-22): the colour is set before the background
-/// image, which takes it (the image's own `color=` was ignored on a Swedish plate); a negative
-/// margin lets the fill cover the plate's edge; and the plate is written as a Belgian one, whose
-/// definition adds no layout of its own (Sweden's, for one, offsets and aligns the text, which
-/// pushes a fill out of place). So a coloured plate's country is Belgium.
+/// Found in game (2026-11-22): this form, written as a Belgian plate, shows coloured front and
+/// back, and stays when the player takes the truck. The colour comes before the background image,
+/// which takes it, and a negative margin lets the fill cover the plate's edge. The Belgian plate's
+/// definition adds no layout of its own (Sweden's, for one, offsets and aligns its text). Whether
+/// a plate keeps its own country this way is untried: the first test was on the truck carrying
+/// the World of Trucks plate, which the game puts back on load (`world_of_trucks_plate`).
 pub fn coloured_plate(text: &str, background: [u8; 3], letters: [u8; 3]) -> String {
     let text: String = text
         .chars()

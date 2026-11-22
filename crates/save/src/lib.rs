@@ -66,6 +66,7 @@ pub use player_vehicle::{
 pub use preview::{Picture, decode_tga};
 pub use profile_file::{
     company_name, profile_name, set_cached_experience, set_company_name, set_profile_name,
+    world_of_trucks_plate,
 };
 #[cfg(feature = "native")]
 pub use profile_file::{load_profile_file, save_profile_file};
