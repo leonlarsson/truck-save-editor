@@ -725,7 +725,7 @@ map-forget-roads-tooltip = Odkryte drogi na mapie zaczynają się od nowa, jak n
 # Truck and trailer details
 plate-colours = Kolory tablicy
 plate-colours-pick = Wybierz…
-plate-world-of-trucks = Ta ciężarówka ma tablicę z World of Trucks, którą gra przywraca przy każdym wczytaniu zapisu. Zmień ją na World of Trucks: My page → Profile customization (Game default oddaje tablicę z powrotem grze).
+plate-world-of-trucks = Twoja ciężarówka zawsze ma tablicę z World of Trucks: gra zakłada ją na ciężarówkę, która jest twoja, przy każdym wczytaniu zapisu. Zmień ją na World of Trucks: My page → Profile customization (Game default oddaje tablicę z powrotem grze).
 plate-plain = Tablica z gry
 plate-black-on-yellow = Czarne na żółtym
 plate-black-on-white = Czarne na białym

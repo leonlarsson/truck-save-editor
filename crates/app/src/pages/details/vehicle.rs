@@ -505,13 +505,14 @@ impl Render for VehicleDetail {
         let load = (vehicle.kind == VehicleKind::Trailer)
             .then(|| self.session.read(cx).trailer_load(&self.id))
             .flatten();
-        // The truck carrying the World of Trucks plate: the game puts that plate back on load.
-        let has_world_of_trucks_plate = vehicle.kind != VehicleKind::Trailer
-            && self
-                .session
-                .read(cx)
-                .world_of_trucks_plate()
-                .is_some_and(|plate| plate.trim().eq_ignore_ascii_case(vehicle.plate.trim()));
+        // Your truck, when the profile has a World of Trucks plate: the game puts that plate on
+        // whichever truck is yours each time a save loads (found in game, 2026-11-22), so its
+        // plate can't be changed here. It goes by the truck that's yours after the changes.
+        let has_world_of_trucks_plate = vehicle.kind == VehicleKind::Truck && {
+            let session = self.session.read(cx);
+            session.world_of_trucks_plate().is_some()
+                && session.own_truck().as_deref() == Some(self.id.as_str())
+        };
         v_flex()
             .pt_2()
             .gap_6()

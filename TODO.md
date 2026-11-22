@@ -25,9 +25,10 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [ ] In game: trailer cargo weight (only shows while the trailer is on a job) and empty weight; whether a coloured plate can keep its own country.
 - [ ] A picker for each badge spot (front `f_badge`, sides `badge`, chassis logo `f_chs_logo`, others) from the game's own accessories, with "none" where the game has one, instead of only removing the side badge.
 - [ ] In game: a renamed profile, a copied profile in the game's list, copied settings, the developer console and 128-truck convoys (2026-11-22, not tried in game yet).
-- [x] Engines and transmissions from the game's data for a truck's model (2026-11-22; not tried in game yet).
+- [x] Engines and transmissions from the game's data for a truck's model (2026-11-22; works in game).
 - [x] Make another truck your own; take the player to a city, the headquarters or another save's spot (2026-11-22).
-- [ ] In game: Drive it yourself, Take me to a city, Take me to headquarters, another save's spot. The trips rely on schedule_quick_travel and schedule_transfer_to_hq doing what their names say.
+- [x] In game (2026-11-22): Drive it yourself (the truck appears where the player was), with an engine and transmission swap.
+- [ ] In game: Take me to a city, Take me to headquarters, another save's spot. The trips rely on schedule_quick_travel and schedule_transfer_to_hq doing what their names say.
 - [x] Make another trailer your own (Pull it yourself, 2026-11-22; not tried in game yet).
 - [x] In game (2026-11-22): Rest and the clock (Evening) on a Steam Cloud profile.
 - [ ] In game: Clear the record, Repair the cargo (none to try yet), Pull it yourself.

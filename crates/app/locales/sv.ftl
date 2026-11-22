@@ -688,7 +688,7 @@ map-forget-roads-tooltip = Kartans upptäckta vägar börjar om, som på en ny p
 # Truck and trailer details
 plate-colours = Skyltens färger
 plate-colours-pick = Välj…
-plate-world-of-trucks = Den här lastbilen har din World of Trucks-skylt, som spelet sätter tillbaka varje gång en sparfil laddas. Ändra den på World of Trucks: My page → Profile customization (Game default lämnar tillbaka skylten till spelet).
+plate-world-of-trucks = Din lastbil har alltid din World of Trucks-skylt: spelet sätter den på den lastbil som är din varje gång en sparfil laddas. Ändra den på World of Trucks: My page → Profile customization (Game default lämnar tillbaka skylten till spelet).
 plate-plain = Spelets egen skylt
 plate-black-on-yellow = Svart på gult
 plate-black-on-white = Svart på vitt

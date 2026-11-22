@@ -566,8 +566,8 @@ impl Session {
         });
     }
 
-    /// The plate set on World of Trucks, by its text: the game puts it back on the truck carrying it
-    /// whenever a save loads, so that truck's plate can't be changed here.
+    /// The plate set on World of Trucks, by its text: the game puts it on whichever truck is the
+    /// player's whenever a save loads, so that truck's plate can't be changed here.
     pub fn world_of_trucks_plate(&self) -> Option<String> {
         self.profile_file
             .as_ref()

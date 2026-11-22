@@ -24,9 +24,10 @@ fn user_profile_id(document: &Document) -> Option<String> {
 }
 
 /// The plate set on World of Trucks, by its text (`None` when there's none). The game puts it on
-/// the truck that carries it each time a save loads, whatever the save says (found in game,
-/// 2026-11-22: a coloured plate on that truck came back plain, with the World of Trucks text and
-/// country, while other trucks kept theirs).
+/// whichever truck is the player's each time a save loads, whatever the save says (found in
+/// game, 2026-11-22: a coloured plate on the player's truck came back plain with the World of
+/// Trucks text and country, while other trucks kept theirs; and a truck made the player's in the
+/// editor got the World of Trucks plate on the next load).
 pub fn world_of_trucks_plate(document: &Document) -> Option<String> {
     let unit = document.first_of_kind("user_profile")?;
     let entry = unit.items(USER_DATA).get(1)?.clone();
