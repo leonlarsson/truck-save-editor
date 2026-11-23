@@ -30,6 +30,7 @@ pub enum PaletteCommand {
     UpgradeOwnedGarages,
     MaxAllDrivers,
     VisitEveryCity,
+    VisitEveryViewpoint,
     SavedColours,
     NewJob,
     PerfectCoachSatisfaction,
@@ -67,6 +68,7 @@ fn groups(has_coaches: bool) -> Vec<Vec<PaletteCommand>> {
         PaletteCommand::UpgradeOwnedGarages,
         PaletteCommand::MaxAllDrivers,
         PaletteCommand::VisitEveryCity,
+        PaletteCommand::VisitEveryViewpoint,
         PaletteCommand::UnlockDealers,
         PaletteCommand::UnlockRecruitments,
         PaletteCommand::KeepOffers,
@@ -183,6 +185,11 @@ fn item(command: PaletteCommand, cx: &App) -> CommandItem {
             t!(cx, "map-visit-all"),
             IconName::Map,
             &["cities", "map", "discover"],
+        ),
+        PaletteCommand::VisitEveryViewpoint => (
+            t!(cx, "gallery-visit-all"),
+            IconName::Eye,
+            &["viewpoints", "gallery", "cutscene", "discover"],
         ),
         PaletteCommand::UnlockDealers => (
             t!(cx, "map-unlock-dealers"),

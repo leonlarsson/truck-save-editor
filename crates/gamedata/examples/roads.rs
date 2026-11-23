@@ -39,6 +39,32 @@ fn main() {
             "{} defined cities have no area on the map: {missing:?}",
             missing.len()
         );
+        // The photo album's viewpoints and photo trophies the scan placed on the map.
+        let album = &data.photo_album;
+        let viewpoints = album
+            .viewpoints
+            .iter()
+            .filter(|item| {
+                map.markers.iter().any(|marker| {
+                    matches!(marker, gamedata::MapMarker::Viewpoint { item: id, .. } if item.map_items.contains(id))
+                })
+            })
+            .count();
+        let landmarks = album
+            .landmarks
+            .iter()
+            .filter(|item| {
+                map.markers.iter().any(|marker| {
+                    matches!(marker, gamedata::MapMarker::Landmark { id, .. } if *id == item.id)
+                })
+            })
+            .count();
+        println!(
+            "on the map: {viewpoints} of {} viewpoints, {landmarks} of {} photo trophies ({} markers found)",
+            album.viewpoints.len(),
+            album.landmarks.len(),
+            map.markers.len()
+        );
         // `--list`: every defined city, its DLC and whether it has a map area, tab separated.
         if std::env::args().any(|arg| arg == "--list") {
             for (token, dlc) in data.cities() {

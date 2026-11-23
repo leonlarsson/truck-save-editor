@@ -26,6 +26,18 @@ const PREFAB: u32 = 4;
 /// city.
 const CITY_AREA: u32 = 12;
 const GARAGE: u32 = 22;
+/// A cutscene (a viewpoint when its type, the low bits of its flags, is 0) and a map overlay (a
+/// photo trophy's landmark when its type, the flags' first byte, is 4). Every item's head holds,
+/// after the box, its flags (`u32`) and a view distance (`u8`): 57 bytes in all; a landmark
+/// overlay's name (the photo trophy's id, a token) comes right after (documented by the community
+/// for map format 907, and checked against the game's own lists: every viewpoint's map item and
+/// every photo trophy's name are found).
+const CUTSCENE: u32 = 46;
+const MAP_OVERLAY: u32 = 18;
+const FLAGS_AT: usize = 52;
+const OVERLAY_NAME_AT: usize = 57;
+const VIEWPOINT_TYPE: u32 = 0;
+const LANDMARK_OVERLAY: u32 = 4;
 /// Where a city area or garage names its city: the city's token, this many bytes into the item
 /// (found in sector format 907: Berlin, Oslo, Paris and London at the same place).
 const CITY_TOKEN_AT: usize = 57;
@@ -77,12 +89,21 @@ pub enum MapPlaceKind {
     Garage,
 }
 
-/// What the map holds that the editor shows: every road and junction (by id, each once), and the
-/// cities' areas and garages.
+/// A viewpoint or a photo trophy on the map: its viewpoint's cutscene item, or its photo
+/// trophy's id (the landmark overlay's name), and where it is.
+#[derive(Clone, Debug, PartialEq)]
+pub enum MapMarker {
+    Viewpoint { item: u64, x: f32, z: f32 },
+    Landmark { id: String, x: f32, z: f32 },
+}
+
+/// What the map holds that the editor shows: every road and junction (by id, each once), the
+/// cities' areas and garages, and the viewpoints and photo trophies.
 #[derive(Clone, Debug, Default)]
 pub struct MapContents {
     pub roads: Vec<MapRoad>,
     pub places: Vec<MapPlace>,
+    pub markers: Vec<MapMarker>,
 }
 
 /// Every road and junction id on the map of the installed game and its map DLCs, sorted. Empty
@@ -104,6 +125,7 @@ pub fn map_contents(game: Game, install_dir: &Path) -> MapContents {
     let folder = map_folder(game);
     let mut roads: Vec<MapRoad> = Vec::new();
     let mut places: Vec<MapPlace> = Vec::new();
+    let mut markers: Vec<MapMarker> = Vec::new();
     for path in crate::archives_after(install_dir, "base_map.scs") {
         let Ok(mut archive) = hashfs::Archive::open(&path) else {
             continue;
@@ -113,15 +135,20 @@ pub fn map_contents(game: Game, install_dir: &Path) -> MapContents {
         };
         for file in listing.files.iter().filter(|name| name.ends_with(".base")) {
             if let Ok(Some(bytes)) = archive.read(&format!("{folder}/{file}")) {
-                let (sector_roads, sector_places) = sector_contents(&bytes);
+                let (sector_roads, sector_places, sector_markers) = sector_contents(&bytes);
                 roads.extend(sector_roads);
                 places.extend(sector_places);
+                markers.extend(sector_markers);
             }
         }
     }
     roads.sort_unstable_by_key(|road| road.id);
     roads.dedup_by_key(|road| road.id);
-    MapContents { roads, places }
+    MapContents {
+        roads,
+        places,
+        markers,
+    }
 }
 
 /// The roads and junctions in one sector's `.base` file.
@@ -129,13 +156,16 @@ pub fn sector_roads(bytes: &[u8]) -> Vec<MapRoad> {
     sector_contents(bytes).0
 }
 
-/// The roads, junctions, city areas and garages in one sector's `.base` file.
-pub fn sector_contents(bytes: &[u8]) -> (Vec<MapRoad>, Vec<MapPlace>) {
+/// The roads, junctions, city areas and garages, viewpoints and landmarks in one sector's `.base`
+/// file. Viewpoints and landmarks are only as good as the match: the app keeps those the game's
+/// photo album names, so a stray match never shows.
+pub fn sector_contents(bytes: &[u8]) -> (Vec<MapRoad>, Vec<MapPlace>, Vec<MapMarker>) {
     let item_count = read_u32(bytes, ITEM_COUNT_AT).unwrap_or(0) as usize;
     let mut seen: HashSet<u64> = HashSet::new();
     let mut seen_places: HashSet<u64> = HashSet::new();
     let mut roads = Vec::new();
     let mut places = Vec::new();
+    let mut markers = Vec::new();
     let mut at = HEADER_LENGTH;
     // The header's count caps the roads found, as a guard against stray matches; places (which
     // only label the map) don't use it up, so no road is missed for them.
@@ -152,12 +182,34 @@ pub fn sector_contents(bytes: &[u8]) -> (Vec<MapRoad>, Vec<MapPlace>) {
                 (item.low[0] + item.high[0]) / 2.0,
                 (item.low[2] + item.high[2]) / 2.0,
             );
+            let flags = read_u32(bytes, at + FLAGS_AT).unwrap_or(u32::MAX);
             match item.kind {
                 ROAD | PREFAB => roads.push(MapRoad {
                     id: item.id,
                     x: middle.0,
                     z: middle.1,
                 }),
+                CUTSCENE => {
+                    if flags & 0x0F == VIEWPOINT_TYPE {
+                        markers.push(MapMarker::Viewpoint {
+                            item: item.id,
+                            x: middle.0,
+                            z: middle.1,
+                        });
+                    }
+                }
+                MAP_OVERLAY => {
+                    let name = read_u64(bytes, at + OVERLAY_NAME_AT).and_then(decode_token);
+                    if flags & 0xFF == LANDMARK_OVERLAY
+                        && let Some(id) = name
+                    {
+                        markers.push(MapMarker::Landmark {
+                            id,
+                            x: middle.0,
+                            z: middle.1,
+                        });
+                    }
+                }
                 kind => {
                     if let Some(city) = read_u64(bytes, at + CITY_TOKEN_AT).and_then(decode_token) {
                         places.push(MapPlace {
@@ -178,7 +230,7 @@ pub fn sector_contents(bytes: &[u8]) -> (Vec<MapRoad>, Vec<MapPlace>) {
         }
         at += 1;
     }
-    (roads, places)
+    (roads, places, markers)
 }
 
 /// The start of an item the editor reads.
@@ -193,7 +245,7 @@ struct Item {
 fn item_at(bytes: &[u8], at: usize) -> Option<Item> {
     let kind = read_u32(bytes, at)?;
     let largest = match kind {
-        ROAD | PREFAB | GARAGE => LARGEST_ITEM,
+        ROAD | PREFAB | GARAGE | CUTSCENE | MAP_OVERLAY => LARGEST_ITEM,
         CITY_AREA => LARGEST_CITY_AREA,
         _ => return None,
     };
@@ -210,7 +262,9 @@ fn item_at(bytes: &[u8], at: usize) -> Option<Item> {
         .all(|value| value.is_finite() && value.abs() < FARTHEST);
     let is_box = (0..3).all(|axis| low[axis] <= high[axis] && high[axis] - low[axis] < largest);
     // Some extent on the ground: a box of a single point is no road.
-    let has_area = (high[0] - low[0]) + (high[2] - low[2]) > 0.5;
+    // Some extent on the ground for roads and areas; a viewpoint or a landmark can be a point.
+    let has_area =
+        (high[0] - low[0]) + (high[2] - low[2]) > 0.5 || matches!(kind, CUTSCENE | MAP_OVERLAY);
     (plausible && is_box && has_area).then_some(Item {
         kind,
         id,

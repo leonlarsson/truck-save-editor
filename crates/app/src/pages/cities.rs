@@ -1,32 +1,30 @@
-//! Map: every city, how often the player has been there, and its truck dealer and recruitment
-//! agency (if it has them) and whether they're unlocked, as a list or on the map. Visit every city
-//! or unlock every dealer and agency in one go, or one city at a time in its panel.
+//! Cities: every city, how often the player has been there, and its truck dealer and recruitment
+//! agency (if it has them) and whether they're unlocked. Visit every city or unlock every dealer
+//! and agency in one go, or one city at a time in its panel (whose Show on map opens World map).
 
 use std::collections::BTreeSet;
 
 use gpui_kit::component::{
-    ActiveTheme as _, Disableable as _, Selectable as _, Sizable as _, WindowExt as _,
-    button::{Button, ButtonGroup},
+    ActiveTheme as _, Disableable as _, Sizable as _,
+    button::Button,
     h_flex,
-    select::{SearchableVec, Select, SelectEvent, SelectState},
     table::{DataTable, TableEvent, TableState},
     v_flex,
 };
 use gpui_kit::{
     App, AppContext as _, Context, Entity, InteractiveElement as _, IntoElement,
     ParentElement as _, Render, SharedString, Styled as _, Subscription, Window, div,
-    prelude::FluentBuilder as _,
 };
 use save::Place;
 
 use crate::game_data;
 use crate::i18n::t;
 use crate::session::Session;
-use crate::ui::{Choice, FilterBar, FilterChanged};
+use crate::ui::{FilterBar, FilterChanged};
 use crate::ui::{RowLook, TextColumn, TextRow, TextTable};
 use crate::workspace::OpenDetails;
 
-pub struct MapPage {
+pub struct CitiesPage {
     session: Entity<Session>,
     table: Entity<TableState<TextTable>>,
     /// The cities' tokens, row by row as the table shows them, to open a row's panel.
@@ -36,13 +34,6 @@ pub struct MapPage {
     dealers: PlaceCount,
     recruitments: PlaceCount,
     filter: Entity<FilterBar>,
-    /// Moving the player's truck to another save's spot.
-    position: Entity<crate::pages::position::PositionPicker>,
-    /// The roads as a picture, shown instead of the cities when chosen.
-    map_view: Entity<crate::pages::map_view::MapView>,
-    /// Find a city on the map (beside the List | Map switch while the map shows).
-    finder: Entity<SelectState<SearchableVec<Choice>>>,
-    shows_map: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -64,7 +55,7 @@ impl PlaceCount {
     }
 }
 
-impl MapPage {
+impl CitiesPage {
     pub fn new(session: Entity<Session>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let columns = vec![
             TextColumn {
@@ -114,39 +105,7 @@ impl MapPage {
                 }
             }),
         ];
-        let position = {
-            let session = session.clone();
-            cx.new(|cx| crate::pages::position::PositionPicker::new(session, window, cx))
-        };
-        let finder = cx.new(|cx| {
-            SelectState::new(SearchableVec::new(Vec::new()), None, window, cx).searchable(true)
-        });
-        let mut _subscriptions = _subscriptions;
-        _subscriptions.push(cx.subscribe_in(
-            &finder,
-            window,
-            |this, _, event: &SelectEvent<SearchableVec<Choice>>, window, cx| {
-                if let SelectEvent::Confirm(Some(token)) = event {
-                    let token = token.to_string();
-                    this.map_view
-                        .update(cx, |map, cx| map.find_city(&token, cx));
-                    // An action, not a setting: the list goes back to its prompt.
-                    this.finder
-                        .update(cx, |select, cx| select.set_selected_index(None, window, cx));
-                }
-            },
-        ));
-        _subscriptions.push(game_data::observe_in(window, cx, |this, window, cx| {
-            this.fill_finder(window, cx)
-        }));
-        let map_view = {
-            let session = session.clone();
-            cx.new(|cx| crate::pages::map_view::MapView::new(session, cx))
-        };
         let mut page = Self {
-            map_view,
-            finder,
-            shows_map: false,
             session,
             table,
             tokens: Vec::new(),
@@ -155,37 +114,10 @@ impl MapPage {
             dealers: PlaceCount::default(),
             recruitments: PlaceCount::default(),
             filter,
-            position,
             _subscriptions,
         };
         page.reload(cx);
-        page.fill_finder(window, cx);
         page
-    }
-
-    /// The cities to find, by name (in the game's language, so again when its data is read).
-    fn fill_finder(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let mut cities: Vec<Choice> = self
-            .session
-            .read(cx)
-            .cities()
-            .into_iter()
-            .map(|city| Choice {
-                name: game_data::city_name(cx, &city.token).into(),
-                value: city.token.into(),
-            })
-            .collect();
-        cities.sort_by(|a, b| a.name.cmp(&b.name));
-        self.finder.update(cx, |select, cx| {
-            select.set_items(SearchableVec::new(cities), window, cx)
-        });
-    }
-
-    /// Switches to the map and moves it to the city (the city panel's Show on map).
-    fn show_on_map(&mut self, token: &str, cx: &mut Context<Self>) {
-        self.shows_map = true;
-        self.map_view.update(cx, |map, cx| map.find_city(token, cx));
-        cx.notify();
     }
 
     fn reload(&mut self, cx: &mut Context<Self>) {
@@ -265,10 +197,12 @@ impl MapPage {
     /// Opens the panel of the city on this row.
     fn open_city(&mut self, row: usize, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(token) = self.tokens.get(row) {
-            let page = cx.entity().downgrade();
             let show_on_map: crate::pages::details::ShowOnMap =
                 std::rc::Rc::new(move |token, _, cx| {
-                    let _ = page.update(cx, |page, cx| page.show_on_map(token, cx));
+                    crate::workspace::show_on_world_map(
+                        crate::pages::world_map::MapSpot::City(token.to_string()),
+                        cx,
+                    );
                 });
             crate::pages::details::open_city(
                 self.session.clone(),
@@ -287,32 +221,6 @@ impl MapPage {
         self.session
             .update(cx, |session, cx| session.unlock_all(place, &cities, cx));
     }
-}
-
-/// Asks before marking every road as driven: it may count toward the game's road achievements, and
-/// nobody knows for sure whether it does.
-fn confirm_discover_roads(
-    session: Entity<Session>,
-    ids: std::sync::Arc<Vec<u64>>,
-    window: &mut Window,
-    cx: &mut App,
-) {
-    window.open_alert_dialog(cx, move |alert, _, cx| {
-        let session = session.clone();
-        let ids = ids.clone();
-        alert
-            .title(t!(cx, "map-discover-roads-confirm-title"))
-            .description(t!(cx, "map-discover-roads-confirm-body"))
-            .confirm()
-            // The kit's own Cancel is English; ours follows the app's language.
-            .cancel_text(t!(cx, "cancel"))
-            .ok_text(t!(cx, "map-discover-roads"))
-            .on_ok(move |_, _, cx| {
-                let ids = ids.clone();
-                session.update(cx, |session, cx| session.discover_roads(ids, cx));
-                true
-            })
-    });
 }
 
 /// Unlocked ones count only where the game says there's one (the save can hold leftovers from
@@ -347,7 +255,7 @@ fn place_cell(
     }
 }
 
-impl Render for MapPage {
+impl Render for CitiesPage {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let has_game_data = self.dealers.total.is_some() && self.recruitments.total.is_some();
         let mut summary = vec![t!(
@@ -407,44 +315,6 @@ impl Render for MapPage {
                             .flex_shrink_0()
                             .gap_2()
                             .child(
-                                Button::new("forget-roads")
-                                    .small()
-                                    .outline()
-                                    .label(t!(cx, "map-forget-roads"))
-                                    .tooltip(t!(cx, "map-forget-roads-tooltip"))
-                                    .disabled(self.session.read(cx).discovered_roads().1 == 0)
-                                    .on_click(cx.listener(|this, _, _, cx| {
-                                        this.session
-                                            .update(cx, |session, cx| session.forget_roads(cx));
-                                    })),
-                            )
-                            .child({
-                                // Needs the game's map, read in the background after startup.
-                                let roads = game_data::road_ids(cx);
-                                let (_, after) = self.session.read(cx).discovered_roads();
-                                let is_all = roads.as_ref().is_some_and(|ids| after >= ids.len());
-                                Button::new("discover-roads")
-                                    .small()
-                                    .outline()
-                                    .label(t!(cx, "map-discover-roads"))
-                                    .tooltip(if roads.is_some() {
-                                        t!(cx, "map-discover-roads-tooltip")
-                                    } else {
-                                        t!(cx, "map-discover-roads-needs-game")
-                                    })
-                                    .disabled(roads.is_none() || is_all)
-                                    .on_click(cx.listener(move |this, _, window, cx| {
-                                        if let Some(ids) = roads.clone() {
-                                            confirm_discover_roads(
-                                                this.session.clone(),
-                                                ids,
-                                                window,
-                                                cx,
-                                            );
-                                        }
-                                    }))
-                            })
-                            .child(
                                 Button::new("visit-all")
                                     .small()
                                     .outline()
@@ -482,95 +352,37 @@ impl Render for MapPage {
                             ),
                     ),
             )
-            .child({
-                // Where the player's truck stands, and moving it to another save's spot.
-                let place = save::position(&self.session.read(cx).preview())
-                    .and_then(|position| position.city)
-                    .map(|city| game_data::city_name(cx, &city))
-                    .unwrap_or_else(|| t!(cx, "player-position-somewhere").to_string());
-                // A column, so a note under the buttons doesn't move them.
-                v_flex()
-                    .gap_2()
-                    .items_start()
-                    .child(
-                        div()
-                            .text_sm()
-                            .child(t!(cx, "player-position-now", place = place)),
-                    )
-                    .child(self.position.clone())
-            })
-            // The cities as a list, or the roads as a map; on the map, finding a city (the
-            // list's search does that for the list).
+            .child(self.filter.clone())
+            // Not hidden, and not just a disabled button: say why, and what makes it work.
+            .children((!has_game_data).then(|| {
+                div()
+                    .text_sm()
+                    .text_color(cx.theme().muted_foreground)
+                    .child(t!(cx, "map-needs-game"))
+            }))
             .child(
-                h_flex()
-                    .gap_3()
-                    .items_center()
-                    .child(
-                        ButtonGroup::new("map-view")
-                            .outline()
-                            .small()
-                            .child(
-                                Button::new("view-cities")
-                                    .label(t!(cx, "map-view-list"))
-                                    .selected(!self.shows_map),
-                            )
-                            .child(
-                                Button::new("view-roads")
-                                    .label(t!(cx, "map-view-map"))
-                                    .selected(self.shows_map),
-                            )
-                            .on_click(cx.listener(|this, clicked: &Vec<usize>, _, cx| {
-                                this.shows_map = clicked.first() == Some(&1);
-                                cx.notify();
-                            })),
-                    )
-                    .children(self.shows_map.then(|| {
-                        div().w(gpui_kit::rems(14.)).child(
-                            Select::new(&self.finder)
-                                .small()
-                                .icon(gpui_kit::component::Icon::new(
-                                    gpui_kit::assets::IconName::Search,
-                                ))
-                                .placeholder(t!(cx, "map-view-find")),
-                        )
-                    })),
-            )
-            .map(|this| {
-                if self.shows_map {
-                    return this.child(div().flex_1().min_h_0().child(self.map_view.clone()));
-                }
-                this.child(self.filter.clone())
-                    // Not hidden, and not just a disabled button: say why, and what makes it work.
-                    .children((!has_game_data).then(|| {
-                        div()
-                            .text_sm()
-                            .text_color(cx.theme().muted_foreground)
-                            .child(t!(cx, "map-needs-game"))
+                div()
+                    .flex_1()
+                    .min_h_0()
+                    // Enter on the selected row opens it, like a double-click.
+                    .on_action(cx.listener(|this, _: &OpenDetails, window, cx| {
+                        if let Some(row) = this.table.read(cx).selected_row() {
+                            this.open_city(row, window, cx);
+                        }
                     }))
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_h_0()
-                            // Enter on the selected row opens it, like a double-click.
-                            .on_action(cx.listener(|this, _: &OpenDetails, window, cx| {
-                                if let Some(row) = this.table.read(cx).selected_row() {
-                                    this.open_city(row, window, cx);
-                                }
-                            }))
-                            .child(crate::ui::table_or_empty(
-                                &self.filter,
-                                crate::ui::fill_table(
-                                    &self.table,
-                                    DataTable::new(&self.table)
-                                        .stripe(true)
-                                        .bordered(true)
-                                        .accessibility_label(t!(cx, "map-table"))
-                                        .into_any_element(),
-                                ),
-                                None,
-                                cx,
-                            )),
-                    )
-            })
+                    .child(crate::ui::table_or_empty(
+                        &self.filter,
+                        crate::ui::fill_table(
+                            &self.table,
+                            DataTable::new(&self.table)
+                                .stripe(true)
+                                .bordered(true)
+                                .accessibility_label(t!(cx, "map-table"))
+                                .into_any_element(),
+                        ),
+                        None,
+                        cx,
+                    )),
+            )
     }
 }

@@ -31,6 +31,11 @@ pub struct Session {
     /// The game's cities the save may have (its map DLCs'; on the map once that's read), for the
     /// towns without a garage: see `save::cities_including`. Set by the workspace.
     game_cities: Vec<String>,
+    /// The game's viewpoints the save may have (its map DLCs'), by their cutscene's map item id:
+    /// what Visit every viewpoint covers. Set by the workspace.
+    game_viewpoints: Vec<u64>,
+    /// The photo trophies captured in this profile (its album; read only).
+    captured_landmarks: BTreeSet<String>,
     /// The profile's `profile.sii`, as on disk. Held only to write it back with a new company
     /// name; it also holds the World of Trucks login, which nothing here reads or shows.
     profile_file: Option<sii::Document>,
@@ -123,6 +128,9 @@ struct Pending {
     saved_colours: Option<Vec<save::SavedColour>>,
     /// Jobs to put on the market, in the order made.
     new_jobs: Vec<save::NewJob>,
+    /// Viewpoints (by map item id) to mark as visited, and to forget as never found.
+    visited_viewpoints: BTreeSet<u64>,
+    forgotten_viewpoints: BTreeSet<u64>,
 }
 
 /// Changes to the coach career's numbers (see `save::coach_stats`): each is a line of its own.
@@ -180,6 +188,8 @@ impl Pending {
             coach: CoachChanges::default(),
             saved_colours: None,
             new_jobs: Vec::new(),
+            visited_viewpoints: BTreeSet::new(),
+            forgotten_viewpoints: BTreeSet::new(),
         }
     }
 
@@ -400,6 +410,8 @@ impl Session {
             saved_drivers: save::drivers(&loaded.game),
             profile_file: save::load_profile_file(&profile.dir).ok(),
             game_cities: Vec::new(),
+            game_viewpoints: Vec::new(),
+            captured_landmarks: save::read_captured_landmarks(&profile.dir),
             pending: Pending::none(career.clone()),
             undo: Vec::new(),
             redo: Vec::new(),
@@ -805,6 +817,10 @@ impl Session {
             + self.pending.coach.count()
             + usize::from(self.pending.saved_colours.is_some())
             + self.pending.new_jobs.len()
+            + usize::from(
+                !self.pending.visited_viewpoints.is_empty()
+                    || !self.pending.forgotten_viewpoints.is_empty(),
+            )
             + usize::from(self.pending.roads.is_some())
     }
 
@@ -882,6 +898,87 @@ impl Session {
                 save::RequirementKind::Dlc | save::RequirementKind::RemovableDlc
             ) && requirement.id == dlc
         })
+    }
+
+    /// The game's viewpoints the save may have (see `game_viewpoints`): not a change.
+    pub fn set_game_viewpoints(&mut self, viewpoints: Vec<u64>, cx: &mut Context<Self>) {
+        if self.game_viewpoints != viewpoints {
+            self.game_viewpoints = viewpoints;
+            cx.notify();
+        }
+    }
+
+    /// The viewpoints' states as they'll be after saving, by map item id (others aren't found).
+    pub fn viewpoint_states(&self) -> std::collections::HashMap<u64, save::ViewpointState> {
+        save::cutscene_states(&self.preview())
+            .into_iter()
+            .filter_map(|(id, state)| Some((id, state?)))
+            .collect()
+    }
+
+    /// The photo trophies captured in this profile, by id.
+    pub fn captured_landmarks(&self) -> &BTreeSet<String> {
+        &self.captured_landmarks
+    }
+
+    /// Marks viewpoints as visited (watched), as if the player had seen each. Those visited
+    /// already are no change.
+    pub fn visit_viewpoints(&mut self, ids: &[u64], cx: &mut Context<Self>) {
+        let states = self.viewpoint_states();
+        let saved: std::collections::HashMap<u64, Option<save::ViewpointState>> =
+            save::cutscene_states(&self.loaded.game)
+                .into_iter()
+                .collect();
+        let new: Vec<u64> = ids
+            .iter()
+            .copied()
+            .filter(|id| states.get(id) != Some(&save::ViewpointState::Visited))
+            .collect();
+        if new.is_empty() {
+            return;
+        }
+        self.change(cx, |pending, _| {
+            for id in new {
+                // Forgotten earlier: taking that back is enough when the save had it visited.
+                pending.forgotten_viewpoints.remove(&id);
+                if saved.get(&id) != Some(&Some(save::ViewpointState::Visited)) {
+                    pending.visited_viewpoints.insert(id);
+                }
+            }
+        });
+    }
+
+    /// Every viewpoint the save may have, visited.
+    pub fn visit_every_viewpoint(&mut self, cx: &mut Context<Self>) {
+        let all = self.game_viewpoints.clone();
+        self.visit_viewpoints(&all, cx);
+    }
+
+    /// Forgets a viewpoint, as never found (the game finds it again when driven past).
+    pub fn forget_viewpoint(&mut self, id: u64, cx: &mut Context<Self>) {
+        if !self.viewpoint_states().contains_key(&id) {
+            return;
+        }
+        let in_save = save::cutscene_states(&self.loaded.game)
+            .iter()
+            .any(|(saved, _)| *saved == id);
+        self.change(cx, |pending, _| {
+            pending.visited_viewpoints.remove(&id);
+            if in_save {
+                pending.forgotten_viewpoints.insert(id);
+            }
+        });
+    }
+
+    /// How many of the game's viewpoints a document has visited.
+    fn viewpoints_visited(&self, document: &sii::Document) -> usize {
+        save::cutscene_states(document)
+            .iter()
+            .filter(|(id, state)| {
+                *state == Some(save::ViewpointState::Visited)
+                    && (self.game_viewpoints.is_empty() || self.game_viewpoints.contains(id))
+            })
+            .count()
     }
 
     /// Puts a job on the market when saving.
@@ -1512,6 +1609,27 @@ impl Session {
                 ),
             );
         }
+        if !self.pending.visited_viewpoints.is_empty()
+            || !self.pending.forgotten_viewpoints.is_empty()
+        {
+            let count = self.game_viewpoints.len();
+            add(
+                &map,
+                t!(cx, "gallery-viewpoints"),
+                t!(
+                    cx,
+                    "gallery-visited-of",
+                    visited = self.viewpoints_visited(&self.loaded.game),
+                    count = count
+                ),
+                t!(
+                    cx,
+                    "gallery-visited-of",
+                    visited = self.viewpoints_visited(&self.preview()),
+                    count = count
+                ),
+            );
+        }
         if self.pending.saved_colours.is_some() {
             // Saved colours with any colour in them.
             let count = |colours: Vec<save::SavedColour>| {
@@ -2052,6 +2170,13 @@ impl Session {
         }
         for job in &self.pending.new_jobs {
             save::add_job(&mut slot.game, job);
+        }
+        if !self.pending.visited_viewpoints.is_empty()
+            || !self.pending.forgotten_viewpoints.is_empty()
+        {
+            let visit: Vec<u64> = self.pending.visited_viewpoints.iter().copied().collect();
+            let forget: Vec<u64> = self.pending.forgotten_viewpoints.iter().copied().collect();
+            save::set_viewpoints(&mut slot.game, &visit, &forget);
         }
         // The passengers first: setting satisfaction doesn't touch them.
         if let Some(total) = self.pending.coach.passengers {

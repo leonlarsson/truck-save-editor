@@ -31,11 +31,11 @@ use crate::labels;
 use crate::pages::{
     Page,
     all_data::AllDataPage,
+    cities::CitiesPage,
     drivers::DriversPage,
     fleet::FleetPage,
     garages::GaragesPage,
     jobs::JobsPage,
-    map::MapPage,
     open_save::{OpenSavePage, OpenSlot},
     overview::OverviewPage,
     settings::SettingsPage,
@@ -108,6 +108,27 @@ pub fn init(cx: &mut App) {
     });
 }
 
+/// Opens World map and moves it to a city or a point (Show on map, from a city's, viewpoint's or
+/// photo trophy's panel, on whichever page it was opened).
+pub fn show_on_world_map(spot: crate::pages::world_map::MapSpot, cx: &mut App) {
+    let Some(workspace) = cx
+        .try_global::<ActiveWorkspace>()
+        .and_then(|active| active.0.upgrade())
+    else {
+        return;
+    };
+    // Just after: a click inside a panel is being handled, with the window busy until then.
+    cx.defer(move |cx| {
+        workspace.update(cx, |this, cx| {
+            this.page = Page::WorldMap;
+            if let Some(opened) = &this.opened {
+                opened.world_map.update(cx, |page, cx| page.show(spot, cx));
+            }
+            cx.notify();
+        });
+    });
+}
+
 fn step_history(cx: &mut App, is_undo: bool) {
     let session = cx
         .try_global::<ActiveWorkspace>()
@@ -163,7 +184,9 @@ struct Opened {
     garages: Entity<GaragesPage>,
     drivers: Entity<DriversPage>,
     all_data: Entity<AllDataPage>,
-    map: Entity<MapPage>,
+    cities: Entity<CitiesPage>,
+    world_map: Entity<crate::pages::world_map::WorldMapPage>,
+    gallery: Entity<crate::pages::gallery::GalleryView>,
     jobs: Entity<JobsPage>,
     game_settings: Entity<crate::pages::game_settings::GameSettingsPage>,
     settings: Entity<SettingsPage>,
@@ -283,7 +306,7 @@ impl Workspace {
         self.sync_game_cities(cx);
     }
 
-    /// Gives the open save the game's cities, as the game counts them: those of the base game and
+    /// Gives the open save the game's cities, as the game counts them, and its viewpoints: those of the base game and
     /// the map DLCs it was made with (every DLC's files ship with the game, owned or not), with a
     /// company or a garage in the save (ferry ports and villages without either aren't counted),
     /// and, once the map is read, with an area on it (a few definitions are border posts and
@@ -314,6 +337,18 @@ impl Workspace {
                 .collect();
             session.set_game_cities(cities, cx);
         });
+        // And its viewpoints: those of the map DLCs the save was made with.
+        if let Some(album) = game_data::photo_album(cx) {
+            opened.session.update(cx, |session, cx| {
+                let viewpoints: Vec<u64> = album
+                    .viewpoints
+                    .iter()
+                    .filter(|item| session.has_dlc(item.dlc.as_deref()))
+                    .flat_map(|item| item.map_items.iter().copied())
+                    .collect();
+                session.set_game_viewpoints(viewpoints, cx);
+            });
+        }
     }
 
     /// Makes the pages for an open save. Also after a language change: pages make some of their
@@ -332,7 +367,11 @@ impl Workspace {
         let garages = cx.new(|cx| GaragesPage::new(session.clone(), window, cx));
         let drivers = cx.new(|cx| DriversPage::new(session.clone(), window, cx));
         let all_data = cx.new(|cx| AllDataPage::new(session.clone(), window, cx));
-        let map = cx.new(|cx| MapPage::new(session.clone(), window, cx));
+        let cities = cx.new(|cx| CitiesPage::new(session.clone(), window, cx));
+        let world_map =
+            cx.new(|cx| crate::pages::world_map::WorldMapPage::new(session.clone(), window, cx));
+        let gallery =
+            cx.new(|cx| crate::pages::gallery::GalleryView::new(session.clone(), window, cx));
         let jobs = cx.new(|cx| JobsPage::new(session.clone(), window, cx));
         let game_settings =
             cx.new(|cx| crate::pages::game_settings::GameSettingsPage::new(window, cx));
@@ -346,7 +385,9 @@ impl Workspace {
             garages,
             drivers,
             all_data,
-            map,
+            cities,
+            world_map,
+            gallery,
             jobs,
             game_settings,
             settings,
@@ -447,13 +488,16 @@ impl Workspace {
                         session.update(cx, |session, cx| session.unlock_all(place, &cities, cx))
                     }
                     None => {
-                        self.page = Page::Map;
+                        self.page = Page::Cities;
                         cx.notify();
                     }
                 }
             }
             PaletteCommand::VisitEveryCity => {
                 session.update(cx, |session, cx| session.visit_all_cities(cx));
+            }
+            PaletteCommand::VisitEveryViewpoint => {
+                session.update(cx, |session, cx| session.visit_every_viewpoint(cx));
             }
             PaletteCommand::NewJob => {
                 crate::pages::new_job::open(session.clone(), window, cx);
@@ -946,6 +990,7 @@ impl Workspace {
             .child(
                 SidebarGroup::new(t!(cx, "sidebar-company")).child(self.menu(&Page::COMPANY, cx)),
             )
+            .child(SidebarGroup::new(t!(cx, "sidebar-map")).child(self.menu(&Page::MAP, cx)))
             .child(
                 SidebarGroup::new(t!(cx, "sidebar-advanced")).child(self.menu(&Page::ADVANCED, cx)),
             )
@@ -1121,9 +1166,17 @@ impl Workspace {
                 .size_full()
                 .child(opened.drivers.clone())
                 .into_any_element(),
-            Page::Map => div()
+            Page::Cities => div()
                 .size_full()
-                .child(opened.map.clone())
+                .child(opened.cities.clone())
+                .into_any_element(),
+            Page::WorldMap => div()
+                .size_full()
+                .child(opened.world_map.clone())
+                .into_any_element(),
+            Page::Gallery => div()
+                .size_full()
+                .child(opened.gallery.clone())
                 .into_any_element(),
             Page::Jobs => div()
                 .size_full()

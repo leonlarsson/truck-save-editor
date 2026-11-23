@@ -157,9 +157,9 @@ fn run_command(cx: &mut TestAppContext, handle: AnyWindowHandle, name: &'static 
 
 #[gpui_kit::test]
 fn without_the_game_dealers_stay_locked_but_cities_can_be_visited(cx: &mut TestAppContext) {
-    let slot = TempSlot::new("map");
+    let slot = TempSlot::new("cities");
     let (handle, workspace) = open(cx, &slot);
-    run_command(cx, handle, "map");
+    run_command(cx, handle, "cities");
 
     // No game data in tests: nobody knows where dealers are, so the button is off.
     act(cx, handle, |window, cx| window.click("unlock-dealers", cx));
@@ -430,7 +430,7 @@ fn session(
 fn the_current_job_can_be_cancelled_and_brought_back(cx: &mut TestAppContext) {
     let slot = TempSlot::new("cancel-job");
     let (handle, workspace) = open(cx, &slot);
-    act(cx, handle, |window, cx| window.press("ctrl-7", cx));
+    act(cx, handle, |window, cx| window.press("ctrl-6", cx));
     let session = session(&workspace, cx);
     let has_job =
         |cx: &mut TestAppContext| cx.update(|cx| session.read(cx).current_job().is_some());
@@ -456,7 +456,7 @@ fn the_current_job_can_be_cancelled_and_brought_back(cx: &mut TestAppContext) {
 fn the_current_job_can_lose_its_deadline(cx: &mut TestAppContext) {
     let slot = TempSlot::new("job-deadline");
     let (handle, workspace) = open(cx, &slot);
-    act(cx, handle, |window, cx| window.press("ctrl-7", cx));
+    act(cx, handle, |window, cx| window.press("ctrl-6", cx));
     let session = session(&workspace, cx);
     let deadline = |cx: &mut TestAppContext| {
         cx.update(|cx| session.read(cx).current_job().and_then(|job| job.deadline))

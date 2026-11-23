@@ -2,7 +2,8 @@
 //! `gamedata::map_roads`), the ones driven in this save in the accent colour, and where the
 //! player's truck is. The mouse wheel zooms around the pointer, dragging moves the map, and
 //! buttons do both from the keyboard. A click on a city's name, a garage or the truck opens its
-//! panel (the list of cities, Garages and Fleet open the same panels from the keyboard).
+//! panel (the list of cities, Garages and Fleet open the same panels from the keyboard). The
+//! viewpoints and photo trophies are marked too, each opening its panel (the Gallery lists them).
 //!
 //! Drawn the way web maps are: in square tiles at fixed zoom levels, each drawn once in the
 //! background and kept. Moving the map reuses the tiles already drawn; zooming shows the nearest
@@ -30,6 +31,7 @@ use gpui_kit::{
 use crate::game_data;
 use crate::i18n::t;
 use crate::pages::details;
+use crate::pages::gallery::{self, GalleryKind};
 use crate::session::Session;
 
 /// A tile's side, in screen pixels.
@@ -68,6 +70,11 @@ const CLICK_SLOP: f32 = 4.0;
 const HIT_MARGIN: f32 = 3.0;
 /// How close a found city is shown: metres a screen pixel covers (the city and its roads).
 const FOUND_ZOOM: f32 = 25.0;
+/// A viewpoint's or photo trophy's marker, in pixels: with its icon once zoomed in closer than
+/// `MARKER_ICON_ZOOM` metres a pixel, a small dot farther out (hundreds would cover the map).
+const GALLERY_MARKER: f32 = 24.0;
+const GALLERY_DOT: f32 = 8.0;
+const MARKER_ICON_ZOOM: f32 = 250.0;
 
 /// What the map shows: the point in the middle (in the game's metres, `x` east and `z` south)
 /// and how many metres one screen pixel covers.
@@ -216,6 +223,38 @@ enum Target {
     Garage { id: String, city: String },
     /// The player's truck, by its unit's id.
     Truck(String),
+    /// A viewpoint or photo trophy, by kind and id.
+    Gallery(GalleryKind, String),
+}
+
+/// A viewpoint or photo trophy on screen.
+struct MapGalleryMarker {
+    at: Point<Pixels>,
+    kind: GalleryKind,
+    id: String,
+    is_done: bool,
+    /// Its icon shows (zoomed in), else it's a dot.
+    has_icon: bool,
+}
+
+impl MapGalleryMarker {
+    /// The game's own map icon for it, as the game's map draws it.
+    fn game_icon_name(&self) -> &'static str {
+        match (self.kind, self.is_done) {
+            (GalleryKind::Viewpoint, true) => "viewpoint",
+            (GalleryKind::Viewpoint, false) => "viewpoint_unseen",
+            (GalleryKind::Landmark, true) => "photo_sight_captured",
+            (GalleryKind::Landmark, false) => "photo_sight_not_captured",
+        }
+    }
+
+    fn side(&self) -> Pixels {
+        px(if self.has_icon {
+            GALLERY_MARKER
+        } else {
+            GALLERY_DOT
+        })
+    }
 }
 
 /// A city's name on screen: the room it takes, and whether the player has been there.
@@ -271,6 +310,8 @@ struct Layers {
     truck: bool,
     garages: bool,
     names: bool,
+    viewpoints: bool,
+    photo_trophies: bool,
 }
 
 impl Default for Layers {
@@ -281,6 +322,8 @@ impl Default for Layers {
             truck: true,
             garages: true,
             names: true,
+            viewpoints: true,
+            photo_trophies: true,
         }
     }
 }
@@ -293,6 +336,8 @@ enum Layer {
     Truck,
     Garages,
     Names,
+    Viewpoints,
+    PhotoTrophies,
 }
 
 impl Layers {
@@ -303,6 +348,8 @@ impl Layers {
             Layer::Truck => self.truck,
             Layer::Garages => self.garages,
             Layer::Names => self.names,
+            Layer::Viewpoints => self.viewpoints,
+            Layer::PhotoTrophies => self.photo_trophies,
         }
     }
 
@@ -313,6 +360,8 @@ impl Layers {
             Layer::Truck => &mut self.truck,
             Layer::Garages => &mut self.garages,
             Layer::Names => &mut self.names,
+            Layer::Viewpoints => &mut self.viewpoints,
+            Layer::PhotoTrophies => &mut self.photo_trophies,
         };
         *shown = !*shown;
     }
@@ -729,6 +778,51 @@ impl MapView {
             .collect()
     }
 
+    /// The viewpoints and photo trophies on screen (those whose layer shows).
+    fn gallery_markers(&self, cx: &App) -> Vec<MapGalleryMarker> {
+        let (Some(view), Some(area)) = (self.view, self.area.get()) else {
+            return Vec::new();
+        };
+        if !self.layers.viewpoints && !self.layers.photo_trophies {
+            return Vec::new();
+        }
+        let has_icon = view.metres_per_pixel <= MARKER_ICON_ZOOM;
+        gallery::entries(self.session.read(cx), cx)
+            .into_iter()
+            .filter(|entry| match entry.kind {
+                GalleryKind::Viewpoint => self.layers.viewpoints,
+                GalleryKind::Landmark => self.layers.photo_trophies,
+            })
+            .filter_map(|entry| {
+                let (x, z) = entry.position?;
+                let at = to_screen(view, area, x, z);
+                area.contains(&at).then(|| MapGalleryMarker {
+                    at,
+                    kind: entry.kind,
+                    is_done: entry.progress.is_done(),
+                    id: entry.item.id,
+                    has_icon,
+                })
+            })
+            .collect()
+    }
+
+    /// Moves the map to a point, close up (a viewpoint's or photo trophy's Show on map).
+    pub fn find_point(&mut self, x: f32, z: f32, cx: &mut Context<Self>) {
+        self.found = None;
+        self.needs_to_show_found = false;
+        let metres_per_pixel = self
+            .view
+            .map(|view| view.metres_per_pixel.clamp(CLOSEST, FOUND_ZOOM))
+            .unwrap_or(FOUND_ZOOM);
+        self.view = Some(View {
+            x,
+            z,
+            metres_per_pixel,
+        });
+        cx.notify();
+    }
+
     /// Moves the map to a city and marks it (Find a city, Show on map); done as soon as the map
     /// is ready, if it isn't yet.
     pub fn find_city(&mut self, token: &str, cx: &mut Context<Self>) {
@@ -792,6 +886,7 @@ impl MapView {
                     details::open_garage(session, &garage, window, cx);
                 }
             }
+            Target::Gallery(kind, id) => gallery::open(session, (kind, id), window, cx),
             Target::Truck(id) => {
                 let truck = session
                     .read(cx)
@@ -857,6 +952,18 @@ fn to_screen(view: View, area: Bounds<Pixels>, x: f32, z: f32) -> Point<Pixels> 
         area.center().x + px((x - view.x) / view.metres_per_pixel),
         area.center().y + px((z - view.z) / view.metres_per_pixel),
     )
+}
+
+/// A colour of one of the game's map icons (a channel's, as its material sets it).
+fn game_colour(cx: &App, icon: &str, channel: usize) -> Option<Hsla> {
+    let icon = game_data::map_icon(cx, icon)?;
+    let [red, green, blue, alpha] = *icon.colours.get(channel)?;
+    Some(Hsla::from(Rgba {
+        r: f32::from(red) / 255.0,
+        g: f32::from(green) / 255.0,
+        b: f32::from(blue) / 255.0,
+        a: f32::from(alpha) / 255.0,
+    }))
 }
 
 /// The tiles of a level that the view shows.
@@ -985,6 +1092,7 @@ impl Render for MapView {
         let paint = self.tiles_to_paint();
         let names = self.names(cx);
         let garages = self.garages(cx);
+        let gallery_markers = self.gallery_markers(cx);
         // A copy: the legend's switches need the context while the theme is in use.
         let theme = cx.theme().clone();
         // The legend is the map's switches: each item shows or hides what it names, and a
@@ -1036,6 +1144,25 @@ impl Render for MapView {
         let truck_label = t!(cx, "map-view-truck");
         let garages_label = t!(cx, "map-view-garages");
         let names_label = t!(cx, "map-view-names");
+        let viewpoints_label = t!(cx, "gallery-viewpoints");
+        let photo_trophies_label = t!(cx, "gallery-photo-trophies");
+        // The game's own icons in the legend, as on its map; ours without the game.
+        let icon_mark = |game_icon: &str, name: gpui_kit::assets::IconName, cx: &App| {
+            match game_data::map_icon(cx, game_icon) {
+                Some(icon) => crate::ui::GameIconView::new(icon)
+                    .size(1.1)
+                    .into_any_element(),
+                None => gpui_kit::component::Icon::new(name)
+                    .xsmall()
+                    .into_any_element(),
+            }
+        };
+        let viewpoint_mark = icon_mark("viewpoint", gpui_kit::assets::IconName::Eye, cx);
+        let photo_trophy_mark = icon_mark(
+            "photo_sight_captured",
+            gpui_kit::assets::IconName::Camera,
+            cx,
+        );
         let (primary, muted, danger) = (theme.primary, theme.muted_foreground, theme.danger);
         let legend = h_flex()
             .gap_1()
@@ -1080,6 +1207,20 @@ impl Render for MapView {
                     .child("Aa")
                     .into_any_element(),
                 names_label,
+                cx,
+            ))
+            .child(item(
+                "layer-viewpoints",
+                Layer::Viewpoints,
+                viewpoint_mark,
+                viewpoints_label,
+                cx,
+            ))
+            .child(item(
+                "layer-photo-trophies",
+                Layer::PhotoTrophies,
+                photo_trophy_mark,
+                photo_trophies_label,
                 cx,
             ))
             .child(div().flex_1())
@@ -1135,10 +1276,17 @@ impl Render for MapView {
         };
 
         // What a click opens, in the order they're drawn, topmost first: the names (over the
-        // map), the truck, the garages.
+        // map), the viewpoints and photo trophies, the truck, the garages.
         let mut targets = Vec::new();
         for name in &names {
             targets.push((name.room, Target::City(name.token.clone())));
+        }
+        // The last drawn is on top.
+        for marker in gallery_markers.iter().rev() {
+            targets.push((
+                square_around(marker.at, marker.side(), HIT_MARGIN),
+                Target::Gallery(marker.kind, marker.id.clone()),
+            ));
         }
         if let (Some(at), Some(id)) = (truck_at, self.session.read(cx).own_truck()) {
             targets.push((
@@ -1171,6 +1319,17 @@ impl Render for MapView {
                     city = game_data::city_name(cx, city)
                 ),
                 Target::Truck(_) => t!(cx, "map-view-truck"),
+                Target::Gallery(kind, id) => {
+                    let entry = gallery::entries(self.session.read(cx), cx)
+                        .into_iter()
+                        .find(|entry| entry.kind == *kind && &entry.item.id == id)?;
+                    t!(
+                        cx,
+                        "gallery-map-hover",
+                        name = game_data::album_item_name(cx, &entry.item),
+                        progress = gallery::progress_label(cx, entry.progress)
+                    )
+                }
             };
             let (bounds, _) = self.targets.iter().find(|(_, target)| target == hovered)?;
             Some((bounds.top_right(), bounds.size.height, label))
@@ -1319,6 +1478,86 @@ impl Render for MapView {
                     }),
                 )
                 .child(map)
+                // Viewpoints (an eye) and photo trophies (a camera): filled once visited or
+                // captured, hollow before (so it doesn't rest on colour alone).
+                .children(gallery_markers.into_iter().map(|marker| {
+                    let offset = self.area.get().map(|area| area.origin).unwrap_or_default();
+                    let side = marker.side();
+                    let is_hovered = self.hovered.as_ref()
+                        == Some(&Target::Gallery(marker.kind, marker.id.clone()));
+                    // Zoomed in, the game's own icon, as its map shows it (ringed when hovered).
+                    let game_icon = marker
+                        .has_icon
+                        .then(|| game_data::map_icon(cx, marker.game_icon_name()))
+                        .flatten();
+                    if let Some(icon) = game_icon {
+                        // A ring two pixels out, there always (clear unless hovered) so the
+                        // icon doesn't move when it shows.
+                        let ring = px(2.0);
+                        return div()
+                            .absolute()
+                            .left(marker.at.x - offset.x - side / 2.0 - ring)
+                            .top(marker.at.y - offset.y - side / 2.0 - ring)
+                            .size(side + ring * 2.0)
+                            .border_2()
+                            .rounded(px(4.0))
+                            .border_color(if is_hovered {
+                                theme.primary
+                            } else {
+                                gpui_kit::transparent_black()
+                            })
+                            .child(
+                                crate::ui::GameIconView::new(icon)
+                                    .size(f32::from(side) / f32::from(window.rem_size())),
+                            )
+                            .into_any_element();
+                    }
+                    // Dots (zoomed out, or without the game's icons) in the game's colour for
+                    // the kind: the viewpoint's purple, the captured photo trophy's orange.
+                    let kind_colour = match marker.kind {
+                        GalleryKind::Viewpoint => game_colour(cx, "viewpoint", gamedata::RED),
+                        GalleryKind::Landmark => {
+                            game_colour(cx, "photo_sight_captured", gamedata::GREEN)
+                        }
+                    }
+                    .unwrap_or(theme.foreground);
+                    let (fill, ink) = if marker.is_done {
+                        (kind_colour, theme.background)
+                    } else {
+                        (theme.background, theme.muted_foreground)
+                    };
+                    let icon = match marker.kind {
+                        GalleryKind::Viewpoint => gpui_kit::assets::IconName::Eye,
+                        GalleryKind::Landmark => gpui_kit::assets::IconName::Camera,
+                    };
+                    div()
+                        .absolute()
+                        .left(marker.at.x - offset.x - side / 2.0)
+                        .top(marker.at.y - offset.y - side / 2.0)
+                        .size(side)
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .rounded_full()
+                        .bg(fill)
+                        .border_1()
+                        .when(!marker.is_done, |this| this.border_2())
+                        .border_color(if is_hovered {
+                            theme.primary
+                        } else if marker.is_done {
+                            theme.background
+                        } else {
+                            kind_colour
+                        })
+                        .when(marker.has_icon, |this| {
+                            this.child(
+                                gpui_kit::component::Icon::new(icon)
+                                    .size(px(GALLERY_MARKER - 6.0))
+                                    .text_color(ink),
+                            )
+                        })
+                        .into_any_element()
+                }))
                 // Cities' names over the map: the ones visited in full colour.
                 .children(names.into_iter().map(|name| {
                     let offset = self.area.get().map(|area| area.origin).unwrap_or_default();

@@ -14,6 +14,13 @@ fn main() {
                 *by_dlc.entry(dlc.unwrap_or("base")).or_default() += 1;
             }
             println!("{} cities: {by_dlc:?}", data.cities().count());
+            let album = &data.photo_album;
+            println!(
+                "{} viewpoints, {} photo trophies; first: {:?}",
+                album.viewpoints.len(),
+                album.landmarks.len(),
+                album.landmarks.first()
+            );
             for level in [0, 5, 30, 100, 182] {
                 println!(
                     "level {level}: starts at {} XP, rank {:?}, coach rank {:?}",

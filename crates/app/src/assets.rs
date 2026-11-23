@@ -34,7 +34,10 @@ gpui_kit::assets::icon_assets!(
         Warehouse,
         Wrench,
         Award,
-        ChartNoAxesColumn
+        ChartNoAxesColumn,
+        Eye,
+        Camera,
+        Building2
     ]
 );
 

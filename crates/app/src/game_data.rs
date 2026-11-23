@@ -30,6 +30,8 @@ struct RoadsRead {
     ids: Arc<Vec<u64>>,
     /// The cities' areas and the garages, for names and garages on the map view.
     places: Arc<Vec<gamedata::MapPlace>>,
+    /// Where the viewpoints and photo trophies are.
+    markers: Arc<Vec<gamedata::MapMarker>>,
 }
 
 impl Global for MapRoads {}
@@ -63,6 +65,38 @@ pub fn observe_map_in<V: 'static>(
     on_read: impl Fn(&mut V, &mut gpui_kit::Window, &mut gpui_kit::Context<V>) + 'static,
 ) -> gpui_kit::Subscription {
     cx.observe_global_in::<MapRoads>(window, on_read)
+}
+
+/// Where the map's viewpoints and photo trophies are, once read.
+pub fn map_markers(cx: &App) -> Option<Arc<Vec<gamedata::MapMarker>>> {
+    cx.try_global::<MapRoads>()
+        .and_then(|read| read.0.as_ref().map(|read| read.markers.clone()))
+}
+
+/// One of the game's world map icons (see `gamedata::MAP_ICONS`), if the game was found.
+pub fn map_icon(cx: &App, name: &str) -> Option<Arc<gamedata::GameIcon>> {
+    data(cx)?.map_icon(name)
+}
+
+/// The game's photo album (every viewpoint and photo trophy), once its data is read.
+pub fn photo_album(cx: &App) -> Option<gamedata::PhotoAlbum> {
+    data(cx).map(|data| data.photo_album.clone())
+}
+
+/// A viewpoint's or photo trophy's name in the game's words (see `GameData::album_item_name`).
+pub fn album_item_name(cx: &App, item: &gamedata::AlbumItem) -> String {
+    match data(cx) {
+        Some(data) => data.album_item_name(item),
+        None => item.id.clone(),
+    }
+}
+
+/// Text that may be a key (`@@landmark_prague@@`) in the game's words, else as it is.
+pub fn resolve(cx: &App, raw: &str) -> String {
+    match data(cx) {
+        Some(data) => data.resolve(raw),
+        None => raw.trim_matches('@').to_string(),
+    }
 }
 
 /// The map's roads and junctions with where they are, once read.
@@ -126,6 +160,7 @@ pub fn reload(cx: &mut App) {
                     roads: Arc::new(map.roads),
                     ids: Arc::new(ids),
                     places: Arc::new(map.places),
+                    markers: Arc::new(map.markers),
                 })
             })
             .await;

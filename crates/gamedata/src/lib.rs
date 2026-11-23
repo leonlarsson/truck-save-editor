@@ -10,6 +10,7 @@ mod companies;
 mod content;
 mod icon;
 mod install;
+mod photo_album;
 mod recruitment;
 mod roads;
 mod texture;
@@ -25,9 +26,10 @@ pub use companies::{CompanyCargo, company_cargo};
 pub use content::{Installed, installed};
 pub use icon::{ALPHA, BLUE, GREEN, GameIcon, RED};
 pub use install::find_install;
+pub use photo_album::{AlbumItem, PhotoAlbum};
 pub use roads::{
-    MapContents, MapPlace, MapPlaceKind, MapRoad, decode_token, map_contents, map_roads, road_ids,
-    sector_contents, sector_roads,
+    MapContents, MapMarker, MapPlace, MapPlaceKind, MapRoad, decode_token, map_contents, map_roads,
+    road_ids, sector_contents, sector_roads,
 };
 pub use texture::{decode_rgba, distance_field_coverage};
 pub use vehicles::{PaintJob, Part, PartKind, model_paint_jobs, model_parts};
@@ -59,12 +61,16 @@ pub struct GameData {
     skill_max: HashMap<String, u8>,
     /// Each skill's icon, by its save field name.
     skill_icons: HashMap<String, Arc<GameIcon>>,
+    /// The world map's icons the editor draws (viewpoints and photo trophies), by name.
+    map_icons: HashMap<String, Arc<GameIcon>>,
     /// The ADR class placards, in the order of the save's ADR bits.
     adr_icons: Vec<Arc<GameIcon>>,
     /// The game's text: key → text, in the loaded language.
     strings: HashMap<String, String>,
     /// Every city in the installed game and its maps: token → key of its name in the text.
     city_names: std::collections::BTreeMap<String, String>,
+    /// Every viewpoint and photo trophy (the game's Gallery).
+    pub photo_album: PhotoAlbum,
     /// The map DLC each city comes with (token → DLC id); the base game's aren't in it. Every
     /// DLC's files ship with the game, owned or not, so a save's cities are the base game's and
     /// those of the map DLCs it was made with.
@@ -88,6 +94,15 @@ pub struct GameData {
     coach_logos: HashMap<String, Arc<GameIcon>>,
 }
 
+/// The world map's icons the editor draws, from `/material/ui/map` in `base.scs`: a viewpoint
+/// visited and not, a photo trophy captured and not.
+pub const MAP_ICONS: [&str; 4] = [
+    "viewpoint",
+    "viewpoint_unseen",
+    "photo_sight_captured",
+    "photo_sight_not_captured",
+];
+
 impl GameData {
     /// Reads the game's data from its install folder. `language` is the game's code
     /// (`en_us`, `de_de` …); English is used when the language isn't there.
@@ -110,6 +125,7 @@ impl GameData {
             data.coach_levels = coach_levels;
             data.coach_ranks = coach_ranks;
         }
+        data.photo_album = photo_album::read(&mut definitions);
         let skills = read_skills(&mut definitions).unwrap_or_default();
         data.skill_max = skills.limits;
         // Icons are a nicety: without `base.scs`, or with an icon the editor can't read, the
@@ -119,6 +135,11 @@ impl GameData {
             for (field, name) in skills.icons {
                 if let Some(icon) = GameIcon::load(&mut base, folder, &name) {
                     data.skill_icons.insert(field, Arc::new(icon));
+                }
+            }
+            for name in MAP_ICONS {
+                if let Some(icon) = GameIcon::load(&mut base, "/material/ui/map", name) {
+                    data.map_icons.insert(name.to_string(), Arc::new(icon));
                 }
             }
             for (folder, logos) in [
@@ -339,6 +360,38 @@ impl GameData {
     }
 
     /// A skill's icon, by its save field name (`long_dist`, `long_duty` …).
+    /// A viewpoint's or photo trophy's name in the game's words. A few of the album's name keys
+    /// aren't in the game's text (`landmark_lonje_windmill` where the text has
+    /// `landmark_lonje_windmi`, a typo in another); for a photo trophy the text's own key is then
+    /// `landmark_<id>`, or the one key that begins with it. Else its id, made readable.
+    pub fn album_item_name(&self, item: &AlbumItem) -> String {
+        let known = |key: &str| self.text(key).filter(|text| !text.is_empty());
+        if let Some(text) = known(&item.name) {
+            return text;
+        }
+        let key = format!("landmark_{}", item.id);
+        if let Some(text) = known(&key) {
+            return text;
+        }
+        let mut starting: Vec<&String> = self
+            .strings
+            .iter()
+            .filter(|(other, text)| other.starts_with(&key) && !text.is_empty())
+            .map(|(_, text)| text)
+            .collect();
+        if starting.len() == 1
+            && let Some(text) = starting.pop()
+        {
+            return text.clone();
+        }
+        readable_id(&item.id)
+    }
+
+    /// One of the world map's icons (`viewpoint`, `photo_sight_captured`: see `MAP_ICONS`).
+    pub fn map_icon(&self, name: &str) -> Option<Arc<GameIcon>> {
+        self.map_icons.get(name).cloned()
+    }
+
     pub fn skill_icon(&self, field: &str) -> Option<Arc<GameIcon>> {
         self.skill_icons.get(field).cloned()
     }
@@ -541,9 +594,55 @@ fn read_strings(archive: &mut hashfs::Archive, language: &str) -> Result<HashMap
     Ok(strings)
 }
 
+/// An id as words, for when the game has no name for it (`lonje_windmi` → `Lonje windmi`).
+fn readable_id(id: &str) -> String {
+    let words = id.replace('_', " ");
+    let mut characters = words.chars();
+    match characters.next() {
+        Some(first) => first.to_uppercase().chain(characters).collect(),
+        None => String::new(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn names_an_album_item_even_when_its_key_is_off() {
+        let mut data = GameData::default();
+        for (key, text) in [
+            ("landmark_harbour", "Harbour Lights"),
+            ("landmark_mill_tower", "Old Mill Tower"),
+        ] {
+            data.strings.insert(key.to_string(), text.to_string());
+        }
+        let item = |id: &str, name: &str| AlbumItem {
+            id: id.to_string(),
+            name: name.to_string(),
+            description: None,
+            dlc: None,
+            map_items: Vec::new(),
+            group: None,
+        };
+        // The album's key, then `landmark_<id>`, then the one key starting with it, then the id.
+        assert_eq!(
+            data.album_item_name(&item("harbour", "@@landmark_harbour@@")),
+            "Harbour Lights"
+        );
+        assert_eq!(
+            data.album_item_name(&item("harbour", "@@landmark_harbor@@")),
+            "Harbour Lights"
+        );
+        assert_eq!(
+            data.album_item_name(&item("mill", "@@landmark_mil@@")),
+            "Old Mill Tower"
+        );
+        assert_eq!(
+            data.album_item_name(&item("lost_place", "@@x@@")),
+            "Lost place"
+        );
+    }
 
     #[test]
     fn picks_the_rank_for_a_level() {

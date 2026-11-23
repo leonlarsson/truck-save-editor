@@ -376,3 +376,19 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Decided:** of the game's cities (see the entry above), only those with a company or a garage in the save count (`save::cities_with_business`); the save's own city tokens that aren't game cities (multiplayer's `truckersmp`, event places `x_…`) are left out once the game's list is known. Visit every city visits exactly the counted cities. Adds to "The city list is the game's" above.
 
 **Why:** checked against a save's Career Progress: the defined cities of the save's map DLCs, on the map, with a company or a garage, came to exactly the game's count, and its real visited cities to exactly the game's discovered count. The cities left out are ferry ports and a village with no business at all, and the tokens are places the game visited but doesn't count.
+
+## 2026-11-23: Viewpoints and photo trophies: the game's photo album, read only for photo trophies
+
+**Decided:** the Map page gets a third view, Gallery: every viewpoint and photo trophy from the game's own photo album (`def/photo_album/photo_album.sii`, `viewpoints.sui`, `landmarks.sui` in `def.scs`; `gamedata::PhotoAlbum`), kept to the base game's and the save's map DLCs (each item names its `dlc_id`). Viewpoints come from the save: `economy.discovered_cutscene_items[]` (the viewpoint's cutscene map item, the album item's `objects_uid`) with `discovered_cutscene_items_states[]`, 1 found but not watched, 2 watched (what Career Progress counts). They can be marked visited (state 2) or not found (removed from both lists), one at a time or all (Visit every viewpoint); other cutscenes in the lists are kept as they are (`save::set_viewpoints`). Photo trophies come from the profile's `album/landmarks.sii` (`album_landmarks_data.landmark_id`), else its `landmarks.<id>.png` pictures, and are only shown. On the map, viewpoints are cutscene items (type 46) whose flags' type is 0, and photo trophies are map overlays (type 18) of type 4 named by the trophy's id (`gamedata::MapMarker`).
+
+**Why:** the save and profile hold exactly what the game's Career Progress shows (checked: the same counts). A photo trophy is a photo the player took, kept for the whole profile, not one save; marking one captured would mean writing a capture without a photo, outside the save the player opened. The state meanings and the map item layout aren't documented by SCS; they come from the community's map format notes and fit the game's own lists exactly (every viewpoint's item and every photo trophy's overlay found).
+
+**Considered:** a page of its own (the gallery is about places, so it sits with the map); marking photo trophies captured (left out, as above); finding viewpoints by scanning the map's cutscenes alone (they include other cutscenes, so the album's list decides).
+
+## 2026-11-23: The map is a sidebar group: Cities, World map, Gallery
+
+**Decided:** the Map page is split into three pages under a Map group in the sidebar: Cities (the list, visits, dealers and agencies), World map (the game's name for its map: roads, the truck's position, Find a city) and Gallery (viewpoints and photo trophies). A panel's Show on map opens World map from any page (`workspace::show_on_world_map`). Replaces the Gallery's place as a third view on the Map page (entry above). Ctrl+1…9 now reach Overview to Gallery; All data and Game settings are reached from the sidebar and the palette.
+
+**Why:** one sidebar item named Map led to cities, roads, the truck and the gallery behind a List | Map | Gallery switch, which said little; the owner suggested Map as the group. Each page now holds one thing, named as the game names it.
+
+**Considered:** an Exploration page with Cities | Map | Gallery tabs (the game's Career Progress heading); naming the switch Cities | Map | Gallery on one page.

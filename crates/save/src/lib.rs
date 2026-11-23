@@ -10,6 +10,7 @@ mod current_job;
 mod drivers;
 mod error;
 mod fleet;
+mod gallery;
 mod game;
 mod game_config;
 mod garages;
@@ -46,6 +47,9 @@ pub use error::{Error, Result};
 pub use fleet::{
     Vehicle, VehicleKind, Wear, model_display_name, refuel, repair, vehicles, wear_is_known,
 };
+#[cfg(feature = "native")]
+pub use gallery::read_captured_landmarks;
+pub use gallery::{ViewpointState, captured_landmarks, cutscene_states, set_viewpoints};
 pub use game::Game;
 pub use game_config::{
     DEFAULT_CONVOY_SIZE, GameSettings, MAX_CONVOY_SIZE, config_value, game_settings,
