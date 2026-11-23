@@ -6,8 +6,8 @@ use gpui_kit::component::{
     button::{Button, ButtonVariants as _},
     h_flex,
     input::{Input, InputEvent, InputState},
-    progress::Progress,
     select::{SearchableVec, Select, SelectEvent, SelectItem, SelectState},
+    slider::{Slider, SliderEvent, SliderState},
     v_flex,
 };
 use gpui_kit::{
@@ -33,6 +33,16 @@ const PARTS: [(&str, &str); 6] = [
     ("wheels_wear", "part-wheels"),
 ];
 
+/// One part's wear as a slider, in percent: dragged to set it.
+struct WearSlider {
+    field: &'static str,
+    label: &'static str,
+    state: Entity<SliderState>,
+    /// Where the slider is while it's dragged (shown as the percent beside it); the change is
+    /// made when it's let go, so one drag is one step for Undo.
+    dragging: Option<f32>,
+}
+
 pub struct VehicleDetail {
     session: Entity<Session>,
     id: String,
@@ -50,6 +60,8 @@ pub struct VehicleDetail {
     /// The engine and transmission (trucks and coaches with a known model), filled in once the
     /// model's parts are read from the game.
     parts: Vec<PartPicker>,
+    /// Each part's wear (current-format vehicles keep it on themselves; older ones have none).
+    wear: Vec<WearSlider>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -146,6 +158,26 @@ impl VehicleDetail {
                 });
             }
         }
+        let unit = session.read(cx).unit(&id);
+        let wear: Vec<WearSlider> = PARTS
+            .iter()
+            .filter_map(|&(field, label)| {
+                let wear = part_wear(unit.as_ref()?, field)?;
+                let state = cx.new(|_| {
+                    SliderState::new()
+                        .min(0.)
+                        .max(100.)
+                        .step(1.)
+                        .default_value(wear * 100.)
+                });
+                Some(WearSlider {
+                    field,
+                    label,
+                    state,
+                    dragging: None,
+                })
+            })
+            .collect();
         let mut _subscriptions = vec![
             cx.subscribe_in(
                 &plate_colours,
@@ -202,6 +234,27 @@ impl VehicleDetail {
                 },
             ));
         }
+        for (index, slider) in wear.iter().enumerate() {
+            _subscriptions.push(cx.subscribe(
+                &slider.state,
+                move |this, _, event: &SliderEvent, cx| {
+                    let Some(slider) = this.wear.get_mut(index) else {
+                        return;
+                    };
+                    match event {
+                        SliderEvent::Change(value) => slider.dragging = Some(value.start()),
+                        SliderEvent::Release(value) => {
+                            slider.dragging = None;
+                            let (id, field) = (this.id.clone(), slider.field);
+                            let wear = value.start() / 100.0;
+                            this.session
+                                .update(cx, |session, cx| session.set_wear(&id, field, wear, cx));
+                        }
+                    }
+                    cx.notify();
+                },
+            ));
+        }
         if let Some(field) = &fuel {
             _subscriptions.push(cx.subscribe(field, |this, _, AmountChanged(percent), cx| {
                 let edit = save::VehicleEdit::Fuel {
@@ -243,6 +296,7 @@ impl VehicleDetail {
             empty_weight,
             plate_colours,
             parts,
+            wear,
             _subscriptions,
         }
     }
@@ -265,6 +319,22 @@ impl VehicleDetail {
             let percent = (f64::from(fuel) * 100.0).round() as i64;
             if field.read(cx).value() != percent {
                 field.update(cx, |field, cx| field.set_value(percent, window, cx));
+            }
+        }
+        // Undo, Repair and the like move the sliders; one being dragged is left where it is.
+        if let Some(unit) = self.session.read(cx).unit(&self.id) {
+            for slider in &self.wear {
+                let Some(wear) = part_wear(&unit, slider.field) else {
+                    continue;
+                };
+                let percent = wear * 100.0;
+                if slider.dragging.is_none()
+                    && (slider.state.read(cx).value().start() - percent).abs() > 0.01
+                {
+                    slider
+                        .state
+                        .update(cx, |state, cx| state.set_value(percent, window, cx));
+                }
             }
         }
         if let Some(load) = self.session.read(cx).trailer_load(&self.id) {
@@ -332,25 +402,12 @@ impl VehicleDetail {
         });
     }
 
-    /// Repairs one part (current-format vehicles keep each part's wear on themselves).
+    /// Repairs one part (current-format vehicles keep each part's wear on themselves): every
+    /// item of it (each wheel) in one change.
     fn repair_part(&mut self, field: &'static str, cx: &mut Context<Self>) {
-        let Some(unit) = self.session.read(cx).unit(&self.id) else {
-            return;
-        };
         let id = self.id.clone();
-        let count = match unit.get(field) {
-            Some(sii::Value::Array(items)) => Some(items.len()),
-            Some(sii::Value::Single(_)) => None,
-            None => return,
-        };
-        self.session.update(cx, |session, cx| match count {
-            Some(count) => {
-                for index in 0..count {
-                    session.set_field(&id, field, Some(index), "0".into(), cx);
-                }
-            }
-            None => session.set_field(&id, field, None, "0".into(), cx),
-        });
+        self.session
+            .update(cx, |session, cx| session.set_wear(&id, field, 0.0, cx));
     }
 }
 
@@ -433,58 +490,66 @@ impl Render for VehicleDetail {
             (None, false, None) => t!(cx, "no-garage"),
         };
 
-        let parts = unit.as_ref().map(|unit| {
-            PARTS
-                .iter()
-                .filter_map(|(field, label)| Some((*field, *label, part_wear(unit, field)?)))
-                .collect::<Vec<_>>()
-        });
-        let wear: gpui_kit::AnyElement =
-            match parts.filter(|parts| !parts.is_empty()) {
-                Some(parts) => {
-                    v_flex()
-                        .gap_2()
-                        .children(parts.into_iter().enumerate().map(
-                            |(index, (field, label, wear))| {
-                                let percent = (wear * 100.0).ceil() as i64;
-                                h_flex()
-                                    .gap_3()
-                                    .items_center()
-                                    .child(div().w(rems(7.)).text_sm().child(part_label(label, cx)))
-                                    .child(div().flex_1().child(
-                                        Progress::new(("wear", index)).value(percent as f32),
-                                    ))
-                                    .child(div().w(rems(2.5)).text_sm().text_right().child(t!(
-                                        cx,
-                                        "percent",
-                                        amount = percent
-                                    )))
-                                    .child(
-                                        Button::new(("repair-part", index))
-                                            .xsmall()
-                                            .ghost()
-                                            .label(t!(cx, "repair"))
-                                            .disabled(percent == 0)
-                                            .on_click(cx.listener(move |this, _, _, cx| {
-                                                this.repair_part(field, cx)
-                                            })),
-                                    )
-                            },
-                        ))
-                        .into_any_element()
-                }
-                // Older saves keep wear on each part's accessory: repair as a whole.
-                None => fact(
-                    t!(cx, "column-wear"),
-                    t!(
-                        cx,
-                        "percent",
-                        amount = (vehicle.wear.worst() * 100.0).ceil() as i64
-                    ),
+        // Older saves keep wear on each part's accessory: shown and repaired as a whole.
+        let wear: gpui_kit::AnyElement = if self.wear.is_empty() {
+            fact(
+                t!(cx, "column-wear"),
+                t!(
                     cx,
-                )
-                .into_any_element(),
-            };
+                    "percent",
+                    amount = (vehicle.wear.worst() * 100.0).ceil() as i64
+                ),
+                cx,
+            )
+            .into_any_element()
+        } else {
+            let rows: Vec<_> = self
+                .wear
+                .iter()
+                .enumerate()
+                .map(|(index, slider)| {
+                    let worn = unit
+                        .as_ref()
+                        .and_then(|unit| part_wear(unit, slider.field))
+                        .unwrap_or_default();
+                    // While dragged, where the slider is; otherwise the wear, rounded up so a
+                    // part that's worn at all never reads 0 %.
+                    let percent = match slider.dragging {
+                        Some(percent) => percent.round() as i64,
+                        None => (worn * 100.0).ceil() as i64,
+                    };
+                    let part = part_label(slider.label, cx);
+                    let field = slider.field;
+                    h_flex()
+                        .gap_3()
+                        .items_center()
+                        .child(div().w(rems(7.)).text_sm().child(part.clone()))
+                        .child(div().flex_1().child(
+                            Slider::new(&slider.state).accessibility_label(t!(
+                                cx,
+                                "change-wear",
+                                part = part
+                            )),
+                        ))
+                        .child(div().w(rems(2.5)).text_sm().text_right().child(t!(
+                            cx,
+                            "percent",
+                            amount = percent
+                        )))
+                        .child(
+                            Button::new(("repair-part", index))
+                                .xsmall()
+                                .ghost()
+                                .label(t!(cx, "repair"))
+                                .disabled(worn == 0.0)
+                                .on_click(
+                                    cx.listener(move |this, _, _, cx| this.repair_part(field, cx)),
+                                ),
+                        )
+                })
+                .collect();
+            v_flex().gap_2().children(rows).into_any_element()
+        };
 
         // Trucks and trailers can be removed from the company; coaches aren't part of it.
         let removal = match vehicle.kind {

@@ -53,7 +53,7 @@ The editor tells you when a newer version is out: when it starts, it asks GitHub
 ### Fleet: trucks, coaches and trailers
 
 - Every truck, coach and trailer, with its garage, odometer, fuel and wear; your own truck and trailer tagged and listed first, with filters for needs repair, no garage and yours.
-- Repair one part or everything, fill the tank (or past full), Repair all and Fill every tank.
+- Repair one part or everything, or drag a part's wear to any level; fill the tank (or past full), Repair all and Fill every tank.
 - Move a truck to another garage (its driver goes with it), or remove it.
 - Swap a truck's engine and transmission for others of its model, from the game's own parts.
 - Change the plate's text, colour the plate (white on blue, gold on black …), remove the side badge, set the odometer.

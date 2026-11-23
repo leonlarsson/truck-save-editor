@@ -598,6 +598,50 @@ impl Session {
         self.set_raw_value(path, text, cx);
     }
 
+    /// Sets a part's wear (0 is like new, 1 is worn out) on a vehicle that keeps it on itself,
+    /// for every item of the field (each wheel, say), as one change: one step for Undo. A value
+    /// equal to the save's own isn't a change.
+    pub fn set_wear(&mut self, unit: &str, field: &str, wear: f32, cx: &mut Context<Self>) {
+        let Some(value) = self
+            .preview()
+            .unit(unit)
+            .and_then(|unit| unit.get(field).cloned())
+        else {
+            return;
+        };
+        let indices: Vec<Option<usize>> = match value {
+            sii::Value::Single(_) => vec![None],
+            sii::Value::Array(items) => (0..items.len()).map(Some).collect(),
+        };
+        let wear = wear.clamp(0.0, 1.0);
+        let text = sii::value::format_f32(wear);
+        let paths: Vec<(FieldPath, bool)> = indices
+            .into_iter()
+            .map(|index| {
+                let path = FieldPath {
+                    unit: unit.to_string(),
+                    field: field.to_string(),
+                    index,
+                };
+                // Compared as numbers: the save may write the same value another way (`&3f000000`).
+                let is_saved = self
+                    .saved_value(&path)
+                    .and_then(|saved| sii::value::parse_f32(&saved))
+                    .is_some_and(|saved| saved == wear);
+                (path, is_saved)
+            })
+            .collect();
+        self.change(cx, |pending, _| {
+            for (path, is_saved) in paths {
+                if is_saved {
+                    pending.raw_edits.remove(&path);
+                } else {
+                    pending.raw_edits.insert(path, text.clone());
+                }
+            }
+        });
+    }
+
     /// A unit as it'll be saved (for detail panels: every field, every change in it).
     pub fn unit(&self, id: &str) -> Option<sii::Unit> {
         self.preview().unit(id).cloned()
@@ -2052,6 +2096,46 @@ mod tests {
         session.update(cx, |session, cx| session.unlock(Place::Dealer, "lyon", cx));
         session.update(cx, |session, cx| session.lock(Place::Dealer, "lyon", cx));
         assert_eq!(count(&session, cx), before);
+    }
+
+    /// A truck with its engine half worn and three wheels.
+    const TRUCK: &str = "SiiNunit\r\n{\r\neconomy : _nameless.1 {\r\n bank: _nameless.2\r\n player: _nameless.3\r\n experience_points: 5000\r\n adr: 0\r\n long_dist: 0\r\n heavy: 0\r\n fragile: 0\r\n urgent: 0\r\n mechanical: 0\r\n}\r\n\r\nbank : _nameless.2 {\r\n money_account: 1000\r\n loans: 0\r\n}\r\n\r\nplayer : _nameless.3 {\r\n hq_city: lyon\r\n trucks: 1\r\n trucks[0]: _nameless.4\r\n}\r\n\r\nvehicle : _nameless.4 {\r\n engine_wear: &3f000000\r\n wheels_wear: 3\r\n wheels_wear[0]: 0.25\r\n wheels_wear[1]: 0.5\r\n wheels_wear[2]: 0\r\n}\r\n\r\n}\r\n";
+
+    #[gpui_kit::test]
+    fn sets_a_parts_wear_as_one_step(cx: &mut TestAppContext) {
+        let session = session_of(TRUCK, cx);
+        let items = |session: &Entity<Session>, field: &str, cx: &mut TestAppContext| {
+            cx.update(|cx| {
+                session
+                    .read(cx)
+                    .unit("_nameless.4")
+                    .map(|unit| {
+                        unit.items(field)
+                            .iter()
+                            .filter_map(|item| sii::value::parse_f32(item))
+                            .collect::<Vec<f32>>()
+                    })
+                    .unwrap_or_default()
+            })
+        };
+
+        // Every wheel at once, one step: one Undo puts them all back.
+        session.update(cx, |session, cx| {
+            session.set_wear("_nameless.4", "wheels_wear", 0.8, cx)
+        });
+        assert_eq!(items(&session, "wheels_wear", cx), [0.8, 0.8, 0.8]);
+        session.update(cx, |session, cx| session.undo(cx));
+        assert_eq!(items(&session, "wheels_wear", cx), [0.25, 0.5, 0.0]);
+        cx.update(|cx| assert!(!session.read(cx).can_undo()));
+
+        // Back to the save's own value, written another way: no change left.
+        session.update(cx, |session, cx| {
+            session.set_wear("_nameless.4", "engine_wear", 0.2, cx)
+        });
+        session.update(cx, |session, cx| {
+            session.set_wear("_nameless.4", "engine_wear", 0.5, cx)
+        });
+        cx.update(|cx| assert_eq!(session.read(cx).change_count(), 0));
     }
 
     #[gpui_kit::test]
