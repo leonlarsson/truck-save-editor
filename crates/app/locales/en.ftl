@@ -494,10 +494,6 @@ shape-value = a value
 map-summary = { $visited } of { $count } cities visited
 map-visit-all = Visit every city
 map-visit-all-tooltip = Mark every city as visited, as if you'd driven through each.
-map-visited-all = { $count ->
-    [one] 1 more city visited
-   *[other] { $count } more cities visited
-}
 map-visits = { $count ->
     [0] Not visited
     [one] Once
@@ -532,6 +528,10 @@ city-visit = Mark as visited
 city-visit-tooltip = Mark the city as visited, as if you'd driven through it.
 city-unlock = Unlock
 city-unlock-tooltip = Unlock it, as if you'd driven past it.
+city-unvisit = Mark as not visited
+city-unvisit-tooltip = Mark the city as never visited, as on a new profile. The game counts it again the next time you drive through.
+city-lock = Lock
+city-lock-tooltip = Lock it again, as if you'd never driven past it.
 city-open-garage = Open
 
 ## Garages

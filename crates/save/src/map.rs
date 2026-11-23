@@ -2,7 +2,7 @@
 //! truck dealers and recruitment agencies they've found.
 //!
 //! `economy.unlocked_dealers[]` and `economy.unlocked_recruitments[]` list city tokens: a dealer or
-//! agency is unlocked by driving past it. Which cities have one isn't in the save; the game's data
+//! agency is unlocked by driving past it, and locked again by leaving the list. Which cities have one isn't in the save; the game's data
 //! knows (see the `gamedata` crate).
 //!
 //! `economy.visited_cities[]` lists city tokens and `economy.visited_cities_count[]` how many times
@@ -159,6 +159,71 @@ pub fn unlock(document: &mut Document, place: Place, cities: &[String]) -> usize
     added
 }
 
+/// Locks the dealers or agencies in `cities` again, as if never found: they leave the list, the
+/// others keep their order. Returns how many were removed.
+pub fn lock(document: &mut Document, place: Place, cities: &[String]) -> usize {
+    let mut list = unlocked(document, place);
+    let before = list.len();
+    list.retain(|city| !cities.contains(city));
+    let removed = before - list.len();
+    if removed == 0 {
+        return 0;
+    }
+    let Some(id) = document
+        .first_of_kind("economy")
+        .map(|unit| unit.id.clone())
+    else {
+        return 0;
+    };
+    let Some(mut economy) = document.unit_mut(&id) else {
+        return 0;
+    };
+    economy.set(place.field(), Value::Array(list));
+    removed
+}
+
+/// Marks the cities in `tokens` as never visited: they leave the visited list, with their counts
+/// (the two lists go item by item). Returns how many were removed.
+pub fn unvisit_cities(document: &mut Document, tokens: &[String]) -> usize {
+    let Some(id) = document
+        .first_of_kind("economy")
+        .map(|unit| unit.id.clone())
+    else {
+        return 0;
+    };
+    let Some(mut economy) = document.unit_mut(&id) else {
+        return 0;
+    };
+    let visited = economy
+        .get("visited_cities")
+        .map(|v| v.items().to_vec())
+        .unwrap_or_default();
+    let counts = economy
+        .get("visited_cities_count")
+        .map(|v| v.items().to_vec())
+        .unwrap_or_default();
+    let mut kept_cities = Vec::new();
+    let mut kept_counts = Vec::new();
+    for (index, city) in visited.iter().enumerate() {
+        if tokens.contains(city) {
+            continue;
+        }
+        kept_cities.push(city.clone());
+        kept_counts.push(
+            counts
+                .get(index)
+                .cloned()
+                .unwrap_or_else(|| "1".to_string()),
+        );
+    }
+    let removed = visited.len() - kept_cities.len();
+    if removed > 0 {
+        economy.set("visited_cities", Value::Array(kept_cities));
+        economy.set("visited_cities_count", Value::Array(kept_counts));
+    }
+    removed
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -203,6 +268,27 @@ mod tests {
         let both = vec!["berlin".to_string(), "lyon".to_string()];
         assert_eq!(visit_cities(&mut document, &both), 0);
         assert_eq!(cities(&document)[0].visits, 4);
+    }
+
+    #[test]
+    fn unvisits_a_city_with_its_count() {
+        let mut document = sii::parse_text(SAVE).expect("parses");
+        visit_all_cities(&mut document);
+        let berlin = vec!["berlin".to_string()];
+        assert_eq!(unvisit_cities(&mut document, &berlin), 1);
+        let economy = document.first_of_kind("economy").expect("economy");
+        assert_eq!(economy.items("visited_cities"), ["lyon"]);
+        assert_eq!(economy.items("visited_cities_count"), ["1"]);
+        assert_eq!(unvisit_cities(&mut document, &berlin), 0);
+    }
+
+    #[test]
+    fn locks_a_dealer_again() {
+        let mut document = sii::parse_text(SAVE).expect("parses");
+        let lyon = vec!["lyon".to_string()];
+        assert_eq!(lock(&mut document, Place::Dealer, &lyon), 1);
+        assert!(unlocked(&document, Place::Dealer).is_empty());
+        assert_eq!(lock(&mut document, Place::Dealer, &lyon), 0);
     }
 
     #[test]

@@ -1,6 +1,6 @@
 //! One city: how often the player has been there, its truck dealer and recruitment agency, and the
-//! company's garage there. Each fact has its action beside it: mark the city as visited, unlock
-//! its dealer or agency, open its garage. Opened from the map (a click on the city's name) or the
+//! company's garage there. Each fact has its action beside it: mark the city as visited or not,
+//! unlock or lock its dealer or agency, open its garage. Opened from the map (a click on the city's name) or the
 //! list of cities (double-click or Enter on its row).
 
 use gpui_kit::component::{
@@ -91,21 +91,32 @@ impl Render for CityDetail {
         let recruitment = place_state(session, Place::Recruitment, &self.token, cx);
         let is_unknown = dealer == PlaceState::Unknown || recruitment == PlaceState::Unknown;
 
-        let visits = value_with_action(
-            t!(cx, "map-visits", count = city.visits),
-            (city.visits == 0).then(|| {
-                let token = self.token.clone();
-                Button::new("visit-city")
-                    .xsmall()
-                    .outline()
-                    .label(t!(cx, "city-visit"))
-                    .tooltip(t!(cx, "city-visit-tooltip"))
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.session
-                            .update(cx, |session, cx| session.visit_city(&token, cx));
-                    }))
-            }),
-        );
+        // Visited or not, the button turns it the other way.
+        let is_visited = city.visits > 0;
+        let token = self.token.clone();
+        let visit = Button::new("visit-city")
+            .xsmall()
+            .outline()
+            .label(if is_visited {
+                t!(cx, "city-unvisit")
+            } else {
+                t!(cx, "city-visit")
+            })
+            .tooltip(if is_visited {
+                t!(cx, "city-unvisit-tooltip")
+            } else {
+                t!(cx, "city-visit-tooltip")
+            })
+            .on_click(cx.listener(move |this, _, _, cx| {
+                this.session.update(cx, |session, cx| {
+                    if is_visited {
+                        session.unvisit_city(&token, cx);
+                    } else {
+                        session.visit_city(&token, cx);
+                    }
+                });
+            }));
+        let visits = value_with_action(t!(cx, "map-visits", count = city.visits), Some(visit));
         let place = |place: Place, state: PlaceState, cx: &mut Context<Self>| {
             let value = match state {
                 PlaceState::Unlocked => t!(cx, "map-place-unlocked"),
@@ -118,17 +129,36 @@ impl Render for CityDetail {
                 Place::Recruitment => "unlock-recruitment".into(),
             };
             let token = self.token.clone();
-            let action = (state == PlaceState::Locked).then(|| {
-                Button::new(id)
-                    .xsmall()
-                    .outline()
-                    .label(t!(cx, "city-unlock"))
-                    .tooltip(t!(cx, "city-unlock-tooltip"))
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.session
-                            .update(cx, |session, cx| session.unlock(place, &token, cx));
-                    }))
-            });
+            // Found or not, the button turns it the other way; nothing to do where the city has
+            // none, or nobody knows.
+            let is_unlocked = match state {
+                PlaceState::Unlocked => true,
+                PlaceState::Locked => false,
+                PlaceState::Missing | PlaceState::Unknown => return value_with_action(value, None),
+            };
+            let action = Button::new(id)
+                .xsmall()
+                .outline()
+                .label(if is_unlocked {
+                    t!(cx, "city-lock")
+                } else {
+                    t!(cx, "city-unlock")
+                })
+                .tooltip(if is_unlocked {
+                    t!(cx, "city-lock-tooltip")
+                } else {
+                    t!(cx, "city-unlock-tooltip")
+                })
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.session.update(cx, |session, cx| {
+                        if is_unlocked {
+                            session.lock(place, &token, cx);
+                        } else {
+                            session.unlock(place, &token, cx);
+                        }
+                    });
+                }));
+            let action = Some(action);
             value_with_action(value, action)
         };
         let dealer = place(Place::Dealer, dealer, cx);

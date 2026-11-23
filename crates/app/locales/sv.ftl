@@ -494,10 +494,6 @@ shape-value = ett värde
 map-summary = { $visited } av { $count } städer besökta
 map-visit-all = Besök alla städer
 map-visit-all-tooltip = Markera varje stad som besökt, som om du hade kört genom alla.
-map-visited-all = { $count ->
-    [one] 1 stad till besökt
-   *[other] { $count } städer till besökta
-}
 map-visits = { $count ->
     [0] Inte besökt
     [one] En gång
@@ -532,6 +528,10 @@ city-visit = Markera som besökt
 city-visit-tooltip = Markera staden som besökt, som om du hade kört genom den.
 city-unlock = Lås upp
 city-unlock-tooltip = Lås upp, som om du hade kört förbi.
+city-unvisit = Markera som inte besökt
+city-unvisit-tooltip = Markera staden som aldrig besökt, som på en ny profil. Spelet räknar den igen nästa gång du kör genom den.
+city-lock = Lås
+city-lock-tooltip = Lås igen, som om du aldrig hade kört förbi.
 city-open-garage = Öppna
 
 ## Garages

@@ -108,6 +108,8 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [x] Map view: zoom (wheel, + and −, Whole map) and drag to move; drawn sharp for the area shown (2026-11-22).
 - [x] Map view: city names (visited ones brighter, bigger cities first), the player's garages (2026-11-22).
 - [x] Map view: click a city for its panel (visited, dealer, agency, garage, each with its action), a garage or the truck for theirs; the list of cities opens the same city panel (double-click or Enter). The switch reads List | Map, not Cities | Road map (2026-11-23).
+- [x] City panel: mark a city as not visited, lock its dealer or agency again (2026-11-23).
+- [ ] In game (owner): one city marked visited, one marked not visited, one dealer unlocked and one locked, saved as a new slot. Do they show as such in game, and does the game count a city again when driven through?
 - [ ] Map view: find a city; roads as lines (needs each road's ends, deeper in its item).
 
 ## Later

@@ -292,3 +292,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** "Road map" read as a product roadmap and named the roads, not the map; List | Map says what each half is. A map that shows cities and garages but can't open them is a dead end, and the panels already exist for garages and trucks. The list opening the same panel keeps every action reachable by keyboard.
 
 **Considered:** Cities | Map and Table | Map (the owner picked List | Map); a city card drawn on the map itself (a second kind of popup next to the panels everything else uses).
+
+## 2026-11-23: Cities can be unvisited, and dealers and agencies locked again
+
+**Decided:** the city panel turns each fact both ways: Mark as visited or Mark as not visited, Unlock or Lock. Un-visiting takes the city out of `economy.visited_cities` with its count (`save::unvisit_cities`); locking takes it out of `unlocked_dealers` or `unlocked_recruitments` (`save::lock`). Pending, they're sets of their own, applied after the visits and unlocks, and each direction first takes back the other (visiting a city asked to be unvisited brings its count back), so going back and forth ends with no change. Visit every city and Unlock every dealer or agency clear any such asks for their cities. The save dialog shows the cities as "N of M cities visited" before and after, whichever way they went.
+
+**Why:** the owner asked why only one direction was possible; the save holds both as plain lists, so there's no reason not to. Showing both counts reads the same for more and for fewer.
+
+**Considered:** a per-city map of wanted states in place of four sets (simpler to apply, but the existing all-at-once changes are sets, and the change list would need rewriting).

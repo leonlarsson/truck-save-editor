@@ -498,10 +498,6 @@ shape-value = einen Wert
 map-summary = { $visited } von { $count } Städten besucht
 map-visit-all = Alle Städte besuchen
 map-visit-all-tooltip = Markiert jede Stadt als besucht, als wärst du durch jede gefahren.
-map-visited-all = { $count ->
-    [one] 1 Stadt mehr besucht
-   *[other] { $count } Städte mehr besucht
-}
 map-visits = { $count ->
     [0] Nicht besucht
     [one] Einmal
@@ -536,6 +532,10 @@ city-visit = Als besucht markieren
 city-visit-tooltip = Markiert die Stadt als besucht, als wärst du durchgefahren.
 city-unlock = Freischalten
 city-unlock-tooltip = Schaltet frei, als wärst du vorbeigefahren.
+city-unvisit = Als nicht besucht markieren
+city-unvisit-tooltip = Markiert die Stadt als nie besucht, wie bei einem neuen Profil. Das Spiel zählt sie wieder, wenn du das nächste Mal durchfährst.
+city-lock = Sperren
+city-lock-tooltip = Sperrt wieder, als wärst du nie vorbeigefahren.
 city-open-garage = Öffnen
 
 ## Garages

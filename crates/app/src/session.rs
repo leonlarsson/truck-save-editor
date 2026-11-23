@@ -73,6 +73,8 @@ struct Pending {
     visit_all_cities: bool,
     /// Cities to mark as visited one by one (a city's panel), by token.
     visited_cities: BTreeSet<String>,
+    /// Cities to mark as never visited (a city's panel), by token; applied after the visits.
+    unvisited_cities: BTreeSet<String>,
     /// Values changed in All data, by where they are; applied before the other changes.
     raw_edits: BTreeMap<FieldPath, String>,
     /// Whether to make every job offer last at least a week (game time) when saving.
@@ -85,6 +87,10 @@ struct Pending {
     unlock_dealers: BTreeSet<String>,
     /// Cities whose recruitment agency to unlock when saving.
     unlock_recruitments: BTreeSet<String>,
+    /// Cities whose truck dealer (unlocked in the save) to lock again; applied after the unlocks.
+    lock_dealers: BTreeSet<String>,
+    /// Cities whose recruitment agency (unlocked in the save) to lock again.
+    lock_recruitments: BTreeSet<String>,
     /// Trucks and drivers to move to another garage (id, garage id), in the order asked; each
     /// takes its whole slot along (see `save::move_to_garage`).
     garage_moves: Vec<(String, String)>,
@@ -121,12 +127,15 @@ impl Pending {
             maxed_drivers: HashSet::new(),
             visit_all_cities: false,
             visited_cities: BTreeSet::new(),
+            unvisited_cities: BTreeSet::new(),
             raw_edits: BTreeMap::new(),
             keep_offers: false,
             company_name: None,
             profile_name: None,
             unlock_dealers: BTreeSet::new(),
             unlock_recruitments: BTreeSet::new(),
+            lock_dealers: BTreeSet::new(),
+            lock_recruitments: BTreeSet::new(),
             garage_moves: Vec::new(),
             cancel_job: false,
             remove_job_deadline: false,
@@ -152,6 +161,33 @@ impl Pending {
             Place::Dealer => &mut self.unlock_dealers,
             Place::Recruitment => &mut self.unlock_recruitments,
         }
+    }
+
+    fn locks(&self, place: Place) -> &BTreeSet<String> {
+        match place {
+            Place::Dealer => &self.lock_dealers,
+            Place::Recruitment => &self.lock_recruitments,
+        }
+    }
+
+    fn locks_mut(&mut self, place: Place) -> &mut BTreeSet<String> {
+        match place {
+            Place::Dealer => &mut self.lock_dealers,
+            Place::Recruitment => &mut self.lock_recruitments,
+        }
+    }
+
+    /// Unlocks the dealers (or agencies) in `cities` that the save doesn't have unlocked; any of
+    /// them asked to be locked again aren't any more.
+    fn unlock_cities(&mut self, place: Place, cities: &BTreeSet<String>, saved: &BTreeSet<String>) {
+        *self.unlocks_mut(place) = cities.difference(saved).cloned().collect();
+        self.locks_mut(place).retain(|city| !cities.contains(city));
+    }
+
+    /// Every city visited; none asked to be unvisited any more.
+    fn visit_all(&mut self) {
+        self.visit_all_cities = true;
+        self.unvisited_cities.clear();
     }
 }
 
@@ -466,7 +502,7 @@ impl Session {
                 }
             }
             if plan.visit_cities {
-                pending.visit_all_cities = true;
+                pending.visit_all();
             }
             for (place, cities) in [
                 (Place::Dealer, &plan.dealers),
@@ -476,7 +512,7 @@ impl Session {
                     let saved: BTreeSet<String> = save::unlocked(&this.loaded.game, place)
                         .into_iter()
                         .collect();
-                    *pending.unlocks_mut(place) = cities.difference(&saved).cloned().collect();
+                    pending.unlock_cities(place, cities, &saved);
                 }
             }
         });
@@ -656,13 +692,13 @@ impl Session {
             + usize::from(!self.pending.upgraded_garages.is_empty())
             + usize::from(!self.pending.maxed_drivers.is_empty())
             + self.pending.raw_edits.len()
-            // Every city or some, it's one line: the cities visited.
-            + usize::from(self.pending.visit_all_cities || !self.pending.visited_cities.is_empty())
+            // Every city or some, visited or not, it's one line: the cities visited.
+            + usize::from(self.visits_changed())
             + usize::from(self.pending.keep_offers)
             + usize::from(self.pending.company_name.is_some())
             + usize::from(self.pending.profile_name.is_some())
-            + usize::from(!self.pending.unlock_dealers.is_empty())
-            + usize::from(!self.pending.unlock_recruitments.is_empty())
+            + usize::from(self.places_changed(Place::Dealer))
+            + usize::from(self.places_changed(Place::Recruitment))
             + self.moved().len()
             + usize::from(self.pending.cancel_job)
             + usize::from(self.pending.remove_job_deadline)
@@ -691,12 +727,31 @@ impl Session {
             .into_iter()
             .collect();
         self.change(cx, |pending, _| {
-            *pending.unlocks_mut(place) = cities.difference(&saved).cloned().collect();
+            pending.unlock_cities(place, cities, &saved)
         });
     }
 
     pub fn visit_all_cities(&mut self, cx: &mut Context<Self>) {
-        self.change(cx, |pending, _| pending.visit_all_cities = true);
+        self.change(cx, |pending, _| pending.visit_all());
+    }
+
+    /// Whether any change touches which cities are visited.
+    fn visits_changed(&self) -> bool {
+        self.pending.visit_all_cities
+            || !self.pending.visited_cities.is_empty()
+            || !self.pending.unvisited_cities.is_empty()
+    }
+
+    /// Whether any change touches which dealers (or agencies) are unlocked.
+    fn places_changed(&self, place: Place) -> bool {
+        !self.pending.unlocks(place).is_empty() || !self.pending.locks(place).is_empty()
+    }
+
+    /// Whether the city is visited in the save as loaded.
+    fn was_visited(&self, token: &str) -> bool {
+        save::cities(&self.loaded.game)
+            .iter()
+            .any(|city| city.token == token && city.visits > 0)
     }
 
     /// Marks one city as visited (once), as if the player had driven through it.
@@ -710,7 +765,30 @@ impl Session {
             return;
         }
         self.change(cx, |pending, _| {
-            pending.visited_cities.insert(token.to_string());
+            // Asked to be unvisited earlier: taking that back brings back its count.
+            if !pending.unvisited_cities.remove(token) {
+                pending.visited_cities.insert(token.to_string());
+            }
+        });
+    }
+
+    /// Marks one city as never visited, as on a new profile; the game counts it again the next
+    /// time the player drives through.
+    pub fn unvisit_city(&mut self, token: &str, cx: &mut Context<Self>) {
+        let is_visited = self
+            .cities()
+            .iter()
+            .any(|city| city.token == token && city.visits > 0);
+        if !is_visited {
+            return;
+        }
+        let is_visited_otherwise = self.was_visited(token) || self.pending.visit_all_cities;
+        self.change(cx, |pending, _| {
+            pending.visited_cities.remove(token);
+            // Visited in the save, or by Visit every city: taken out when saving.
+            if is_visited_otherwise {
+                pending.unvisited_cities.insert(token.to_string());
+            }
         });
     }
 
@@ -720,7 +798,27 @@ impl Session {
             return;
         }
         self.change(cx, |pending, _| {
-            pending.unlocks_mut(place).insert(token.to_string());
+            // Asked to be locked earlier: taking that back is enough.
+            if !pending.locks_mut(place).remove(token) {
+                pending.unlocks_mut(place).insert(token.to_string());
+            }
+        });
+    }
+
+    /// Locks one city's dealer (or agency) again, as if the player had never driven past it.
+    pub fn lock(&mut self, place: Place, token: &str, cx: &mut Context<Self>) {
+        if !self.unlocked(place).contains(token) {
+            return;
+        }
+        let was_unlocked = save::unlocked(&self.loaded.game, place)
+            .iter()
+            .any(|city| city == token);
+        self.change(cx, |pending, _| {
+            pending.unlocks_mut(place).remove(token);
+            // Unlocked in the save: taken out when saving.
+            if was_unlocked {
+                pending.locks_mut(place).insert(token.to_string());
+            }
         });
     }
 
@@ -1186,24 +1284,24 @@ impl Session {
                 text.clone().into(),
             );
         }
-        if self.pending.visit_all_cities || !self.pending.visited_cities.is_empty() {
-            // How many more cities are visited than on disk, every city or some.
-            let unvisited =
-                |cities: Vec<save::City>| cities.iter().filter(|city| city.visits == 0).count();
-            let unvisited =
-                unvisited(save::cities(&self.loaded.game)).saturating_sub(unvisited(self.cities()));
+        if self.visits_changed() {
+            // How many cities are visited, of how many, before and after.
+            let summary = |cities: Vec<save::City>| {
+                let visited = cities.iter().filter(|city| city.visits > 0).count();
+                t!(cx, "map-summary", visited = visited, count = cities.len())
+            };
             add(
                 &map,
                 t!(cx, "change-cities"),
-                t!(cx, "garages-before"),
-                t!(cx, "map-visited-all", count = unvisited),
+                summary(save::cities(&self.loaded.game)),
+                summary(self.cities()),
             );
         }
         for (place, what) in [
             (Place::Dealer, t!(cx, "map-dealers")),
             (Place::Recruitment, t!(cx, "map-recruitments")),
         ] {
-            if self.pending.unlocks(place).is_empty() {
+            if !self.places_changed(place) {
                 continue;
             }
             let saved: BTreeSet<String> = save::unlocked(&self.loaded.game, place)
@@ -1637,6 +1735,8 @@ impl Session {
         if self.pending.visit_all_cities {
             save::visit_all_cities(&mut slot.game);
         }
+        let unvisited: Vec<String> = self.pending.unvisited_cities.iter().cloned().collect();
+        save::unvisit_cities(&mut slot.game, &unvisited);
         if self.pending.keep_offers
             && let Some(now) = save::game_time(&slot.game)
         {
@@ -1645,6 +1745,8 @@ impl Session {
         for place in [Place::Dealer, Place::Recruitment] {
             let cities: Vec<String> = self.pending.unlocks(place).iter().cloned().collect();
             save::unlock(&mut slot.game, place, &cities);
+            let cities: Vec<String> = self.pending.locks(place).iter().cloned().collect();
+            save::lock(&mut slot.game, place, &cities);
         }
         // The game reads a save as one tree from the economy; drop anything an edit cut off
         // (a cancelled job's units, a reference cleared in All data).
@@ -1857,8 +1959,8 @@ mod tests {
         cx.update(|cx| assert!(!session.read(cx).can_undo()));
     }
 
-    /// Two cities, Berlin visited and Lyon not; neither dealer nor agency unlocked.
-    const CITIES: &str = "SiiNunit\r\n{\r\neconomy : _nameless.1 {\r\n bank: _nameless.2\r\n player: _nameless.3\r\n garages: 2\r\n garages[0]: garage.berlin\r\n garages[1]: garage.lyon\r\n experience_points: 5000\r\n adr: 0\r\n long_dist: 0\r\n heavy: 0\r\n fragile: 0\r\n urgent: 0\r\n mechanical: 0\r\n unlocked_dealers: 0\r\n unlocked_recruitments: 0\r\n visited_cities: 1\r\n visited_cities[0]: berlin\r\n visited_cities_count: 1\r\n visited_cities_count[0]: 4\r\n}\r\n\r\nbank : _nameless.2 {\r\n money_account: 1000\r\n loans: 0\r\n}\r\n\r\nplayer : _nameless.3 {\r\n hq_city: berlin\r\n}\r\n\r\ngarage : garage.berlin {\r\n status: 0\r\n}\r\n\r\ngarage : garage.lyon {\r\n status: 0\r\n}\r\n\r\n}\r\n";
+    /// Two cities, Berlin visited (4 times) and Lyon not; Berlin's dealer unlocked.
+    const CITIES: &str = "SiiNunit\r\n{\r\neconomy : _nameless.1 {\r\n bank: _nameless.2\r\n player: _nameless.3\r\n garages: 2\r\n garages[0]: garage.berlin\r\n garages[1]: garage.lyon\r\n experience_points: 5000\r\n adr: 0\r\n long_dist: 0\r\n heavy: 0\r\n fragile: 0\r\n urgent: 0\r\n mechanical: 0\r\n unlocked_dealers: 1\r\n unlocked_dealers[0]: berlin\r\n unlocked_recruitments: 0\r\n visited_cities: 1\r\n visited_cities[0]: berlin\r\n visited_cities_count: 1\r\n visited_cities_count[0]: 4\r\n}\r\n\r\nbank : _nameless.2 {\r\n money_account: 1000\r\n loans: 0\r\n}\r\n\r\nplayer : _nameless.3 {\r\n hq_city: berlin\r\n}\r\n\r\ngarage : garage.berlin {\r\n status: 0\r\n}\r\n\r\ngarage : garage.lyon {\r\n status: 0\r\n}\r\n\r\n}\r\n";
 
     #[gpui_kit::test]
     fn visits_and_unlocks_one_city_as_one_step_each(cx: &mut TestAppContext) {
@@ -1894,6 +1996,62 @@ mod tests {
         session.update(cx, |session, cx| session.undo(cx));
         assert_eq!(lyon_visits(&session, cx), Some(0));
         cx.update(|cx| assert_eq!(session.read(cx).change_count(), 0));
+    }
+
+    fn visits(session: &Entity<Session>, token: &str, cx: &mut TestAppContext) -> u32 {
+        cx.update(|cx| {
+            session
+                .read(cx)
+                .cities()
+                .into_iter()
+                .find(|city| city.token == token)
+                .map(|city| city.visits)
+                .unwrap_or_default()
+        })
+    }
+
+    #[gpui_kit::test]
+    fn unvisits_and_locks_one_city_and_takes_it_back(cx: &mut TestAppContext) {
+        let session = session_of(CITIES, cx);
+        let count = |session: &Entity<Session>, cx: &mut TestAppContext| {
+            cx.update(|cx| session.read(cx).change_count())
+        };
+
+        // Unvisited, then visited again: back to its count, and no change left.
+        session.update(cx, |session, cx| session.unvisit_city("berlin", cx));
+        assert_eq!(visits(&session, "berlin", cx), 0);
+        assert_eq!(count(&session, cx), 1);
+        session.update(cx, |session, cx| session.visit_city("berlin", cx));
+        assert_eq!(visits(&session, "berlin", cx), 4);
+        assert_eq!(count(&session, cx), 0);
+
+        // Visit every city, then one taken back out.
+        session.update(cx, |session, cx| session.visit_all_cities(cx));
+        session.update(cx, |session, cx| session.unvisit_city("lyon", cx));
+        assert_eq!(visits(&session, "lyon", cx), 0);
+        assert_eq!(visits(&session, "berlin", cx), 4);
+        // Visit every city again wins over it.
+        session.update(cx, |session, cx| session.visit_all_cities(cx));
+        assert_eq!(visits(&session, "lyon", cx), 1);
+
+        // Locked, then unlocked again: no change left for the dealers.
+        let dealers = |session: &Entity<Session>, cx: &mut TestAppContext| {
+            cx.update(|cx| session.read(cx).unlocked(Place::Dealer))
+        };
+        let before = count(&session, cx);
+        session.update(cx, |session, cx| session.lock(Place::Dealer, "berlin", cx));
+        assert!(dealers(&session, cx).is_empty());
+        assert_eq!(count(&session, cx), before + 1);
+        session.update(cx, |session, cx| {
+            session.unlock(Place::Dealer, "berlin", cx)
+        });
+        assert!(dealers(&session, cx).contains("berlin"));
+        assert_eq!(count(&session, cx), before);
+
+        // Unlocked here, then locked: nothing to write.
+        session.update(cx, |session, cx| session.unlock(Place::Dealer, "lyon", cx));
+        session.update(cx, |session, cx| session.lock(Place::Dealer, "lyon", cx));
+        assert_eq!(count(&session, cx), before);
     }
 
     #[gpui_kit::test]

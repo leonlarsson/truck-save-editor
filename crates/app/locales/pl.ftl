@@ -515,11 +515,6 @@ shape-value = wartość
 map-summary = Odwiedzone miasta: { $visited } z { $count }
 map-visit-all = Odwiedź każde miasto
 map-visit-all-tooltip = Oznacz każde miasto jako odwiedzone, jakbyś przejechał przez każde z nich.
-map-visited-all = { $count ->
-    [one] Odwiedzono 1 nowe miasto
-    [few] Odwiedzono { $count } nowe miasta
-   *[many] Odwiedzono { $count } nowych miast
-}
 map-visits = { $count ->
     [0] Nieodwiedzone
     [one] Raz
@@ -557,6 +552,10 @@ city-visit = Oznacz jako odwiedzone
 city-visit-tooltip = Oznacz miasto jako odwiedzone, jakbyś przez nie przejechał.
 city-unlock = Odblokuj
 city-unlock-tooltip = Odblokuj, jakbyś przejechał obok.
+city-unvisit = Oznacz jako nieodwiedzone
+city-unvisit-tooltip = Oznacz miasto jako nigdy nieodwiedzone, jak w nowym profilu. Gra policzy je ponownie, gdy następnym razem przez nie przejedziesz.
+city-lock = Zablokuj
+city-lock-tooltip = Zablokuj ponownie, jakbyś nigdy obok nie przejechał.
 city-open-garage = Otwórz
 
 ## Garages
