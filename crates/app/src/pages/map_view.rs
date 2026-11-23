@@ -757,7 +757,7 @@ impl MapView {
             x,
             z,
             // Closer, never farther out than the view already is.
-            metres_per_pixel: view.metres_per_pixel.min(FOUND_ZOOM).max(CLOSEST),
+            metres_per_pixel: view.metres_per_pixel.clamp(CLOSEST, FOUND_ZOOM),
         });
         self.needs_to_show_found = false;
     }
