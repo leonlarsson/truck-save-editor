@@ -95,8 +95,31 @@ fn groups(has_coaches: bool) -> Vec<Vec<PaletteCommand>> {
     vec![pages, actions, app]
 }
 
+/// The palette command with this label (case aside), as the palette shows it in English or the
+/// app's language: for `TSE_SCRIPT` (see `dev_script`).
+pub fn command_named(name: &str, has_coaches: bool, cx: &App) -> Option<PaletteCommand> {
+    let wanted = name.trim().to_lowercase();
+    groups(has_coaches)
+        .into_iter()
+        .flatten()
+        .find(|command| parts(*command, cx).0.to_lowercase() == wanted)
+}
+
 fn item(command: PaletteCommand, cx: &App) -> CommandItem {
-    let (label, icon, keywords): (_, IconName, &[&str]) = match command {
+    let (label, icon, keywords) = parts(command, cx);
+    let item = CommandItem::new()
+        .label(label)
+        .icon(Icon::new(icon))
+        .keywords(keywords.iter().copied());
+    item_with_shortcut(command, item)
+}
+
+/// A command's label, icon and the extra words it's found by.
+fn parts(
+    command: PaletteCommand,
+    cx: &App,
+) -> (gpui_kit::SharedString, IconName, &'static [&'static str]) {
+    match command {
         PaletteCommand::Go(page) => (
             t!(cx, "palette-go", page = page.title(cx)),
             page.icon(),
@@ -230,11 +253,10 @@ fn item(command: PaletteCommand, cx: &App) -> CommandItem {
             IconName::ExternalLink,
             &["bug", "issue", "github", "feedback", "help"],
         ),
-    };
-    let item = CommandItem::new()
-        .label(label)
-        .icon(Icon::new(icon))
-        .keywords(keywords.iter().copied());
+    }
+}
+
+fn item_with_shortcut(command: PaletteCommand, item: CommandItem) -> CommandItem {
     // Settings shows its shortcut (Ctrl+,). The item dispatches the action too, which for going
     // to a page is harmless alongside the palette's own handling; other commands don't get one,
     // or they'd run twice.

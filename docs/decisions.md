@@ -400,3 +400,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** the two careers were mixed on Overview (both experience cards side by side, truck skills, ADR, coach skills and coach services one after another). A Truck | Coach switch in the sidebar was tried and dropped: most of the app (Jobs, Garages, Drivers, the map) doesn't change with it, so a global switch promised more than it did. Number shortcuts shifted whenever a page was added, and stopped at nine.
 
 **Considered:** the global switch (above); tabs on each page with both careers (the coach career spread over three pages); splitting Career into Trucking and Coaching with the company on Overview (a bigger reshuffle).
+
+## 2026-11-23: Screenshots come from a script and a made-up demo profile
+
+**Decided:** `scripts/screenshots.sh` takes every README picture (light and dark) and a release's pictures in one run of the dev build. `scripts/demo-profile.py` turns a fixture copy into a demo profile ("Leon") with invented money, experience, HQ city, truck position, plates, save, company and profile names, and photo trophies. The app drives itself through a script (`TSE_SCRIPT`: pages, themes, palette commands by their labels, waits), and asks for each picture through a request file the shell script answers by capturing the window (the app can't capture itself). Development builds also build the crates that read the game's files (`sii`, `hashfs`, `gamedata`, `save`) optimised, like the dependencies.
+
+**Why:** pictures of a real save would put the player's own values in a public repository, and taking them by hand (or by restarting the app and typing per picture) took about ten minutes and broke when layouts moved. A run now takes about half a minute; the optimised crates bring the game's data and map from about 18 seconds to a few in a development build.
+
+**Considered:** keystrokes and clicks at coordinates (slow, and coordinates break with layouts); restarting per picture (each start reloads the game's data); rendering pictures headless in tests (GPUI's test platform draws nothing).

@@ -7,6 +7,7 @@
 
 mod assets;
 mod crash;
+mod dev_script;
 mod format;
 mod game_data;
 mod i18n;

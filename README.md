@@ -33,17 +33,29 @@ The editor tells you when a newer version is out: when it starts, it asks GitHub
 ### Your career
 
 - Money, with shortcuts (2.5m, +1m, −500k).
-- Truck and coach experience, shown as levels with the game's own rank names; set a level directly or step it.
-- Every truck and coach skill, and ADR classes, with Max all.
-- Coach services as the game's statistics show them: set the passengers transported and the coach distance, make every service's passengers fully satisfied, or discover every bus stop.
+- Truck experience, shown as a level with the game's own rank name; set a level directly or step it.
+- Every truck skill, and ADR classes, with Max all.
 - Your headquarters city, your company's name and the profile's name.
 - **Your day**: rest (no tiredness, no break due), clear your police record, repair the cargo you're carrying, and set the clock to the morning, noon, evening or night.
 - **Quick start** for a fresh career: a rich start, everything unlocked, or your own picks, in one go.
 - **DLC and mods**: what the save was made with, and whether each is installed.
 
+### Coach career
+
+A page of its own, for saves with a coach career:
+
+- Coach experience as a level with the game's rank name, and every coach skill, with Max all.
+- Coach services as the game's statistics show them: set the passengers transported and the coach distance, make every service's passengers fully satisfied, or discover every bus stop.
+- Every coach service from the game's log, newest first: where from and to, passengers, satisfaction, distance, pay and XP.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/coach-career-dark.png">
+  <img alt="Coach career: coach experience as a level, coach skills, the coach services and their log" src="docs/screenshots/coach-career-light.png">
+</picture>
+
 ### Statistics
 
-- Your career in numbers: deliveries, money and XP earned from them, distance driven, days on the road, the average delivery, the cargo you hauled most, jobs cancelled.
+- Your truck career in numbers: deliveries, money and XP earned from them, distance driven, days on the road, the average delivery, the cargo you hauled most, jobs cancelled.
 - Every delivery from the game's delivery log, newest first, to sort, search, and filter to damaged cargo.
 
 <picture>
@@ -73,16 +85,23 @@ The editor tells you when a newer version is out: when it starts, it asks GitHub
 - Every garage: buy them all, make them large, change the headquarters, remove empty ones; pick several to make them large or remove them.
 - Every hired driver, with their face, hometown, where they are now, their truck, experience, skills and ADR: max one or all, move them to another garage (their truck goes with them), or remove them.
 
-### The map
+### The map: Cities, World map, Gallery
 
-- **The map**: every road and junction on the game's map, the ones you've driven highlighted, with city names, your garages and your truck. Zoom with the mouse wheel and drag to move; the legend shows and hides each part. Click a city, a garage or your truck to open it.
+- **Cities**: every city of the game, counted as the game counts them, whether you've been there, and its truck dealer and recruitment agency. Visit every city, unlock every dealer and agency, or open one city to visit it (or not), unlock or lock its dealer or agency, open its garage, or show it on the map.
+- **World map**: every road and junction on the game's map, the ones you've driven highlighted, with city names, your garages, your truck, and the viewpoints and photo trophies in the game's own icons. Zoom with the mouse wheel and drag to move; the legend shows and hides each part. Click a city, a garage, your truck, a viewpoint or a photo trophy to open it, or find a city.
 - **Discover every road**: the whole map explored (100 % in game), from the game's own map files. Or **forget visited roads** and start the map over.
-- Every city, whether you've been there, and its truck dealer and recruitment agency: visit every city, unlock every dealer and agency, or open one city to visit it, unlock its dealer or agency, or open its garage.
 - Your position: a free **quick travel** when the save loads (the game lets you pick any city you've visited), or the exact spot from another save of the profile.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/map-dark.png">
-  <img alt="The map: roads driven highlighted, with city names and garages" src="docs/screenshots/map-light.png">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/world-map-dark.png">
+  <img alt="World map around Hamburg: roads driven highlighted, city names, garages, viewpoints and photo trophies" src="docs/screenshots/world-map-light.png">
+</picture>
+
+- **Gallery**: every viewpoint and photo trophy from the game's own list, with what you've visited and captured, and what's left: visit every viewpoint, or mark one visited or not found. Photo trophies are your own photos, so they're shown, never made up.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/gallery-dark.png">
+  <img alt="Gallery: viewpoints and photo trophies by country, with what's visited and captured" src="docs/screenshots/gallery-light.png">
 </picture>
 
 ### Jobs

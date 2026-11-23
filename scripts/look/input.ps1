@@ -35,6 +35,10 @@ if ($Action -eq "scroll") {
   $delta = [BitConverter]::ToUInt32([BitConverter]::GetBytes([int32]$Wheel), 0)
   [U]::mouse_event(0x0800, 0, 0, $delta, [UIntPtr]::Zero)
 }
+if ($Action -eq "park") {
+  # The pointer just outside the window's bottom-right corner: no hover in a screenshot.
+  [U]::SetCursorPos($r.R + 40, $r.B + 40) | Out-Null
+}
 if ($Action -eq "keys") {
   Add-Type -AssemblyName System.Windows.Forms
   [System.Windows.Forms.SendKeys]::SendWait($Keys)

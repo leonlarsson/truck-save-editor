@@ -26,3 +26,17 @@ panic = "warn"
 [profile.dev.package."*"]
 # Dependencies (GPUI is big) build optimised, so the app runs smoothly while developing.
 opt-level = 2
+
+# The crates that read the game's files build optimised too: unoptimised, reading the game's data
+# and its map at startup takes about 18 seconds in a development build instead of a few.
+[profile.dev.package.sii]
+opt-level = 2
+
+[profile.dev.package.hashfs]
+opt-level = 2
+
+[profile.dev.package.gamedata]
+opt-level = 2
+
+[profile.dev.package.save]
+opt-level = 2

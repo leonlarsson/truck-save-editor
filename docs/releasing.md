@@ -15,7 +15,7 @@ The .exe carries its version, product name and copyright in its file details (`c
 
 1. **Check it in game.** Changes to how saves are written need the owner's in-game check (see `AGENTS.md`).
 2. **Bump the version** in the root `Cargo.toml` (`[workspace.package] version`), then run `cargo check` so `Cargo.lock` follows, and `mise run licenses` so the licence list does (it names the editor's own crates with their version; CI fails if it's behind). The release builds with `--locked`, and fails if the lock file is behind.
-3. **Preview the notes**: `mise run release-notes`.
+3. **Preview the notes**: `mise run release-notes`. **Pictures** for the README and the notes: `scripts/screenshots.sh <slot copy> <version>` (see `AGENTS.md` → Verifying); the notes link them by the commit that adds them.
 4. **Commit and tag**: `git commit -am "chore: release 0.1.0"`, `git tag v0.1.0`, `git push origin main v0.1.0`. The workflow refuses a tag that doesn't match the version.
 5. **Try the draft**: when the workflow finishes, download the .exe from the draft release on a Windows PC, run it, open a save and look around.
 6. **Edit the notes and publish.** Hand-written notes for a version go in `docs/release-notes/<version>.md`, to paste over the drafted ones (the download and checksum sections stay). A version with a dash (`0.2.0-beta.1`) is marked as a pre-release.

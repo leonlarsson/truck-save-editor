@@ -77,6 +77,13 @@ impl WorldMapPage {
             _subscriptions,
         };
         page.fill_finder(window, cx);
+        // Development builds only: `TSE_FIND_CITY=hamburg` opens the map on that city, close up
+        // (for screenshots of the markers).
+        if cfg!(debug_assertions)
+            && let Ok(token) = std::env::var("TSE_FIND_CITY")
+        {
+            page.show(MapSpot::City(token), cx);
+        }
         page
     }
 

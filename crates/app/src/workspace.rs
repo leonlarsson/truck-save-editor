@@ -246,6 +246,7 @@ impl Workspace {
         if let Some((profile, slot)) = dev_start_slot() {
             workspace.open(profile, slot, window, cx);
         }
+        crate::dev_script::start(window, cx);
         workspace
     }
 
@@ -396,6 +397,32 @@ impl Workspace {
     #[cfg(test)]
     pub(crate) fn session(&self) -> Option<Entity<Session>> {
         self.opened.as_ref().map(|opened| opened.session.clone())
+    }
+
+    /// Goes to a page.
+    pub(crate) fn go_to(&mut self, page: Page, cx: &mut Context<Self>) {
+        self.page = page;
+        cx.notify();
+    }
+
+    /// Whether a development script (`TSE_SCRIPT`) can start: a save is open, and the game's
+    /// data and map are read.
+    pub(crate) fn is_ready_for_script(&self, cx: &App) -> bool {
+        self.opened.is_some() && !game_data::is_loading(cx) && game_data::is_map_read(cx)
+    }
+
+    /// Carries out one step of a development script.
+    pub(crate) fn run_step(
+        &mut self,
+        step: crate::dev_script::Step,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let has_coaches = self
+            .opened
+            .as_ref()
+            .is_some_and(|opened| opened.session.read(cx).career().coach_experience.is_some());
+        crate::dev_script::act(self, step, has_coaches, window, cx);
     }
 
     /// Shows Coach career: the coach commands land there, so what they changed is in view.
@@ -1851,7 +1878,9 @@ fn dev_start_page() -> Option<Page> {
 }
 
 /// Development builds only: `TSE_SLOT=<slot folder>` opens that slot on launch. Point it at a copy
-/// (like `fixtures/ets2/autosave`), never at the live save folder.
+/// (like `fixtures/ets2/autosave`), never at the live save folder. The profile is named by its
+/// folder (`4C656F6E` → Leon) when that's a profile's name in hex, as for the demo profile the
+/// screenshots are taken with (`scripts/screenshots.sh`).
 fn dev_start_slot() -> Option<(Profile, Slot)> {
     if !cfg!(debug_assertions) {
         return None;
@@ -1862,14 +1891,19 @@ fn dev_start_slot() -> Option<(Profile, Slot)> {
         .ok()
         .and_then(|bytes| sii_info(&bytes))
         .unwrap_or_default();
+    let profile_dir = dir
+        .parent()
+        .and_then(|p| p.parent())
+        .unwrap_or(&dir)
+        .to_path_buf();
+    let name = profile_dir
+        .file_name()
+        .and_then(|folder| save::decode_profile_folder(&folder.to_string_lossy()))
+        .unwrap_or_else(|| "Development copy".to_string());
     let profile = Profile {
         game: save::Game::Ets2,
-        name: "Development copy".to_string(),
-        dir: dir
-            .parent()
-            .and_then(|p| p.parent())
-            .unwrap_or(&dir)
-            .to_path_buf(),
+        name,
+        dir: profile_dir,
         location: save::Location::Local,
         last_saved: None,
     };

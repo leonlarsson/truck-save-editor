@@ -1,5 +1,6 @@
-# Captures one window (by title) to a PNG. Used by scripts/look.sh.
-param([string]$Title, [string]$Out)
+# Captures one window (by title) to a PNG, or a part of it (-Crop "x,y,width,height", in the
+# window's pixels). Used by scripts/look.sh.
+param([string]$Title, [string]$Out, [string]$Crop = "")
 Add-Type -AssemblyName System.Drawing
 Add-Type @"
 using System; using System.Runtime.InteropServices; using System.Text;
@@ -25,4 +26,9 @@ $bmp = New-Object System.Drawing.Bitmap $w, $hgt
 $g = [System.Drawing.Graphics]::FromImage($bmp); $hdc = $g.GetHdc()
 [W]::PrintWindow($found, $hdc, 2) | Out-Null
 $g.ReleaseHdc($hdc); $g.Dispose()
+if ($Crop -ne "") {
+  $c = $Crop.Split(",") | ForEach-Object { [int]$_ }
+  $part = $bmp.Clone((New-Object System.Drawing.Rectangle $c[0], $c[1], $c[2], $c[3]), $bmp.PixelFormat)
+  $bmp.Dispose(); $bmp = $part; $w = $c[2]; $hgt = $c[3]
+}
 $bmp.Save($Out, [System.Drawing.Imaging.ImageFormat]::Png); Write-Output "OK $w x $hgt"

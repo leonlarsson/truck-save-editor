@@ -5,8 +5,9 @@
 # find the app's window by its title, capture just that window, and click or type into it.
 #
 #   scripts/look.sh start [ENV=VALUE ...]   restart the dev build, e.g. TSE_PAGE=fleet TSE_THEME=dark
-#   scripts/look.sh shot <file.png>         capture the app window
+#   scripts/look.sh shot <file.png> [x y w h] capture the app window, or that part of it
 #   scripts/look.sh click <x> <y>           left-click at a point relative to the window's top-left
+#   scripts/look.sh park                    move the pointer off the window (no hover in shots)
 #   scripts/look.sh keys <text>             type, in SendKeys syntax ({ESC}, {ENTER}, {TAB}, ^a …)
 #   scripts/look.sh scroll <x> <y> <notches> scroll at a point (negative = down)
 #   scripts/look.sh stop                    close the app
@@ -28,8 +29,10 @@ case "${1:-}" in
         sleep 4
         ;;
     shot)
+        crop=""
+        if [ "$#" -ge 6 ]; then crop="$3,$4,$5,$6"; fi
         for _ in 1 2 3 4 5 6 7 8 9 10; do
-            if ps shot.ps1 -Title "$title" -Out "$win_temp\\tse-shot.png" | grep -q '^OK'; then
+            if ps shot.ps1 -Title "$title" -Out "$win_temp\\tse-shot.png" -Crop "$crop" | grep -q '^OK'; then
                 cp "$temp/tse-shot.png" "$2"
                 echo "$2"
                 exit 0
@@ -40,8 +43,9 @@ case "${1:-}" in
         exit 1
         ;;
     click) ps input.ps1 -Title "$title" -Action click -X "$2" -Y "$3" ;;
+    park) ps input.ps1 -Title "$title" -Action park ;;
     keys) ps input.ps1 -Title "$title" -Action keys -Keys "$2" ;;
     scroll) ps input.ps1 -Title "$title" -Action scroll -X "$2" -Y "$3" -Wheel "$(( $4 * 120 ))" ;;
     stop) pkill -x truck-save-edit || true ;;
-    *) sed -n '2,13p' "$0"; exit 1 ;;
+    *) sed -n '2,14p' "$0"; exit 1 ;;
 esac

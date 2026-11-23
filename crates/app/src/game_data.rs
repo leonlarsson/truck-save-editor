@@ -67,6 +67,12 @@ pub fn observe_map_in<V: 'static>(
     cx.observe_global_in::<MapRoads>(window, on_read)
 }
 
+/// Whether the game's map has been read (or found missing): the last of what loads in the
+/// background after startup.
+pub fn is_map_read(cx: &App) -> bool {
+    cx.try_global::<MapRoads>().is_some()
+}
+
 /// Where the map's viewpoints and photo trophies are, once read.
 pub fn map_markers(cx: &App) -> Option<Arc<Vec<gamedata::MapMarker>>> {
     cx.try_global::<MapRoads>()
@@ -168,6 +174,14 @@ pub fn reload(cx: &mut App) {
             cx.set_global(MapRoads(roads));
             cx.refresh_windows();
         });
+        // Development builds only: `TSE_READY_FILE=<path>` is written once the game's data and
+        // its map are read, the last of what loads in the background, so a script taking
+        // screenshots (`scripts/screenshots.sh`) knows when to start instead of guessing.
+        if cfg!(debug_assertions)
+            && let Some(path) = std::env::var_os("TSE_READY_FILE")
+        {
+            let _ = std::fs::write(path, "ready");
+        }
     })
     .detach();
 }
