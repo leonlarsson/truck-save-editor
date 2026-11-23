@@ -215,7 +215,7 @@ checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 
 [[package]]
 name = "app"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "dirs 7.0.0",
  "embed-resource",
@@ -2134,7 +2134,7 @@ dependencies = [
 
 [[package]]
 name = "gamedata"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "bcdec_rs",
  "dirs 7.0.0",
@@ -3365,7 +3365,7 @@ dependencies = [
 
 [[package]]
 name = "hashfs"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "flate2",
  "thiserror 2.0.21",
@@ -6376,7 +6376,7 @@ dependencies = [
 
 [[package]]
 name = "save"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "dirs 7.0.0",
  "sii",
@@ -6679,7 +6679,7 @@ dependencies = [
 
 [[package]]
 name = "sii"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "aes 0.9.4",
  "cbc 0.2.1",
