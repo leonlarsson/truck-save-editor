@@ -195,3 +195,29 @@ impl TableDelegate for TextTable {
         self.cell(row_ix, col_ix).to_string()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn columns() -> Vec<TextColumn> {
+        ["city", "visits"]
+            .into_iter()
+            .map(|key| TextColumn {
+                key,
+                title: SharedString::from(key),
+                width: 100.,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_details_column_comes_after_the_text_columns() {
+        let plain = TextTable::new(columns());
+        assert!(!plain.is_details(2));
+
+        let with_details = TextTable::new(columns()).with_details("Details".into(), |_, _, _| {});
+        assert!(!with_details.is_details(1));
+        assert!(with_details.is_details(2));
+    }
+}

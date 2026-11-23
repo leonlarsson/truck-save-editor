@@ -2138,6 +2138,8 @@ mod tests {
             session.set_wear("_nameless.4", "wheels_wear", 0.8, cx)
         });
         assert_eq!(items(&session, "wheels_wear", cx), [0.8, 0.8, 0.8]);
+        // Three wheels, one change, as the save dialog lists it.
+        cx.update(|cx| assert_eq!(session.read(cx).change_count(), 1));
         session.update(cx, |session, cx| session.undo(cx));
         assert_eq!(items(&session, "wheels_wear", cx), [0.25, 0.5, 0.0]);
         cx.update(|cx| assert!(!session.read(cx).can_undo()));
