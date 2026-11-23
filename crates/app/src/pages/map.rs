@@ -1,6 +1,6 @@
 //! Map: every city, how often the player has been there, and its truck dealer and recruitment
-//! agency (if it has them) and whether they're unlocked. Visit every city or unlock every dealer
-//! and agency in one go.
+//! agency (if it has them) and whether they're unlocked, as a list or on the map. Visit every city
+//! or unlock every dealer and agency in one go, or one city at a time in its panel.
 
 use std::collections::BTreeSet;
 
@@ -8,12 +8,13 @@ use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Selectable as _, Sizable as _, WindowExt as _,
     button::{Button, ButtonGroup},
     h_flex,
-    table::{DataTable, TableState},
+    table::{DataTable, TableEvent, TableState},
     v_flex,
 };
 use gpui_kit::{
-    App, AppContext as _, Context, Entity, IntoElement, ParentElement as _, Render, SharedString,
-    Styled as _, Subscription, Window, div, prelude::FluentBuilder as _,
+    App, AppContext as _, Context, Entity, InteractiveElement as _, IntoElement,
+    ParentElement as _, Render, SharedString, Styled as _, Subscription, Window, div,
+    prelude::FluentBuilder as _,
 };
 use save::Place;
 
@@ -22,10 +23,13 @@ use crate::i18n::t;
 use crate::session::Session;
 use crate::ui::{FilterBar, FilterChanged};
 use crate::ui::{RowLook, TextColumn, TextRow, TextTable};
+use crate::workspace::OpenDetails;
 
 pub struct MapPage {
     session: Entity<Session>,
     table: Entity<TableState<TextTable>>,
+    /// The cities' tokens, row by row as the table shows them, to open a row's panel.
+    tokens: Vec<String>,
     visited: usize,
     count: usize,
     dealers: PlaceCount,
@@ -34,8 +38,8 @@ pub struct MapPage {
     /// Moving the player's truck to another save's spot.
     position: Entity<crate::pages::position::PositionPicker>,
     /// The roads as a picture, shown instead of the cities when chosen.
-    road_map: Entity<crate::pages::road_map::RoadMap>,
-    shows_road_map: bool,
+    map_view: Entity<crate::pages::map_view::MapView>,
+    shows_map: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -93,20 +97,26 @@ impl MapPage {
             cx.observe(&session, |this, _, cx| this.reload(cx)),
             game_data::observe(cx, |this, cx| this.reload(cx)),
             cx.subscribe(&filter, |this, _, _: &FilterChanged, cx| this.reload(cx)),
+            cx.subscribe_in(&table, window, |this, _, event: &TableEvent, window, cx| {
+                if let TableEvent::DoubleClickedRow(row) = event {
+                    this.open_city(*row, window, cx);
+                }
+            }),
         ];
         let position = {
             let session = session.clone();
             cx.new(|cx| crate::pages::position::PositionPicker::new(session, window, cx))
         };
-        let road_map = {
+        let map_view = {
             let session = session.clone();
-            cx.new(|cx| crate::pages::road_map::RoadMap::new(session, cx))
+            cx.new(|cx| crate::pages::map_view::MapView::new(session, cx))
         };
         let mut page = Self {
-            road_map,
-            shows_road_map: false,
+            map_view,
+            shows_map: false,
             session,
             table,
+            tokens: Vec::new(),
             visited: 0,
             count: 0,
             dealers: PlaceCount::default(),
@@ -128,7 +138,7 @@ impl MapPage {
         self.dealers = count(&unlocked_dealers, dealer_cities.as_ref());
         self.recruitments = count(&unlocked_recruitments, recruitment_cities.as_ref());
 
-        let mut cities: Vec<(String, u32, SharedString, SharedString)> = session
+        let mut cities: Vec<(String, u32, SharedString, SharedString, String)> = session
             .cities()
             .into_iter()
             .map(|city| {
@@ -144,6 +154,7 @@ impl MapPage {
                     city.visits,
                     dealer,
                     recruitment,
+                    city.token,
                 )
             })
             .collect();
@@ -156,7 +167,7 @@ impl MapPage {
             let filter = self.filter.read(cx);
             cities
                 .into_iter()
-                .filter(|(name, visits, dealer, recruitment)| {
+                .filter(|(name, visits, dealer, recruitment, _)| {
                     (!filter.is_on(FILTER_NOT_VISITED) || *visits == 0)
                         && (!filter.is_on(FILTER_DEALER_LOCKED) || *dealer == locked)
                         && (!filter.is_on(FILTER_RECRUITMENT_LOCKED) || *recruitment == locked)
@@ -167,9 +178,10 @@ impl MapPage {
         let (shown, total) = (cities.len(), self.count);
         self.filter
             .update(cx, |filter, cx| filter.set_counts(shown, total, cx));
+        self.tokens = cities.iter().map(|city| city.4.clone()).collect();
         let rows = cities
             .into_iter()
-            .map(|(name, visits, dealer, recruitment)| TextRow {
+            .map(|(name, visits, dealer, recruitment, _)| TextRow {
                 cells: vec![
                     name.into(),
                     t!(cx, "map-visits", count = visits),
@@ -189,6 +201,13 @@ impl MapPage {
             cx.notify();
         });
         cx.notify();
+    }
+
+    /// Opens the panel of the city on this row.
+    fn open_city(&mut self, row: usize, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(token) = self.tokens.get(row) {
+            crate::pages::details::open_city(self.session.clone(), token, window, cx);
+        }
     }
 
     fn unlock(&mut self, place: Place, cx: &mut Context<Self>) {
@@ -417,22 +436,22 @@ impl Render for MapPage {
                     .small()
                     .child(
                         Button::new("view-cities")
-                            .label(t!(cx, "road-map-cities"))
-                            .selected(!self.shows_road_map),
+                            .label(t!(cx, "map-view-list"))
+                            .selected(!self.shows_map),
                     )
                     .child(
                         Button::new("view-roads")
-                            .label(t!(cx, "road-map-roads"))
-                            .selected(self.shows_road_map),
+                            .label(t!(cx, "map-view-map"))
+                            .selected(self.shows_map),
                     )
                     .on_click(cx.listener(|this, clicked: &Vec<usize>, _, cx| {
-                        this.shows_road_map = clicked.first() == Some(&1);
+                        this.shows_map = clicked.first() == Some(&1);
                         cx.notify();
                     })),
             )
             .map(|this| {
-                if self.shows_road_map {
-                    return this.child(div().flex_1().min_h_0().child(self.road_map.clone()));
+                if self.shows_map {
+                    return this.child(div().flex_1().min_h_0().child(self.map_view.clone()));
                 }
                 this.child(self.filter.clone())
                     // Not hidden, and not just a disabled button: say why, and what makes it work.
@@ -443,19 +462,28 @@ impl Render for MapPage {
                             .child(t!(cx, "map-needs-game"))
                     }))
                     .child(
-                        div().flex_1().min_h_0().child(crate::ui::table_or_empty(
-                            &self.filter,
-                            crate::ui::fill_table(
-                                &self.table,
-                                DataTable::new(&self.table)
-                                    .stripe(true)
-                                    .bordered(true)
-                                    .accessibility_label(t!(cx, "map-table"))
-                                    .into_any_element(),
-                            ),
-                            None,
-                            cx,
-                        )),
+                        div()
+                            .flex_1()
+                            .min_h_0()
+                            // Enter on the selected row opens it, like a double-click.
+                            .on_action(cx.listener(|this, _: &OpenDetails, window, cx| {
+                                if let Some(row) = this.table.read(cx).selected_row() {
+                                    this.open_city(row, window, cx);
+                                }
+                            }))
+                            .child(crate::ui::table_or_empty(
+                                &self.filter,
+                                crate::ui::fill_table(
+                                    &self.table,
+                                    DataTable::new(&self.table)
+                                        .stripe(true)
+                                        .bordered(true)
+                                        .accessibility_label(t!(cx, "map-table"))
+                                        .into_any_element(),
+                                ),
+                                None,
+                                cx,
+                            )),
                     )
             })
     }

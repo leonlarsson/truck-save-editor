@@ -526,6 +526,13 @@ column-dealer = Lastbilshandlare
 column-recruitment = Rekryteringsbyrå
 map-place-unlocked = Upplåst
 map-place-locked = Inte hittad än
+city-place-missing = Ingen i den här staden
+city-place-unknown = Okänt
+city-visit = Markera som besökt
+city-visit-tooltip = Markera staden som besökt, som om du hade kört genom den.
+city-unlock = Lås upp
+city-unlock-tooltip = Lås upp, som om du hade kört förbi.
+city-open-garage = Öppna
 
 ## Garages
 
@@ -703,21 +710,21 @@ map-discover-roads-tooltip = Markerar varje väg och korsning på kartan som kö
 map-discover-roads-needs-game = Kräver att spelet är installerat på den här datorn: dess karta säger var vägarna finns.
 map-discover-roads-confirm-title = Upptäcka alla vägar?
 map-discover-roads-confirm-body = Varje väg och korsning på kartan, även i dina kart-DLC, markeras som körd. Spelet kan räkna vägarna mot sina achievements, som Pathfinder (40 000 km upptäckta vägar), men om det gör det, eller när, vet man inte. Ångra tar tillbaka det tills du sparar, och sparfilen säkerhetskopieras först.
-road-map-cities = Städer
-road-map-roads = Vägkarta
-road-map-driven = Körda
-road-map-not-driven = Inte körda än
-road-map-truck = Din lastbil
-road-map-garages = Dina garage
-road-map-names = Stadsnamn
-road-map-hide = Klicka för att dölja
-road-map-show = Klicka för att visa
-road-map-drawing = Ritar kartan…
-road-map-needs-game = Kräver att spelet är installerat på den här datorn: kartan kommer från dess filer.
-road-map-hint = Scrolla för att zooma, dra för att flytta
-road-map-zoom-in = Zooma in
-road-map-zoom-out = Zooma ut
-road-map-fit = Hela kartan
+map-view-list = Lista
+map-view-map = Karta
+map-view-driven = Körda
+map-view-not-driven = Inte körda än
+map-view-truck = Din lastbil
+map-view-garages = Dina garage
+map-view-names = Stadsnamn
+map-view-hide = Klicka för att dölja
+map-view-show = Klicka för att visa
+map-view-drawing = Ritar kartan…
+map-view-needs-game = Kräver att spelet är installerat på den här datorn: kartan kommer från dess filer.
+map-view-hint = Scrolla för att zooma, dra för att flytta, klicka för att öppna
+map-view-zoom-in = Zooma in
+map-view-zoom-out = Zooma ut
+map-view-fit = Hela kartan
 
 # Truck and trailer details
 plate-colours = Skyltens färger

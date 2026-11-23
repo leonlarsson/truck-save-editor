@@ -8,11 +8,11 @@ pub mod garages;
 pub mod jobs;
 pub mod licences;
 pub mod map;
+pub mod map_view;
 pub mod open_save;
 pub mod overview;
 pub mod position;
 pub mod profile_tools;
-pub mod road_map;
 pub mod settings;
 pub mod statistics;
 

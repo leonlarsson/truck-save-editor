@@ -1,12 +1,15 @@
-//! Detail panels: one truck, trailer, driver or garage, opened from its row (double-click, or the
-//! row's Details button), in a sheet at the side. Every edit goes through the session like any
-//! other change: it shows on every page, counts in the header, and Undo takes it back.
+//! Detail panels: one truck, trailer, driver, garage or city, opened from its row (double-click,
+//! Enter, or the row's Details button) or from the map, in a sheet at the side. Every edit goes
+//! through the session like any other change: it shows on every page, counts in the header, and
+//! Undo takes it back.
 
+mod city;
 mod driver;
 mod garage;
 mod garage_picker;
 mod vehicle;
 
+pub use city::open as open_city;
 pub use driver::open as open_driver;
 pub use garage::open as open_garage;
 pub use vehicle::open as open_vehicle;

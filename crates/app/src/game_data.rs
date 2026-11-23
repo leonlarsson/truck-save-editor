@@ -17,18 +17,18 @@ struct Loaded {
     is_loading: bool,
 }
 
-/// Every road and junction on the game's map (for the road map and Discover every road), read
+/// Every road and junction on the game's map (for the map view and Discover every road), read
 /// after the rest of the game's data so it never holds that up. `None` until read, or without the
 /// game.
 #[derive(Default)]
 struct MapRoads(Option<RoadsRead>);
 
-/// The map's roads as read: with where they are (for the road map), and their ids alone (for
+/// The map's roads as read: with where they are (for the map view), and their ids alone (for
 /// Discover every road, kept apart so it isn't rebuilt from the roads each time).
 struct RoadsRead {
     roads: Arc<Vec<gamedata::MapRoad>>,
     ids: Arc<Vec<u64>>,
-    /// The cities' areas and the garages, for names and garages on the road map.
+    /// The cities' areas and the garages, for names and garages on the map view.
     places: Arc<Vec<gamedata::MapPlace>>,
 }
 

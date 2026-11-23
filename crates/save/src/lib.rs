@@ -54,7 +54,7 @@ pub use garages::{
 pub use info::{SlotInfo, read_info, set_name, update_info};
 pub use jobs::{Job, extend_offers, game_time, jobs};
 pub use levels::{FALLBACK_STEPS, Level, LevelTable};
-pub use map::{City, Place, cities, unlock, unlocked, visit_all_cities};
+pub use map::{City, Place, cities, unlock, unlocked, visit_all_cities, visit_cities};
 pub use player_state::{
     DAY_MINUTES, PlayerEdit, apply_player_edit, cargo_damage, is_on_job, minutes_since_break,
     offences, time_of_day,

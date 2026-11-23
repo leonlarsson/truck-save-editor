@@ -526,6 +526,13 @@ column-dealer = Truck dealer
 column-recruitment = Recruitment agency
 map-place-unlocked = Unlocked
 map-place-locked = Not found yet
+city-place-missing = None in this city
+city-place-unknown = Not known
+city-visit = Mark as visited
+city-visit-tooltip = Mark the city as visited, as if you'd driven through it.
+city-unlock = Unlock
+city-unlock-tooltip = Unlock it, as if you'd driven past it.
+city-open-garage = Open
 
 ## Garages
 
@@ -703,21 +710,21 @@ map-discover-roads-tooltip = Marks every road and junction on the map as driven,
 map-discover-roads-needs-game = Needs the game installed on this PC: its map says where the roads are.
 map-discover-roads-confirm-title = Discover every road?
 map-discover-roads-confirm-body = Every road and junction on the map, yours and your map DLCs', is marked as driven. The game may count these roads toward its achievements, such as Pathfinder (40,000 km of discovered roads), but whether it does, or when, isn't known. Undo takes it back until you save, and the save is backed up first.
-road-map-cities = Cities
-road-map-roads = Road map
-road-map-driven = Driven
-road-map-not-driven = Not driven yet
-road-map-truck = Your truck
-road-map-garages = Your garages
-road-map-names = City names
-road-map-hide = Click to hide
-road-map-show = Click to show
-road-map-drawing = Drawing the map…
-road-map-needs-game = Needs the game installed on this PC: the map comes from its files.
-road-map-hint = Scroll to zoom, drag to move
-road-map-zoom-in = Zoom in
-road-map-zoom-out = Zoom out
-road-map-fit = Whole map
+map-view-list = List
+map-view-map = Map
+map-view-driven = Driven
+map-view-not-driven = Not driven yet
+map-view-truck = Your truck
+map-view-garages = Your garages
+map-view-names = City names
+map-view-hide = Click to hide
+map-view-show = Click to show
+map-view-drawing = Drawing the map…
+map-view-needs-game = Needs the game installed on this PC: the map comes from its files.
+map-view-hint = Scroll to zoom, drag to move, click to open
+map-view-zoom-in = Zoom in
+map-view-zoom-out = Zoom out
+map-view-fit = Whole map
 
 # Truck and trailer details
 plate-colours = Plate colours

@@ -71,6 +71,8 @@ struct Pending {
     maxed_drivers: HashSet<String>,
     /// Whether to mark every city as visited when saving.
     visit_all_cities: bool,
+    /// Cities to mark as visited one by one (a city's panel), by token.
+    visited_cities: BTreeSet<String>,
     /// Values changed in All data, by where they are; applied before the other changes.
     raw_edits: BTreeMap<FieldPath, String>,
     /// Whether to make every job offer last at least a week (game time) when saving.
@@ -118,6 +120,7 @@ impl Pending {
             upgraded_garages: HashSet::new(),
             maxed_drivers: HashSet::new(),
             visit_all_cities: false,
+            visited_cities: BTreeSet::new(),
             raw_edits: BTreeMap::new(),
             keep_offers: false,
             company_name: None,
@@ -653,7 +656,8 @@ impl Session {
             + usize::from(!self.pending.upgraded_garages.is_empty())
             + usize::from(!self.pending.maxed_drivers.is_empty())
             + self.pending.raw_edits.len()
-            + usize::from(self.pending.visit_all_cities)
+            // Every city or some, it's one line: the cities visited.
+            + usize::from(self.pending.visit_all_cities || !self.pending.visited_cities.is_empty())
             + usize::from(self.pending.keep_offers)
             + usize::from(self.pending.company_name.is_some())
             + usize::from(self.pending.profile_name.is_some())
@@ -693,6 +697,31 @@ impl Session {
 
     pub fn visit_all_cities(&mut self, cx: &mut Context<Self>) {
         self.change(cx, |pending, _| pending.visit_all_cities = true);
+    }
+
+    /// Marks one city as visited (once), as if the player had driven through it.
+    pub fn visit_city(&mut self, token: &str, cx: &mut Context<Self>) {
+        // One visited already is left alone: no change, so no step for Undo.
+        let is_visited = self
+            .cities()
+            .iter()
+            .any(|city| city.token == token && city.visits > 0);
+        if is_visited {
+            return;
+        }
+        self.change(cx, |pending, _| {
+            pending.visited_cities.insert(token.to_string());
+        });
+    }
+
+    /// Unlocks one city's dealer (or agency), as if the player had driven past it.
+    pub fn unlock(&mut self, place: Place, token: &str, cx: &mut Context<Self>) {
+        if self.unlocked(place).contains(token) {
+            return;
+        }
+        self.change(cx, |pending, _| {
+            pending.unlocks_mut(place).insert(token.to_string());
+        });
     }
 
     /// A value as it'll be saved (every change in it), in its text form.
@@ -1157,11 +1186,12 @@ impl Session {
                 text.clone().into(),
             );
         }
-        if self.pending.visit_all_cities {
-            let unvisited = save::cities(&self.loaded.game)
-                .iter()
-                .filter(|city| city.visits == 0)
-                .count();
+        if self.pending.visit_all_cities || !self.pending.visited_cities.is_empty() {
+            // How many more cities are visited than on disk, every city or some.
+            let unvisited =
+                |cities: Vec<save::City>| cities.iter().filter(|city| city.visits == 0).count();
+            let unvisited =
+                unvisited(save::cities(&self.loaded.game)).saturating_sub(unvisited(self.cities()));
             add(
                 &map,
                 t!(cx, "change-cities"),
@@ -1602,6 +1632,8 @@ impl Session {
         if self.pending.cancel_job {
             save::cancel_job(&mut slot.game);
         }
+        let visited: Vec<String> = self.pending.visited_cities.iter().cloned().collect();
+        save::visit_cities(&mut slot.game, &visited);
         if self.pending.visit_all_cities {
             save::visit_all_cities(&mut slot.game);
         }
@@ -1762,9 +1794,13 @@ mod tests {
     const SAVE: &str = "SiiNunit\r\n{\r\neconomy : _nameless.1 {\r\n bank: _nameless.2\r\n player: _nameless.3\r\n experience_points: 5000\r\n adr: 0\r\n long_dist: 0\r\n heavy: 0\r\n fragile: 0\r\n urgent: 0\r\n mechanical: 0\r\n}\r\n\r\nbank : _nameless.2 {\r\n money_account: 1000\r\n loans: 0\r\n}\r\n\r\nplayer : _nameless.3 {\r\n hq_city: lyon\r\n}\r\n\r\n}\r\n";
 
     fn session(cx: &mut TestAppContext) -> Entity<Session> {
+        session_of(SAVE, cx)
+    }
+
+    fn session_of(text: &str, cx: &mut TestAppContext) -> Entity<Session> {
         let loaded = LoadedSlot {
             dir: "slot".into(),
-            game: sii::parse_text(SAVE).expect("parses"),
+            game: sii::parse_text(text).expect("parses"),
             info: None,
         };
         let profile = Profile {
@@ -1819,6 +1855,45 @@ mod tests {
         let session = session(cx);
         set_money(&session, 1000, cx);
         cx.update(|cx| assert!(!session.read(cx).can_undo()));
+    }
+
+    /// Two cities, Berlin visited and Lyon not; neither dealer nor agency unlocked.
+    const CITIES: &str = "SiiNunit\r\n{\r\neconomy : _nameless.1 {\r\n bank: _nameless.2\r\n player: _nameless.3\r\n garages: 2\r\n garages[0]: garage.berlin\r\n garages[1]: garage.lyon\r\n experience_points: 5000\r\n adr: 0\r\n long_dist: 0\r\n heavy: 0\r\n fragile: 0\r\n urgent: 0\r\n mechanical: 0\r\n unlocked_dealers: 0\r\n unlocked_recruitments: 0\r\n visited_cities: 1\r\n visited_cities[0]: berlin\r\n visited_cities_count: 1\r\n visited_cities_count[0]: 4\r\n}\r\n\r\nbank : _nameless.2 {\r\n money_account: 1000\r\n loans: 0\r\n}\r\n\r\nplayer : _nameless.3 {\r\n hq_city: berlin\r\n}\r\n\r\ngarage : garage.berlin {\r\n status: 0\r\n}\r\n\r\ngarage : garage.lyon {\r\n status: 0\r\n}\r\n\r\n}\r\n";
+
+    #[gpui_kit::test]
+    fn visits_and_unlocks_one_city_as_one_step_each(cx: &mut TestAppContext) {
+        let session = session_of(CITIES, cx);
+        let lyon_visits = |session: &Entity<Session>, cx: &mut TestAppContext| {
+            cx.update(|cx| {
+                session
+                    .read(cx)
+                    .cities()
+                    .into_iter()
+                    .find(|city| city.token == "lyon")
+                    .map(|city| city.visits)
+            })
+        };
+        assert_eq!(lyon_visits(&session, cx), Some(0));
+
+        session.update(cx, |session, cx| session.visit_city("lyon", cx));
+        session.update(cx, |session, cx| session.unlock(Place::Dealer, "lyon", cx));
+        assert_eq!(lyon_visits(&session, cx), Some(1));
+        cx.update(|cx| {
+            let session = session.read(cx);
+            assert!(session.unlocked(Place::Dealer).contains("lyon"));
+            assert!(session.unlocked(Place::Recruitment).is_empty());
+            // The cities visited and the dealers: a line each.
+            assert_eq!(session.change_count(), 2);
+        });
+
+        // Visiting a city already visited changes nothing.
+        session.update(cx, |session, cx| session.visit_city("berlin", cx));
+        cx.update(|cx| assert_eq!(session.read(cx).change_count(), 2));
+
+        session.update(cx, |session, cx| session.undo(cx));
+        session.update(cx, |session, cx| session.undo(cx));
+        assert_eq!(lyon_visits(&session, cx), Some(0));
+        cx.update(|cx| assert_eq!(session.read(cx).change_count(), 0));
     }
 
     #[gpui_kit::test]

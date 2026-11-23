@@ -73,14 +73,14 @@ The editor tells you when a newer version is out: when it starts, it asks GitHub
 
 ### The map
 
-- **Road map**: every road and junction on the game's map, the ones you've driven highlighted, with city names, your garages and your truck. Zoom with the mouse wheel and drag to move; the legend shows and hides each part.
+- **The map**: every road and junction on the game's map, the ones you've driven highlighted, with city names, your garages and your truck. Zoom with the mouse wheel and drag to move; the legend shows and hides each part. Click a city, a garage or your truck to open it.
 - **Discover every road**: the whole map explored (100 % in game), from the game's own map files. Or **forget visited roads** and start the map over.
-- Every city, whether you've been there, and its truck dealer and recruitment agency: visit every city, unlock every dealer and agency.
+- Every city, whether you've been there, and its truck dealer and recruitment agency: visit every city, unlock every dealer and agency, or open one city to visit it, unlock its dealer or agency, or open its garage.
 - Your position: a free **quick travel** when the save loads (the game lets you pick any city you've visited), or the exact spot from another save of the profile.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/road-map-dark.png">
-  <img alt="The road map: roads driven highlighted, with city names and garages" src="docs/screenshots/road-map-light.png">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/map-dark.png">
+  <img alt="The map: roads driven highlighted, with city names and garages" src="docs/screenshots/map-light.png">
 </picture>
 
 ### Jobs

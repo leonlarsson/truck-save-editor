@@ -284,3 +284,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** one file to download and run is simplest for players, and licences inside the .exe go wherever it's copied; the zip held only the editor's own and the adapted code's notices, not the crates' (MIT and Apache-2.0 both ask for their notices with binary copies).
 
 **Considered:** keeping the zip with a generated licences file next to the .exe (the licences only travel with the zip); writing our own licence collector over `cargo metadata` (more to maintain, and easy to get subtly wrong).
+
+## 2026-11-23: The map's things open their panels; "Road map" becomes the Map view
+
+**Decided:** on Map, the switch between the table and the picture reads **List | Map** (it was Cities | Road map), and the code calls the picture the map view (`pages/map_view.rs`, `MapView`, `map-view-*` messages). On the map, a click (let go within 4 px of where it was pressed, so a drag isn't a click) opens what's under the pointer, in the order things are drawn: a city's name opens a new city panel (`details/city.rs`), the truck its truck panel, a garage its garage panel. The city panel lists visits, the truck dealer, the recruitment agency and the garage, each with its action beside it (Mark as visited, Unlock, Open); the list of cities opens it too, by double-click or Enter. Single-city visits are a pending set of their own (`visited_cities`, applied by `save::visit_cities`), shown with Visit every city as one line, "N more cities visited".
+
+**Why:** "Road map" read as a product roadmap and named the roads, not the map; List | Map says what each half is. A map that shows cities and garages but can't open them is a dead end, and the panels already exist for garages and trucks. The list opening the same panel keeps every action reachable by keyboard.
+
+**Considered:** Cities | Map and Table | Map (the owner picked List | Map); a city card drawn on the map itself (a second kind of popup next to the panels everything else uses).

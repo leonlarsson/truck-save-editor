@@ -530,6 +530,13 @@ column-dealer = Lkw-Händler
 column-recruitment = Arbeitsagentur
 map-place-unlocked = Freigeschaltet
 map-place-locked = Noch nicht gefunden
+city-place-missing = Gibt es hier nicht
+city-place-unknown = Unbekannt
+city-visit = Als besucht markieren
+city-visit-tooltip = Markiert die Stadt als besucht, als wärst du durchgefahren.
+city-unlock = Freischalten
+city-unlock-tooltip = Schaltet frei, als wärst du vorbeigefahren.
+city-open-garage = Öffnen
 
 ## Garages
 
@@ -707,21 +714,21 @@ map-discover-roads-tooltip = Markiert jede Straße und Kreuzung der Karte als be
 map-discover-roads-needs-game = Braucht das auf diesem PC installierte Spiel: Seine Karte sagt, wo die Straßen sind.
 map-discover-roads-confirm-title = Alle Straßen entdecken?
 map-discover-roads-confirm-body = Jede Straße und Kreuzung der Karte, auch in deinen Karten-DLCs, wird als befahren markiert. Das Spiel rechnet diese Straßen vielleicht auf seine Erfolge an, etwa Pathfinder (40.000 km entdeckte Straßen), aber ob und wann, ist nicht bekannt. Rückgängig nimmt es bis zum Speichern zurück, und der Spielstand wird vorher gesichert.
-road-map-cities = Städte
-road-map-roads = Straßenkarte
-road-map-driven = Befahren
-road-map-not-driven = Noch nicht befahren
-road-map-truck = Dein Lkw
-road-map-garages = Deine Garagen
-road-map-names = Städtenamen
-road-map-hide = Zum Ausblenden klicken
-road-map-show = Zum Einblenden klicken
-road-map-drawing = Karte wird gezeichnet…
-road-map-needs-game = Braucht das auf diesem PC installierte Spiel: Die Karte kommt aus seinen Dateien.
-road-map-hint = Scrollen zum Zoomen, Ziehen zum Verschieben
-road-map-zoom-in = Hineinzoomen
-road-map-zoom-out = Herauszoomen
-road-map-fit = Ganze Karte
+map-view-list = Liste
+map-view-map = Karte
+map-view-driven = Befahren
+map-view-not-driven = Noch nicht befahren
+map-view-truck = Dein Lkw
+map-view-garages = Deine Garagen
+map-view-names = Städtenamen
+map-view-hide = Zum Ausblenden klicken
+map-view-show = Zum Einblenden klicken
+map-view-drawing = Karte wird gezeichnet…
+map-view-needs-game = Braucht das auf diesem PC installierte Spiel: Die Karte kommt aus seinen Dateien.
+map-view-hint = Scrollen zum Zoomen, Ziehen zum Verschieben, Klicken zum Öffnen
+map-view-zoom-in = Hineinzoomen
+map-view-zoom-out = Herauszoomen
+map-view-fit = Ganze Karte
 
 # Truck and trailer details
 plate-colours = Kennzeichenfarben

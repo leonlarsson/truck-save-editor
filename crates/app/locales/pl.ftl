@@ -551,6 +551,13 @@ column-dealer = Dealer ciężarówek
 column-recruitment = Agencja pracy
 map-place-unlocked = Odblokowane
 map-place-locked = Jeszcze nieodkryte
+city-place-missing = Brak w tym mieście
+city-place-unknown = Nieznane
+city-visit = Oznacz jako odwiedzone
+city-visit-tooltip = Oznacz miasto jako odwiedzone, jakbyś przez nie przejechał.
+city-unlock = Odblokuj
+city-unlock-tooltip = Odblokuj, jakbyś przejechał obok.
+city-open-garage = Otwórz
 
 ## Garages
 
@@ -740,21 +747,21 @@ map-discover-roads-tooltip = Oznacza każdą drogę i skrzyżowanie na mapie jak
 map-discover-roads-needs-game = Wymaga gry zainstalowanej na tym komputerze: jej mapa mówi, gdzie są drogi.
 map-discover-roads-confirm-title = Odkryć wszystkie drogi?
 map-discover-roads-confirm-body = Każda droga i skrzyżowanie na mapie, także w twoich DLC z mapami, zostaną oznaczone jako przejechane. Gra może zaliczyć te drogi do swoich osiągnięć, np. Pathfinder (40 000 km odkrytych dróg), ale nie wiadomo, czy i kiedy to zrobi. Cofnij odwraca zmianę do czasu zapisu, a zapis jest najpierw kopiowany.
-road-map-cities = Miasta
-road-map-roads = Mapa dróg
-road-map-driven = Przejechane
-road-map-not-driven = Jeszcze nie przejechane
-road-map-truck = Twoja ciężarówka
-road-map-garages = Twoje garaże
-road-map-names = Nazwy miast
-road-map-hide = Kliknij, aby ukryć
-road-map-show = Kliknij, aby pokazać
-road-map-drawing = Rysowanie mapy…
-road-map-needs-game = Wymaga gry zainstalowanej na tym komputerze: mapa pochodzi z jej plików.
-road-map-hint = Przewiń, aby powiększyć, przeciągnij, aby przesunąć
-road-map-zoom-in = Powiększ
-road-map-zoom-out = Pomniejsz
-road-map-fit = Cała mapa
+map-view-list = Lista
+map-view-map = Mapa
+map-view-driven = Przejechane
+map-view-not-driven = Jeszcze nie przejechane
+map-view-truck = Twoja ciężarówka
+map-view-garages = Twoje garaże
+map-view-names = Nazwy miast
+map-view-hide = Kliknij, aby ukryć
+map-view-show = Kliknij, aby pokazać
+map-view-drawing = Rysowanie mapy…
+map-view-needs-game = Wymaga gry zainstalowanej na tym komputerze: mapa pochodzi z jej plików.
+map-view-hint = Przewiń, aby powiększyć, przeciągnij, aby przesunąć, kliknij, aby otworzyć
+map-view-zoom-in = Powiększ
+map-view-zoom-out = Pomniejsz
+map-view-fit = Cała mapa
 
 # Truck and trailer details
 plate-colours = Kolory tablicy

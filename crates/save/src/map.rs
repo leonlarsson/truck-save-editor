@@ -56,6 +56,24 @@ pub fn visit_all_cities(document: &mut Document) -> usize {
         .filter(|city| city.visits == 0)
         .map(|city| city.token)
         .collect();
+    visit_cities(document, &missing)
+}
+
+/// Marks the cities in `tokens` as visited once, leaving those already visited as they are.
+/// Returns how many were added.
+pub fn visit_cities(document: &mut Document, tokens: &[String]) -> usize {
+    let visited_before: Vec<String> = cities(document)
+        .into_iter()
+        .filter(|city| city.visits > 0)
+        .map(|city| city.token)
+        .collect();
+    let missing: Vec<&String> = tokens
+        .iter()
+        .filter(|token| !visited_before.contains(token))
+        .collect();
+    if missing.is_empty() {
+        return 0;
+    }
     let Some(id) = document
         .first_of_kind("economy")
         .map(|unit| unit.id.clone())
@@ -76,9 +94,13 @@ pub fn visit_all_cities(document: &mut Document) -> usize {
     // The two lists go item by item; keep them the same length.
     counts.resize(visited.len(), "1".to_string());
     for token in &missing {
-        if !visited.contains(token) {
-            visited.push(token.clone());
-            counts.push("1".to_string());
+        match visited.iter().position(|city| city == *token) {
+            // Listed with a count of 0: counted once now.
+            Some(index) => counts[index] = "1".to_string(),
+            None => {
+                visited.push((*token).clone());
+                counts.push("1".to_string());
+            }
         }
     }
     economy.set("visited_cities", Value::Array(visited));
@@ -167,6 +189,20 @@ mod tests {
         assert_eq!(economy.items("visited_cities"), ["berlin", "lyon"]);
         assert_eq!(economy.items("visited_cities_count"), ["4", "1"]);
         assert_eq!(visit_all_cities(&mut document), 0);
+    }
+
+    #[test]
+    fn visits_one_city_leaving_the_others() {
+        let mut document = sii::parse_text(SAVE).expect("parses");
+        let lyon = vec!["lyon".to_string()];
+        assert_eq!(visit_cities(&mut document, &lyon), 1);
+        let economy = document.first_of_kind("economy").expect("economy");
+        assert_eq!(economy.items("visited_cities"), ["berlin", "lyon"]);
+        assert_eq!(economy.items("visited_cities_count"), ["4", "1"]);
+        // Already visited: Berlin keeps its count.
+        let both = vec!["berlin".to_string(), "lyon".to_string()];
+        assert_eq!(visit_cities(&mut document, &both), 0);
+        assert_eq!(cities(&document)[0].visits, 4);
     }
 
     #[test]

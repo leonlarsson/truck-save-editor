@@ -1,7 +1,8 @@
 //! The map's roads: a dot for every road and junction on the game's map (read from its files, see
 //! `gamedata::map_roads`), the ones driven in this save in the accent colour, and where the
 //! player's truck is. The mouse wheel zooms around the pointer, dragging moves the map, and
-//! buttons do both from the keyboard.
+//! buttons do both from the keyboard. A click on a city's name, a garage or the truck opens its
+//! panel (the list of cities, Garages and Fleet open the same panels from the keyboard).
 //!
 //! Drawn the way web maps are: in square tiles at fixed zoom levels, each drawn once in the
 //! background and kept. Moving the map reuses the tiles already drawn; zooming shows the nearest
@@ -22,12 +23,13 @@ use gpui_kit::component::{
 use gpui_kit::{
     App, AppContext as _, BorderStyle, Bounds, Context, Corners, Entity, Hsla,
     InteractiveElement as _, IntoElement, MouseButton, ParentElement as _, Pixels, Point, Render,
-    RenderImage, Rgba, SharedString, Styled as _, Task, Window, canvas, div, point,
-    prelude::FluentBuilder as _, px, quad, rems, size,
+    RenderImage, Rgba, SharedString, StatefulInteractiveElement as _, Styled as _, Task, Window,
+    canvas, div, point, prelude::FluentBuilder as _, px, quad, rems, size,
 };
 
 use crate::game_data;
 use crate::i18n::t;
+use crate::pages::details;
 use crate::session::Session;
 
 /// A tile's side, in screen pixels.
@@ -58,6 +60,12 @@ const GARAGE: f32 = 7.0;
 /// overlap a bigger city's aren't shown.
 const NAME_CHARACTER: f32 = 6.5;
 const NAME_HEIGHT: f32 = 16.0;
+/// How far the pointer can move between pressing and letting go for it to be a click, not a drag,
+/// in pixels.
+const CLICK_SLOP: f32 = 4.0;
+/// How much bigger than its marker a garage or the truck is to the pointer, in pixels on each
+/// side: small marks are hard to hit.
+const HIT_MARGIN: f32 = 3.0;
 
 /// What the map shows: the point in the middle (in the game's metres, `x` east and `z` south)
 /// and how many metres one screen pixel covers.
@@ -197,6 +205,52 @@ impl Places {
     }
 }
 
+/// Something on the map that opens a panel when clicked.
+#[derive(Clone, Debug, PartialEq)]
+enum Target {
+    /// A city, by token.
+    City(String),
+    /// A garage, by its unit's id, and its city's token.
+    Garage { id: String, city: String },
+    /// The player's truck, by its unit's id.
+    Truck(String),
+}
+
+/// A city's name on screen: the room it takes, and whether the player has been there.
+struct MapName {
+    room: Bounds<Pixels>,
+    name: SharedString,
+    token: String,
+    is_visited: bool,
+}
+
+/// One of the player's garages on screen.
+struct MapGarage {
+    at: Point<Pixels>,
+    is_headquarters: bool,
+    id: String,
+    city: String,
+}
+
+impl MapGarage {
+    fn side(&self) -> Pixels {
+        if self.is_headquarters {
+            px(GARAGE + 3.0)
+        } else {
+            px(GARAGE)
+        }
+    }
+}
+
+/// A square of `side` around `at`, grown by `margin` on each side.
+fn square_around(at: Point<Pixels>, side: Pixels, margin: f32) -> Bounds<Pixels> {
+    let half = side / 2.0 + px(margin);
+    Bounds::new(
+        point(at.x - half, at.y - half),
+        size(half * 2.0, half * 2.0),
+    )
+}
+
 /// One tile: its zoom level and place in that level's grid.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 struct TileKey {
@@ -294,7 +348,7 @@ struct Tile {
     shown: u64,
 }
 
-pub struct RoadMap {
+pub struct MapView {
     session: Entity<Session>,
     view: Option<View>,
     /// Where the map's area is on screen, as last laid out (set while painting).
@@ -314,10 +368,17 @@ pub struct RoadMap {
     places: Option<Arc<Places>>,
     /// What the map shows; the legend turns each on and off.
     layers: Layers,
+    /// What a click opens, where it is on screen, topmost first (as last drawn).
+    targets: Vec<(Bounds<Pixels>, Target)>,
+    /// Where the pointer is over the map (`None` when it's elsewhere).
+    pointer: Option<Point<Pixels>>,
+    /// What the pointer is over, worked out again on every frame: the map moves under a still
+    /// pointer when zoomed.
+    hovered: Option<Target>,
     _work: Vec<Task<()>>,
 }
 
-impl RoadMap {
+impl MapView {
     pub fn new(session: Entity<Session>, cx: &mut Context<Self>) -> Self {
         cx.observe(&session, |_, _, cx| cx.notify()).detach();
         Self {
@@ -334,6 +395,9 @@ impl RoadMap {
             drag: None,
             places: None,
             layers: Layers::default(),
+            targets: Vec::new(),
+            pointer: None,
+            hovered: None,
             _work: Vec::new(),
         }
     }
@@ -562,7 +626,7 @@ impl RoadMap {
 
     /// The cities' names to show, where, and whether the player has been there: the save's
     /// cities in view, biggest first, each only where it doesn't overlap one already placed.
-    fn names(&self, cx: &App) -> Vec<(Point<Pixels>, SharedString, bool)> {
+    fn names(&self, cx: &App) -> Vec<MapName> {
         let (Some(places), Some(view), Some(area)) = (&self.places, self.view, self.area.get())
         else {
             return Vec::new();
@@ -597,13 +661,18 @@ impl RoadMap {
                 continue;
             }
             taken.push(room);
-            names.push((room.origin, name, visited > 0));
+            names.push(MapName {
+                room,
+                name,
+                token: city.token.clone(),
+                is_visited: visited > 0,
+            });
         }
         names
     }
 
     /// The player's garages on screen, the headquarters marked.
-    fn garages(&self, cx: &App) -> Vec<(Point<Pixels>, bool)> {
+    fn garages(&self, cx: &App) -> Vec<MapGarage> {
         let (Some(places), Some(view), Some(area)) = (&self.places, self.view, self.area.get())
         else {
             return Vec::new();
@@ -620,10 +689,50 @@ impl RoadMap {
             .filter_map(|garage| {
                 let &(x, z) = places.garages.get(&garage.city)?;
                 let at = to_screen(view, area, x, z);
-                area.contains(&at)
-                    .then_some((at, garage.city == headquarters))
+                area.contains(&at).then(|| MapGarage {
+                    at,
+                    is_headquarters: garage.city == headquarters,
+                    id: garage.id,
+                    city: garage.city,
+                })
             })
             .collect()
+    }
+
+    /// What's under the pointer, the topmost first.
+    fn target_at(&self, at: Point<Pixels>) -> Option<Target> {
+        self.targets
+            .iter()
+            .find(|(bounds, _)| bounds.contains(&at))
+            .map(|(_, target)| target.clone())
+    }
+
+    /// Opens what was clicked in its panel.
+    fn open(&self, target: Target, window: &mut Window, cx: &mut Context<Self>) {
+        let session = self.session.clone();
+        match target {
+            Target::City(token) => details::open_city(session, &token, window, cx),
+            Target::Garage { id, .. } => {
+                let garage = session
+                    .read(cx)
+                    .garages()
+                    .into_iter()
+                    .find(|garage| garage.id == id);
+                if let Some(garage) = garage {
+                    details::open_garage(session, &garage, window, cx);
+                }
+            }
+            Target::Truck(id) => {
+                let truck = session
+                    .read(cx)
+                    .vehicles()
+                    .into_iter()
+                    .find(|vehicle| vehicle.id == id);
+                if let Some(truck) = truck {
+                    details::open_vehicle(session, &truck, window, cx);
+                }
+            }
+        }
     }
 
     /// What to paint for each tile in view, marking the tiles used as shown: the tile itself
@@ -800,7 +909,7 @@ fn draw_tile(
     Some(RenderImage::new(vec![image::Frame::new(buffer)]))
 }
 
-impl Render for RoadMap {
+impl Render for MapView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.prepare(window, cx);
         let paint = self.tiles_to_paint();
@@ -821,9 +930,9 @@ impl Render for RoadMap {
                 .ghost()
                 .xsmall()
                 .tooltip(if shown {
-                    t!(cx, "road-map-hide")
+                    t!(cx, "map-view-hide")
                 } else {
-                    t!(cx, "road-map-show")
+                    t!(cx, "map-view-show")
                 })
                 .child(
                     h_flex()
@@ -852,11 +961,11 @@ impl Render for RoadMap {
             .border_1()
             .border_color(theme.background)
             .into_any_element();
-        let driven_label = t!(cx, "road-map-driven");
-        let not_driven_label = t!(cx, "road-map-not-driven");
-        let truck_label = t!(cx, "road-map-truck");
-        let garages_label = t!(cx, "road-map-garages");
-        let names_label = t!(cx, "road-map-names");
+        let driven_label = t!(cx, "map-view-driven");
+        let not_driven_label = t!(cx, "map-view-not-driven");
+        let truck_label = t!(cx, "map-view-truck");
+        let garages_label = t!(cx, "map-view-garages");
+        let names_label = t!(cx, "map-view-names");
         let (primary, muted, danger) = (theme.primary, theme.muted_foreground, theme.danger);
         let legend = h_flex()
             .gap_1()
@@ -904,24 +1013,24 @@ impl Render for RoadMap {
                 cx,
             ))
             .child(div().flex_1())
-            .child(t!(cx, "road-map-hint"))
+            .child(t!(cx, "map-view-hint"))
             .child(
-                ButtonGroup::new("road-map-zoom")
+                ButtonGroup::new("map-zoom")
                     .outline()
                     .xsmall()
                     .child(
                         Button::new("zoom-in")
                             .label("+")
-                            .tooltip(t!(cx, "road-map-zoom-in"))
-                            .accessibility_label(t!(cx, "road-map-zoom-in")),
+                            .tooltip(t!(cx, "map-view-zoom-in"))
+                            .accessibility_label(t!(cx, "map-view-zoom-in")),
                     )
                     .child(
                         Button::new("zoom-out")
                             .label("−")
-                            .tooltip(t!(cx, "road-map-zoom-out"))
-                            .accessibility_label(t!(cx, "road-map-zoom-out")),
+                            .tooltip(t!(cx, "map-view-zoom-out"))
+                            .accessibility_label(t!(cx, "map-view-zoom-out")),
                     )
-                    .child(Button::new("zoom-fit").label(t!(cx, "road-map-fit")))
+                    .child(Button::new("zoom-fit").label(t!(cx, "map-view-fit")))
                     .on_click(cx.listener(
                         |this, clicked: &Vec<usize>, _, cx| match clicked.first() {
                             Some(0) => this.zoom(1.0 / STEP, None, cx),
@@ -938,9 +1047,9 @@ impl Render for RoadMap {
         let is_getting_ready =
             self.index.is_none() || self.driven.is_none() || !self.drawing.is_empty();
         let message = if !has_roads {
-            Some(t!(cx, "road-map-needs-game"))
+            Some(t!(cx, "map-view-needs-game"))
         } else if paint.is_empty() && is_getting_ready {
-            Some(t!(cx, "road-map-drawing"))
+            Some(t!(cx, "map-view-drawing"))
         } else {
             None
         };
@@ -948,7 +1057,58 @@ impl Render for RoadMap {
         let truck = save::position(&self.session.read(cx).preview())
             .and_then(|position| placement_xz(&position.placement))
             .filter(|_| self.layers.truck);
-        let view = self.view;
+        let truck_at = match (truck, self.view, self.area.get()) {
+            (Some((x, z)), Some(view), Some(area)) => {
+                Some(to_screen(view, area, x, z)).filter(|at| area.contains(at))
+            }
+            _ => None,
+        };
+
+        // What a click opens, in the order they're drawn, topmost first: the names (over the
+        // map), the truck, the garages.
+        let mut targets = Vec::new();
+        for name in &names {
+            targets.push((name.room, Target::City(name.token.clone())));
+        }
+        if let (Some(at), Some(id)) = (truck_at, self.session.read(cx).own_truck()) {
+            targets.push((
+                square_around(at, px(MARKER * 2.0), HIT_MARGIN),
+                Target::Truck(id),
+            ));
+        }
+        for garage in &garages {
+            targets.push((
+                square_around(garage.at, garage.side(), HIT_MARGIN),
+                Target::Garage {
+                    id: garage.id.clone(),
+                    city: garage.city.clone(),
+                },
+            ));
+        }
+        self.targets = targets;
+        // Nothing is hovered while the map is dragged.
+        self.hovered = match (self.pointer, self.drag) {
+            (Some(pointer), None) => self.target_at(pointer),
+            _ => None,
+        };
+        // A garage or the truck hovered says what it is, beside it (a name says it already).
+        let hover_label = self.hovered.as_ref().and_then(|hovered| {
+            let label: SharedString = match hovered {
+                Target::City(_) => return None,
+                Target::Garage { city, .. } => t!(
+                    cx,
+                    "detail-garage-in",
+                    city = game_data::city_name(cx, city)
+                ),
+                Target::Truck(_) => t!(cx, "map-view-truck"),
+            };
+            let (bounds, _) = self.targets.iter().find(|(_, target)| target == hovered)?;
+            Some((bounds.top_right(), bounds.size.height, label))
+        });
+        let hovered_city = match &self.hovered {
+            Some(Target::City(token)) => Some(token.clone()),
+            _ => None,
+        };
         let marker = (theme.danger, theme.background);
         let garage_colors = (theme.foreground, theme.background, theme.primary);
         let area = self.area.clone();
@@ -974,17 +1134,10 @@ impl Render for RoadMap {
                     );
                 }
                 // The player's garages: squares, the headquarters bigger and ringed.
-                for (at, is_headquarters) in garages {
-                    let side = if is_headquarters {
-                        px(GARAGE + 3.0)
-                    } else {
-                        px(GARAGE)
-                    };
+                for garage in garages {
+                    let is_headquarters = garage.is_headquarters;
                     window.paint_quad(quad(
-                        Bounds::new(
-                            point(at.x - side / 2.0, at.y - side / 2.0),
-                            size(side, side),
-                        ),
+                        square_around(garage.at, garage.side(), 0.0),
                         px(1.0),
                         garage_colors.0,
                         px(if is_headquarters { 2.0 } else { 1.0 }),
@@ -996,25 +1149,16 @@ impl Render for RoadMap {
                         BorderStyle::Solid,
                     ));
                 }
-                if let (Some((x, z)), Some(view)) = (truck, view) {
-                    let middle = point(
-                        bounds.center().x + px((x - view.x) / view.metres_per_pixel),
-                        bounds.center().y + px((z - view.z) / view.metres_per_pixel),
-                    );
-                    if bounds.contains(&middle) {
-                        let radius = px(MARKER);
-                        window.paint_quad(quad(
-                            Bounds::new(
-                                point(middle.x - radius, middle.y - radius),
-                                size(radius * 2.0, radius * 2.0),
-                            ),
-                            radius,
-                            marker.0,
-                            px(2.0),
-                            marker.1,
-                            BorderStyle::Solid,
-                        ));
-                    }
+                if let Some(middle) = truck_at {
+                    let radius = px(MARKER);
+                    window.paint_quad(quad(
+                        square_around(middle, radius * 2.0, 0.0),
+                        radius,
+                        marker.0,
+                        px(2.0),
+                        marker.1,
+                        BorderStyle::Solid,
+                    ));
                 }
             },
         )
@@ -1022,7 +1166,7 @@ impl Render for RoadMap {
 
         v_flex().size_full().gap_3().child(legend).child(
             div()
-                .id("road-map")
+                .id("map-view")
                 .relative()
                 .flex_1()
                 .min_h_0()
@@ -1030,9 +1174,25 @@ impl Render for RoadMap {
                 .rounded(theme.radius)
                 .border_1()
                 .border_color(theme.border)
-                .cursor_grab()
+                // A pointer over what a click opens; elsewhere, the map is dragged.
+                .map(|this| {
+                    if self.hovered.is_some() {
+                        this.cursor_pointer()
+                    } else {
+                        this.cursor_grab()
+                    }
+                })
+                .on_hover(cx.listener(|this, is_hovered: &bool, _, cx| {
+                    if !*is_hovered {
+                        this.pointer = None;
+                        if this.hovered.take().is_some() {
+                            cx.notify();
+                        }
+                    }
+                }))
                 .on_scroll(
                     cx.listener(|this, event: &gpui_kit::ScrollEvent, window, cx| {
+                        this.pointer = Some(event.position);
                         let delta = f32::from(event.delta.pixel_delta(window.line_height()).y);
                         // One wheel notch zooms by about a third.
                         this.zoom((-delta / 70.0).exp(), Some(event.position), cx);
@@ -1049,7 +1209,13 @@ impl Render for RoadMap {
                 )
                 .on_mouse_move(
                     cx.listener(|this, event: &gpui_kit::MouseMoveEvent, _, cx| {
+                        this.pointer = Some(event.position);
                         let Some((from, start)) = this.drag else {
+                            // Not dragging: drawn again only when what's under the pointer
+                            // changes.
+                            if this.target_at(event.position) != this.hovered {
+                                cx.notify();
+                            }
                             return;
                         };
                         if event.pressed_button != Some(MouseButton::Left) {
@@ -1067,27 +1233,57 @@ impl Render for RoadMap {
                 )
                 .on_mouse_up(
                     MouseButton::Left,
-                    cx.listener(|this, _: &gpui_kit::MouseUpEvent, _, _| this.drag = None),
+                    cx.listener(|this, event: &gpui_kit::MouseUpEvent, window, cx| {
+                        let Some((from, _)) = this.drag.take() else {
+                            return;
+                        };
+                        // What's under the pointer counts again now the drag is over.
+                        cx.notify();
+                        // Let go about where it was pressed: a click, not a drag.
+                        let moved = event.position - from;
+                        let is_click = f32::from(moved.x).abs() <= CLICK_SLOP
+                            && f32::from(moved.y).abs() <= CLICK_SLOP;
+                        if is_click && let Some(target) = this.target_at(event.position) {
+                            this.open(target, window, cx);
+                        }
+                    }),
                 )
                 .child(map)
                 // Cities' names over the map: the ones visited in full colour.
-                .children(names.into_iter().map(|(at, name, visited)| {
+                .children(names.into_iter().map(|name| {
                     let offset = self.area.get().map(|area| area.origin).unwrap_or_default();
+                    let is_hovered = hovered_city.as_ref() == Some(&name.token);
                     div()
                         .absolute()
-                        .left(at.x - offset.x)
-                        .top(at.y - offset.y)
+                        .left(name.room.origin.x - offset.x)
+                        .top(name.room.origin.y - offset.y)
                         .px_1()
                         .rounded(theme.radius)
                         .bg(theme.background.opacity(0.7))
                         .text_xs()
                         .whitespace_nowrap()
-                        .text_color(if visited {
+                        .text_color(if name.is_visited || is_hovered {
                             theme.foreground
                         } else {
                             theme.muted_foreground
                         })
-                        .child(name)
+                        // Hovered, it reads as a link: a click opens the city.
+                        .when(is_hovered, |this| this.underline())
+                        .child(name.name)
+                }))
+                .children(hover_label.map(|(top_right, height, label)| {
+                    let offset = self.area.get().map(|area| area.origin).unwrap_or_default();
+                    div()
+                        .absolute()
+                        .left(top_right.x - offset.x + px(2.0))
+                        .top(top_right.y - offset.y + height / 2.0 - px(NAME_HEIGHT / 2.0))
+                        .px_1()
+                        .rounded(theme.radius)
+                        .bg(theme.background.opacity(0.85))
+                        .text_xs()
+                        .whitespace_nowrap()
+                        .text_color(theme.foreground)
+                        .child(label)
                 }))
                 .children(message.map(|message| {
                     div()
