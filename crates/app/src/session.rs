@@ -114,6 +114,30 @@ struct Pending {
     /// Changes to the player's day (rest, the police record, cargo damage, the clock, the
     /// trailer); a later one of the same kind replaces the earlier.
     player_edits: Vec<save::PlayerEdit>,
+    /// Changes to the coach career's services and bus stops.
+    coach: CoachChanges,
+}
+
+/// Changes to the coach career's numbers (see `save::coach_stats`): each is a line of its own.
+#[derive(Clone, Debug, Default, PartialEq)]
+struct CoachChanges {
+    /// Every logged service's satisfaction to 100 %.
+    perfect_satisfaction: bool,
+    /// Every bus stop on the map found.
+    discover_stops: bool,
+    /// The passengers transported, spread over the logged services.
+    passengers: Option<i64>,
+    /// The coach distance, in km.
+    distance_km: Option<i64>,
+}
+
+impl CoachChanges {
+    fn count(&self) -> usize {
+        usize::from(self.perfect_satisfaction)
+            + usize::from(self.discover_stops)
+            + usize::from(self.passengers.is_some())
+            + usize::from(self.distance_km.is_some())
+    }
 }
 
 impl Pending {
@@ -146,6 +170,7 @@ impl Pending {
             move_to: None,
             quick_travel: false,
             player_edits: Vec::new(),
+            coach: CoachChanges::default(),
         }
     }
 
@@ -752,6 +777,7 @@ impl Session {
             + usize::from(self.pending.move_to.is_some())
             + usize::from(self.pending.quick_travel)
             + self.pending.player_edits.len()
+            + self.pending.coach.count()
             + usize::from(self.pending.roads.is_some())
     }
 
@@ -791,6 +817,50 @@ impl Session {
                     || wear_fields.insert((path.unit.as_str(), path.field.as_str()))
             })
             .count()
+    }
+
+    /// The coach career's numbers as they'll be after saving (`None` without a coach career).
+    pub fn coach_stats(&self) -> Option<save::CoachStats> {
+        save::coach_stats(&self.preview())
+    }
+
+    /// Every logged coach service's passengers left as happy as can be.
+    pub fn perfect_coach_satisfaction(&mut self, cx: &mut Context<Self>) {
+        let is_perfect = self.coach_stats().is_none_or(|stats| {
+            stats
+                .average_satisfaction
+                .is_none_or(|average| average >= 1.0)
+        });
+        if !is_perfect {
+            self.change(cx, |pending, _| pending.coach.perfect_satisfaction = true);
+        }
+    }
+
+    /// Every bus stop on the map found, as if the player had been to each.
+    pub fn discover_bus_stops(&mut self, cx: &mut Context<Self>) {
+        let is_all = self
+            .coach_stats()
+            .is_none_or(|stats| stats.stops_found >= stats.stops_total);
+        if !is_all {
+            self.change(cx, |pending, _| pending.coach.discover_stops = true);
+        }
+    }
+
+    /// The passengers transported, spread over the logged services; the save's own total isn't a
+    /// change.
+    pub fn set_coach_passengers(&mut self, total: i64, cx: &mut Context<Self>) {
+        let saved = save::coach_stats(&self.loaded.game).map(|stats| stats.passengers);
+        self.change(cx, |pending, _| {
+            pending.coach.passengers = (saved != Some(total)).then_some(total);
+        });
+    }
+
+    /// The coach distance, in km; the save's own isn't a change.
+    pub fn set_coach_distance(&mut self, km: i64, cx: &mut Context<Self>) {
+        let saved = save::coach_stats(&self.loaded.game).map(|stats| stats.distance_km);
+        self.change(cx, |pending, _| {
+            pending.coach.distance_km = (saved != Some(km)).then_some(km);
+        });
     }
 
     /// Whether any change touches which cities are visited.
@@ -1342,6 +1412,51 @@ impl Session {
                 text.clone().into(),
             );
         }
+        if self.pending.coach.count() > 0
+            && let (Some(saved), Some(after)) =
+                (save::coach_stats(&self.loaded.game), self.coach_stats())
+        {
+            let coaches = t!(cx, "coach-services");
+            let percent = |satisfaction: Option<f32>| -> SharedString {
+                t!(
+                    cx,
+                    "percent",
+                    amount = (satisfaction.unwrap_or(0.0) * 100.0).round() as i64
+                )
+            };
+            let stops = |stats: &save::CoachStats| {
+                t!(
+                    cx,
+                    "coach-stops-found",
+                    found = stats.stops_found,
+                    count = stats.stops_total
+                )
+            };
+            add(
+                &coaches,
+                t!(cx, "coach-passengers"),
+                thousands(saved.passengers).into(),
+                thousands(after.passengers).into(),
+            );
+            add(
+                &coaches,
+                t!(cx, "coach-average-satisfaction"),
+                percent(saved.average_satisfaction),
+                percent(after.average_satisfaction),
+            );
+            add(
+                &coaches,
+                t!(cx, "coach-distance"),
+                t!(cx, "distance-km", amount = thousands(saved.distance_km)),
+                t!(cx, "distance-km", amount = thousands(after.distance_km)),
+            );
+            add(
+                &coaches,
+                t!(cx, "coach-stops"),
+                stops(&saved),
+                stops(&after),
+            );
+        }
         if self.visits_changed() {
             // How many cities are visited, of how many, before and after.
             let summary = |cities: Vec<save::City>| {
@@ -1788,6 +1903,19 @@ impl Session {
         if self.pending.cancel_job {
             save::cancel_job(&mut slot.game);
         }
+        // The passengers first: setting satisfaction doesn't touch them.
+        if let Some(total) = self.pending.coach.passengers {
+            save::set_coach_passengers(&mut slot.game, total);
+        }
+        if self.pending.coach.perfect_satisfaction {
+            save::perfect_satisfaction(&mut slot.game);
+        }
+        if self.pending.coach.discover_stops {
+            save::discover_bus_stops(&mut slot.game);
+        }
+        if let Some(km) = self.pending.coach.distance_km {
+            save::set_coach_distance(&mut slot.game, km);
+        }
         let visited: Vec<String> = self.pending.visited_cities.iter().cloned().collect();
         save::visit_cities(&mut slot.game, &visited);
         if self.pending.visit_all_cities {
@@ -2152,6 +2280,46 @@ mod tests {
             session.set_wear("_nameless.4", "engine_wear", 0.5, cx)
         });
         cx.update(|cx| assert_eq!(session.read(cx).change_count(), 0));
+    }
+
+    /// A coach career: two logged services (30 and 10 passengers, half and fully satisfied), two
+    /// bus stops (one found), 450 km by coach.
+    const COACHES: &str = "SiiNunit\r\n{\r\neconomy : _nameless.1 {\r\n bank: _nameless.2\r\n player: _nameless.3\r\n experience_points: 5000\r\n adr: 0\r\n long_dist: 0\r\n heavy: 0\r\n fragile: 0\r\n urgent: 0\r\n mechanical: 0\r\n bus_job_log: log\r\n bus_stops: 2\r\n bus_stops[0]: stop.a\r\n bus_stops[1]: stop.b\r\n total_distances_by_mode: 3\r\n total_distances_by_mode[0]: 9000\r\n total_distances_by_mode[1]: 450\r\n total_distances_by_mode[2]: 0\r\n}\r\n\r\nbank : _nameless.2 {\r\n money_account: 1000\r\n loans: 0\r\n}\r\n\r\nplayer : _nameless.3 {\r\n hq_city: lyon\r\n}\r\n\r\nbus_job_log : log {\r\n entries: 2\r\n entries[0]: job.1\r\n entries[1]: job.2\r\n}\r\n\r\nbus_job_log_entry : job.1 {\r\n total_passengers: 30\r\n satisfaction: 0.5\r\n}\r\n\r\nbus_job_log_entry : job.2 {\r\n total_passengers: 10\r\n satisfaction: 1\r\n}\r\n\r\nbus_stop : stop.a {\r\n discovered: true\r\n}\r\n\r\nbus_stop : stop.b {\r\n discovered: false\r\n}\r\n\r\n}\r\n";
+
+    #[gpui_kit::test]
+    fn coach_changes_are_a_line_each_and_undo(cx: &mut TestAppContext) {
+        let session = session_of(COACHES, cx);
+        let stats = |session: &Entity<Session>, cx: &mut TestAppContext| {
+            cx.update(|cx| session.read(cx).coach_stats().expect("a coach career"))
+        };
+        let count = |session: &Entity<Session>, cx: &mut TestAppContext| {
+            cx.update(|cx| session.read(cx).change_count())
+        };
+
+        session.update(cx, |session, cx| session.perfect_coach_satisfaction(cx));
+        session.update(cx, |session, cx| session.discover_bus_stops(cx));
+        session.update(cx, |session, cx| session.set_coach_passengers(100, cx));
+        session.update(cx, |session, cx| session.set_coach_distance(2000, cx));
+        let after = stats(&session, cx);
+        assert_eq!(after.average_satisfaction, Some(1.0));
+        assert_eq!((after.stops_found, after.stops_total), (2, 2));
+        assert_eq!((after.passengers, after.distance_km), (100, 2000));
+        assert_eq!(count(&session, cx), 4);
+
+        // Nothing left to do: no new step.
+        session.update(cx, |session, cx| session.perfect_coach_satisfaction(cx));
+        session.update(cx, |session, cx| session.discover_bus_stops(cx));
+        assert_eq!(count(&session, cx), 4);
+
+        // Back to the save's own distance: that line goes.
+        session.update(cx, |session, cx| session.set_coach_distance(450, cx));
+        assert_eq!(count(&session, cx), 3);
+
+        for _ in 0..5 {
+            session.update(cx, |session, cx| session.undo(cx));
+        }
+        assert_eq!(stats(&session, cx).passengers, 40);
+        assert_eq!(count(&session, cx), 0);
     }
 
     #[gpui_kit::test]

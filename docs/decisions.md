@@ -308,3 +308,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** Switch save at the foot was hard to find, and it's about the open save, which is what the card at the top names: the usual place for a workspace's own menu. The editor's settings and the game's are different things (one changes the editor, the other the installed game), and the game folder is about the game. Settings at the foot, apart from the save's pages, is where most desktop apps put it.
 
 **Considered:** a Switch save button under the card (visible, but one more row above the pages); both settings pages under Advanced (Settings isn't about the save); the game folder with the editor's settings (the game never sees it, but it's about where the game is). The owner picked the save menu and the game folder in Game settings.
+
+## 2026-11-23: Coach services are edited through the game's coach job log
+
+**Decided:** the coach career's numbers (services, passengers, average and best satisfaction) are read the way the game's statistics screen works them out: from `economy.bus_job_log`, one `bus_job_log_entry` per service. The game keeps no totals for them, so editing changes the logged services: Perfect satisfaction sets every service's `satisfaction` to 1, and a new passengers total is spread over the services in proportion to what each carried (whole passengers, the remainder to the first). The coach distance is a stored total, the second item of `economy.total_distances_by_mode[]`, and is set directly. Discover every bus stop sets `discovered: true` on every `bus_stop` in `economy.bus_stops[]`. It's all on Overview, beside the coach experience and skills; Statistics shows the numbers.
+
+**Why:** there's nothing else to edit: the statistics are computed from the log. Changing logged services keeps the number of services real; adding made-up services would write log entries the game never made.
+
+**Considered:** editing each logged service in a table (more control, more to get wrong); adding services to raise the count (the owner picked the simple actions).

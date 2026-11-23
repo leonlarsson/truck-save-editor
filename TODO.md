@@ -113,6 +113,15 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [ ] In game (owner): a truck with its engine dragged to about 50 % and its wheels to about 25 % (wear sliders), saved as a new slot. Does the game show that wear, and does its own repair clear it?
 - [ ] Map view: find a city; roads as lines (needs each road's ends, deeper in its item).
 
+## More to edit (2026-11-23)
+
+- [x] Coach services: the numbers the game's statistics show (worked out from its coach job log), the passengers transported and coach distance to set, Perfect satisfaction for every logged service, Discover every bus stop.
+- [ ] In game (owner): Perfect satisfaction, Discover every bus stop, a new passengers total and coach distance, saved as a new slot. Does the game's statistics screen (Coach Services) show them, and do the found bus stops show on the map?
+- [ ] A custom avatar: a picture chosen in the editor becomes the profile's photo in the game.
+- [ ] Truck and trailer colours: edit the custom colours, and save and share them.
+- [ ] Paint jobs: change a truck's or trailer's paint job, from the game's own list.
+- [ ] Freight market jobs: make a job by picking where from, where to, the cargo, the trailer and how urgent.
+
 ## Later
 
 - [ ] American Truck Simulator: test on real ATS saves (the code is written for both from the start). Until then, ATS profiles and saves show a warning (2026-11-22). Still ETS2-only: the game's data (city names, ranks, engines, icons, the DLC check), distances in miles, and Settings (the game's folder, whether it's running, its config.cfg).

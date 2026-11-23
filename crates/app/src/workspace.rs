@@ -417,6 +417,12 @@ impl Workspace {
             PaletteCommand::VisitEveryCity => {
                 session.update(cx, |session, cx| session.visit_all_cities(cx));
             }
+            PaletteCommand::PerfectCoachSatisfaction => {
+                session.update(cx, |session, cx| session.perfect_coach_satisfaction(cx));
+            }
+            PaletteCommand::DiscoverBusStops => {
+                session.update(cx, |session, cx| session.discover_bus_stops(cx));
+            }
             PaletteCommand::Save => {
                 if session.read(cx).change_count() > 0 {
                     self.confirm_save(window, cx);

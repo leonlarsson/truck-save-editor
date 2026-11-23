@@ -5,6 +5,7 @@
 //! Without `native` it has no disk access, so the same code can run in a browser later.
 
 mod career;
+mod coach;
 mod current_job;
 mod drivers;
 mod error;
@@ -34,6 +35,10 @@ mod time;
 mod vehicle_edits;
 
 pub use career::{ADR_ALL, Career, CoachSkills, MAX_COACH_SKILL_LEVEL, MAX_SKILL_LEVEL, Skills};
+pub use coach::{
+    CoachStats, coach_stats, discover_bus_stops, perfect_satisfaction, set_coach_distance,
+    set_coach_passengers,
+};
 pub use current_job::{CurrentJob, JobKind, cancel_job, current_job, remove_job_deadline};
 pub use drivers::{Driver, drivers, max_driver};
 pub use error::{Error, Result};

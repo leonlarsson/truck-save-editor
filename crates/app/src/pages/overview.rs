@@ -17,7 +17,7 @@ use gpui_kit::{
 };
 use save::{ADR_ALL, CoachSkills, LevelTable, MAX_COACH_SKILL_LEVEL, MAX_SKILL_LEVEL, Skills};
 
-use crate::format::compact;
+use crate::format::{compact, thousands};
 use crate::game_data;
 use crate::i18n::t;
 use crate::labels::{
@@ -26,7 +26,7 @@ use crate::labels::{
 };
 use crate::session::Session;
 use crate::ui::{
-    AmountChanged, AmountField, GameIconView, LevelPicker, Section, StepButtons, page_body,
+    AmountChanged, AmountField, GameIconView, LevelPicker, Section, Stat, StepButtons, page_body,
 };
 
 pub struct OverviewPage {
@@ -35,6 +35,9 @@ pub struct OverviewPage {
     experience: Entity<AmountField>,
     /// Coach experience (Coaches DLC); `None` for saves from before coaches.
     coach_experience: Option<Entity<AmountField>>,
+    /// The coach services' passengers and the coach distance; `None` without a coach career.
+    coach_passengers: Option<Entity<AmountField>>,
+    coach_distance: Option<Entity<AmountField>>,
     /// The company's name (the profile's); `None` when the profile file couldn't be read.
     company: Option<Entity<InputState>>,
     /// The profile's name (in the profile file, like the company's).
@@ -67,6 +70,25 @@ impl OverviewPage {
             })
         });
 
+        let coach = session.read(cx).coach_stats();
+        let coach_passengers = coach.as_ref().map(|stats| {
+            cx.new(|cx| {
+                AmountField::new(stats.passengers, t!(cx, "coach-passengers"), window, cx)
+                    .id("coach-passengers-input")
+                    .min(0)
+                    .compact()
+            })
+        });
+        let coach_distance = coach.as_ref().map(|stats| {
+            cx.new(|cx| {
+                AmountField::new(stats.distance_km, t!(cx, "coach-distance"), window, cx)
+                    .id("coach-distance-input")
+                    .min(0)
+                    .suffix("km")
+                    .compact()
+            })
+        });
+
         let mut _subscriptions = vec![
             cx.subscribe(&money, |this, _, AmountChanged(value), cx| {
                 let value = *value;
@@ -86,6 +108,20 @@ impl OverviewPage {
             _subscriptions.push(cx.subscribe(field, |this, _, AmountChanged(value), cx| {
                 let value = *value;
                 this.edit(cx, |career| career.coach_experience = Some(value));
+            }));
+        }
+        if let Some(field) = &coach_passengers {
+            _subscriptions.push(cx.subscribe(field, |this, _, AmountChanged(value), cx| {
+                let value = *value;
+                this.session
+                    .update(cx, |session, cx| session.set_coach_passengers(value, cx));
+            }));
+        }
+        if let Some(field) = &coach_distance {
+            _subscriptions.push(cx.subscribe(field, |this, _, AmountChanged(value), cx| {
+                let value = *value;
+                this.session
+                    .update(cx, |session, cx| session.set_coach_distance(value, cx));
             }));
         }
         let company = session
@@ -129,6 +165,8 @@ impl OverviewPage {
             money,
             experience,
             coach_experience,
+            coach_passengers,
+            coach_distance,
             company,
             profile,
             _subscriptions,
@@ -143,6 +181,14 @@ impl OverviewPage {
         ];
         if let (Some(field), Some(value)) = (&self.coach_experience, career.coach_experience) {
             fields.push((field.clone(), value));
+        }
+        if let Some(stats) = self.session.read(cx).coach_stats() {
+            if let Some(field) = &self.coach_passengers {
+                fields.push((field.clone(), stats.passengers));
+            }
+            if let Some(field) = &self.coach_distance {
+                fields.push((field.clone(), stats.distance_km));
+            }
         }
         for (field, value) in fields {
             if field.read(cx).value() != value {
@@ -393,6 +439,102 @@ impl OverviewPage {
                         })),
                 )
                 .children(rows),
+        )
+    }
+
+    /// The coach career's services as the game's statistics show them (worked out from the
+    /// services it logged), the passengers and distance to edit, and making every service perfect
+    /// or finding every bus stop.
+    fn render_coach_services(&self, cx: &mut Context<Self>) -> Option<Section> {
+        let stats = self.session.read(cx).coach_stats()?;
+        let (passengers, distance) = (self.coach_passengers.clone()?, self.coach_distance.clone()?);
+        let percent = |satisfaction: Option<f32>, cx: &mut Context<Self>| -> SharedString {
+            match satisfaction {
+                Some(satisfaction) => t!(
+                    cx,
+                    "percent",
+                    amount = (satisfaction * 100.0).round() as i64
+                ),
+                None => "–".into(),
+            }
+        };
+        let numbers = h_flex()
+            .flex_wrap()
+            .gap_x_10()
+            .gap_y_4()
+            .child(Stat::new(
+                t!(cx, "coach-service-count"),
+                SharedString::from(thousands(stats.services as i64)),
+            ))
+            .child(Stat::new(
+                t!(cx, "coach-average-satisfaction"),
+                percent(stats.average_satisfaction, cx),
+            ))
+            .child(Stat::new(
+                t!(cx, "coach-best-satisfaction"),
+                percent(stats.best_satisfaction, cx),
+            ))
+            .child(Stat::new(
+                t!(cx, "coach-stops"),
+                t!(
+                    cx,
+                    "coach-stops-found",
+                    found = stats.stops_found,
+                    count = stats.stops_total
+                ),
+            ));
+        let field = |label: SharedString, field: Entity<AmountField>| {
+            v_flex()
+                .gap_1p5()
+                .w(rems(16.))
+                .child(div().text_sm().child(label))
+                .child(field)
+        };
+        let is_perfect = stats
+            .average_satisfaction
+            .is_none_or(|average| average >= 1.0);
+        let has_found_all = stats.stops_found >= stats.stops_total;
+        Some(
+            Section::new(t!(cx, "coach-services"))
+                .description(t!(cx, "coach-services-description"))
+                .child(numbers)
+                .child(
+                    h_flex()
+                        .gap_4()
+                        .flex_wrap()
+                        .child(field(t!(cx, "coach-passengers"), passengers))
+                        .child(field(t!(cx, "coach-distance"), distance)),
+                )
+                .child(
+                    h_flex()
+                        .gap_2()
+                        .flex_wrap()
+                        .child(
+                            Button::new("perfect-satisfaction")
+                                .small()
+                                .outline()
+                                .label(t!(cx, "coach-perfect-satisfaction"))
+                                .tooltip(t!(cx, "coach-perfect-satisfaction-tooltip"))
+                                .disabled(is_perfect)
+                                .on_click(cx.listener(|this, _, _, cx| {
+                                    this.session.update(cx, |session, cx| {
+                                        session.perfect_coach_satisfaction(cx)
+                                    });
+                                })),
+                        )
+                        .child(
+                            Button::new("discover-bus-stops")
+                                .small()
+                                .outline()
+                                .label(t!(cx, "coach-discover-stops"))
+                                .tooltip(t!(cx, "coach-discover-stops-tooltip"))
+                                .disabled(has_found_all)
+                                .on_click(cx.listener(|this, _, _, cx| {
+                                    this.session
+                                        .update(cx, |session, cx| session.discover_bus_stops(cx));
+                                })),
+                        ),
+                ),
         )
     }
 
@@ -807,6 +949,7 @@ impl Render for OverviewPage {
                 .child(self.render_skills(cx))
                 .child(self.render_adr(cx))
                 .children(self.render_coach_skills(cx))
+                .children(self.render_coach_services(cx))
                 .child(self.render_day(cx))
                 .children(self.render_requirements(cx)),
         )
