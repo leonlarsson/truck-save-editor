@@ -654,6 +654,7 @@ move-what-driver = Driver from { $city }
 driver-truck = Truck
 driver-truck-none = No truck
 driver-truck-open = Open the truck
+garage-driver-open = Open the driver
 move-hint = Pick another garage to move it there.
 move-with-driver = Its driver moves with it.
 move-with-truck = Their truck moves with them.

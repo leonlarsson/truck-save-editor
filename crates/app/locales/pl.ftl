@@ -690,6 +690,7 @@ move-what-driver = Kierowca · { $city }
 driver-truck = Ciężarówka
 driver-truck-none = Brak ciężarówki
 driver-truck-open = Otwórz ciężarówkę
+garage-driver-open = Otwórz kierowcę
 move-hint = Wybierz inny garaż, aby go tam przenieść.
 move-with-driver = Jej kierowca przenosi się razem z nią.
 move-with-truck = Jego ciężarówka przenosi się razem z nim.

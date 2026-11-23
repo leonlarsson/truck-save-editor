@@ -1,12 +1,14 @@
-//! One city's garage: owned or not, how big, and the trucks and drivers it holds.
+//! One city's garage: owned or not, how big, and the trucks and drivers it holds, each opening
+//! its own panel.
 
 use gpui_kit::component::{
-    ActiveTheme as _, Disableable as _, Sizable as _, WindowExt as _, button::Button, h_flex,
-    v_flex,
+    ActiveTheme as _, Disableable as _, Sizable as _, WindowExt as _,
+    button::{Button, ButtonVariants as _},
+    h_flex, v_flex,
 };
 use gpui_kit::{
-    AppContext as _, Context, Entity, IntoElement, ParentElement as _, Render, SharedString,
-    Styled as _, Subscription, Window, div, px, rems,
+    AnyElement, App, AppContext as _, Context, ElementId, Entity, IntoElement, ParentElement as _,
+    Render, SharedString, Styled as _, Subscription, Window, div, px, rems,
 };
 use save::Garage;
 
@@ -31,6 +33,29 @@ impl GarageDetail {
             _subscriptions,
         }
     }
+}
+
+/// A truck or driver in the garage: the whole row is a quiet button that opens their panel.
+fn open_row(
+    id: impl Into<ElementId>,
+    content: impl IntoElement,
+    tooltip: SharedString,
+    on_click: impl Fn(&mut Window, &mut App) + 'static,
+) -> AnyElement {
+    // The button's padding would push the row in from the group's edges: the row is widened by
+    // that much on each side, so its text lines up with the facts above.
+    div()
+        .mx(px(-8.))
+        .child(
+            Button::new(id)
+                .ghost()
+                .small()
+                .w_full()
+                .tooltip(tooltip)
+                .child(div().flex_1().min_w_0().child(content))
+                .on_click(move |_, window, cx| on_click(window, cx)),
+        )
+        .into_any_element()
 }
 
 impl Render for GarageDetail {
@@ -79,7 +104,7 @@ impl Render for GarageDetail {
         let vehicle_rows: Vec<_> = vehicles
             .iter()
             .map(|vehicle| {
-                h_flex()
+                let content = h_flex()
                     .justify_between()
                     .text_sm()
                     .child(game_data::model_name(cx, vehicle).unwrap_or_default())
@@ -87,7 +112,16 @@ impl Render for GarageDetail {
                         div()
                             .text_color(cx.theme().muted_foreground)
                             .child(vehicle.plate.clone()),
-                    )
+                    );
+                let (session, vehicle) = (self.session.clone(), vehicle.clone());
+                open_row(
+                    SharedString::from(format!("truck-{}", vehicle.id)),
+                    content,
+                    t!(cx, "driver-truck-open"),
+                    move |window, cx| {
+                        super::open_vehicle(session.clone(), &vehicle, window, cx);
+                    },
+                )
             })
             .collect();
         let driver_rows: Vec<_> = drivers
@@ -106,8 +140,9 @@ impl Render for GarageDetail {
         let driver_rows: Vec<_> = driver_rows
             .into_iter()
             .zip(faces)
-            .map(|((hometown, _), face)| {
-                h_flex()
+            .zip(drivers.iter().cloned())
+            .map(|(((hometown, _), face), driver)| {
+                let content = h_flex()
                     .gap_2()
                     .items_center()
                     .text_sm()
@@ -120,7 +155,16 @@ impl Render for GarageDetail {
                                 GameIconView::new(face).size(1.4).rounded(cx.theme().radius)
                             })),
                     )
-                    .child(t!(cx, "driver-from", city = hometown))
+                    .child(t!(cx, "driver-from", city = hometown));
+                let session = self.session.clone();
+                open_row(
+                    SharedString::from(format!("driver-{}", driver.id)),
+                    content,
+                    t!(cx, "garage-driver-open"),
+                    move |window, cx| {
+                        super::open_driver(session.clone(), &driver, window, cx);
+                    },
+                )
             })
             .collect();
         let empty = |cx: &Context<Self>| {

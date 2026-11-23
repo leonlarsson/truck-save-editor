@@ -654,6 +654,7 @@ move-what-driver = Förare från { $city }
 driver-truck = Lastbil
 driver-truck-none = Ingen lastbil
 driver-truck-open = Öppna lastbilen
+garage-driver-open = Öppna föraren
 move-hint = Välj ett annat garage för att flytta dit.
 move-with-driver = Föraren följer med.
 move-with-truck = Lastbilen följer med.
