@@ -6,8 +6,9 @@
 //! knows (see the `gamedata` crate).
 //!
 //! `economy.visited_cities[]` lists city tokens and `economy.visited_cities_count[]` how many times
-//! each was visited, item by item. Every city has a garage unit (owned or not), so the garages
-//! list every city there is.
+//! each was visited, item by item. The garages (a unit for every city that has one, owned or
+//! not) and the visited list name the cities the save knows; smaller towns have no garage, so
+//! the game's own city list (the `gamedata` crate) adds the rest: see `cities_including`.
 
 use sii::{Document, Value};
 
@@ -18,8 +19,15 @@ pub struct City {
     pub visits: u32,
 }
 
-/// Every city (from the garages), with how often it was visited, in the save's garage order.
+/// Every city the save knows (the garages', then visited ones without a garage), with how often
+/// it was visited.
 pub fn cities(document: &Document) -> Vec<City> {
+    cities_including(document, &[])
+}
+
+/// The save's cities (see `cities`) and the ones in `more` it doesn't know (never visited): the
+/// game's whole city list, for the towns without a garage.
+pub fn cities_including(document: &Document, more: &[String]) -> Vec<City> {
     let Some(economy) = document.first_of_kind("economy") else {
         return Vec::new();
     };
@@ -33,7 +41,7 @@ pub fn cities(document: &Document) -> Vec<City> {
             .and_then(|count| count.parse().ok())
             .unwrap_or(0)
     };
-    document
+    let mut cities: Vec<City> = document
         .units_of_kind("garage")
         .map(|garage| {
             let token = garage
@@ -46,12 +54,23 @@ pub fn cities(document: &Document) -> Vec<City> {
                 token,
             }
         })
-        .collect()
+        .collect();
+    let extra: Vec<&String> = visited.iter().chain(more).collect();
+    for token in extra {
+        if !cities.iter().any(|city| &city.token == token) {
+            cities.push(City {
+                visits: visits(token),
+                token: token.clone(),
+            });
+        }
+    }
+    cities
 }
 
-/// Marks every city as visited (once, for those never visited). Returns how many were added.
-pub fn visit_all_cities(document: &mut Document) -> usize {
-    let missing: Vec<String> = cities(document)
+/// Marks every city as visited (once, for those never visited): the save's, and those in `more`
+/// (the game's whole list). Returns how many were added.
+pub fn visit_all_cities(document: &mut Document, more: &[String]) -> usize {
+    let missing: Vec<String> = cities_including(document, more)
         .into_iter()
         .filter(|city| city.visits == 0)
         .map(|city| city.token)
@@ -246,14 +265,44 @@ mod tests {
     }
 
     #[test]
+    fn knows_towns_without_a_garage() {
+        // Harbourtown has no garage: known from its visit; Hilltown only from the game's list.
+        let save = SAVE.replace(
+            " visited_cities: 1\r\n visited_cities[0]: berlin\r\n visited_cities_count: 1\r\n visited_cities_count[0]: 4\r\n",
+            " visited_cities: 2\r\n visited_cities[0]: berlin\r\n visited_cities[1]: harbourtown\r\n visited_cities_count: 2\r\n visited_cities_count[0]: 4\r\n visited_cities_count[1]: 2\r\n",
+        );
+        let mut document = sii::parse_text(&save).expect("parses");
+        let tokens: Vec<String> = cities(&document).into_iter().map(|c| c.token).collect();
+        assert_eq!(tokens, ["berlin", "lyon", "harbourtown"]);
+        let more = ["hilltown".to_string(), "lyon".to_string()];
+        let all = cities_including(&document, &more);
+        assert_eq!(all.len(), 4);
+        assert_eq!(all[2].visits, 2);
+        assert_eq!(
+            all[3],
+            City {
+                token: "hilltown".into(),
+                visits: 0
+            }
+        );
+        // Every city: Lyon and Hilltown.
+        assert_eq!(visit_all_cities(&mut document, &more), 2);
+        assert!(
+            cities_including(&document, &more)
+                .iter()
+                .all(|city| city.visits > 0)
+        );
+    }
+
+    #[test]
     fn visits_every_city_keeping_counts_in_step() {
         let mut document = sii::parse_text(SAVE).expect("parses");
-        assert_eq!(visit_all_cities(&mut document), 1);
+        assert_eq!(visit_all_cities(&mut document, &[]), 1);
         assert!(cities(&document).iter().all(|city| city.visits > 0));
         let economy = document.first_of_kind("economy").expect("economy");
         assert_eq!(economy.items("visited_cities"), ["berlin", "lyon"]);
         assert_eq!(economy.items("visited_cities_count"), ["4", "1"]);
-        assert_eq!(visit_all_cities(&mut document), 0);
+        assert_eq!(visit_all_cities(&mut document, &[]), 0);
     }
 
     #[test]
@@ -273,7 +322,7 @@ mod tests {
     #[test]
     fn unvisits_a_city_with_its_count() {
         let mut document = sii::parse_text(SAVE).expect("parses");
-        visit_all_cities(&mut document);
+        visit_all_cities(&mut document, &[]);
         let berlin = vec!["berlin".to_string()];
         assert_eq!(unvisit_cities(&mut document, &berlin), 1);
         let economy = document.first_of_kind("economy").expect("economy");

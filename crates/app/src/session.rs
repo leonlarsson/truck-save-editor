@@ -28,6 +28,9 @@ pub struct Session {
     saved_garages: Vec<Garage>,
     /// The hired drivers as they are on disk.
     saved_drivers: Vec<Driver>,
+    /// The game's cities the save may have (its map DLCs'; on the map once that's read), for the
+    /// towns without a garage: see `save::cities_including`. Set by the workspace.
+    game_cities: Vec<String>,
     /// The profile's `profile.sii`, as on disk. Held only to write it back with a new company
     /// name; it also holds the World of Trucks login, which nothing here reads or shows.
     profile_file: Option<sii::Document>,
@@ -396,6 +399,7 @@ impl Session {
             saved_garages: save::garages(&loaded.game),
             saved_drivers: save::drivers(&loaded.game),
             profile_file: save::load_profile_file(&profile.dir).ok(),
+            game_cities: Vec::new(),
             pending: Pending::none(career.clone()),
             undo: Vec::new(),
             redo: Vec::new(),
@@ -804,9 +808,20 @@ impl Session {
             + usize::from(self.pending.roads.is_some())
     }
 
-    /// Every city with how often it was visited, as it'll be after saving.
+    /// Every city with how often it was visited, as it'll be after saving: the save's, and the
+    /// game's towns without a garage.
     pub fn cities(&self) -> Vec<save::City> {
-        save::cities(&self.preview())
+        save::cities_including(&self.preview(), &self.game_cities)
+    }
+
+    /// The game's cities the save may have (see `game_cities`): not a change, but Visit every city
+    /// covers them, so the preview is made again.
+    pub fn set_game_cities(&mut self, cities: Vec<String>, cx: &mut Context<Self>) {
+        if self.game_cities != cities {
+            self.game_cities = cities;
+            self.forget_preview();
+            cx.notify();
+        }
     }
 
     /// The cities whose dealer (or agency) is unlocked, as it'll be after saving.
@@ -1563,7 +1578,7 @@ impl Session {
             add(
                 &map,
                 t!(cx, "change-cities"),
-                summary(save::cities(&self.loaded.game)),
+                summary(save::cities_including(&self.loaded.game, &self.game_cities)),
                 summary(self.cities()),
             );
         }
@@ -2043,7 +2058,7 @@ impl Session {
         let visited: Vec<String> = self.pending.visited_cities.iter().cloned().collect();
         save::visit_cities(&mut slot.game, &visited);
         if self.pending.visit_all_cities {
-            save::visit_all_cities(&mut slot.game);
+            save::visit_all_cities(&mut slot.game, &self.game_cities);
         }
         let unvisited: Vec<String> = self.pending.unvisited_cities.iter().cloned().collect();
         save::unvisit_cities(&mut slot.game, &unvisited);

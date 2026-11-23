@@ -362,3 +362,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** checked in game: with the editor's `avatar.png` in the profile folder, Career Selection still showed the profile's face, and the game's own screen for it (My Drivers → Driver Details) only offers the game's faces. The game has no picture of the player's own for a profile, so the feature could never work.
 
 **Considered:** a face picker writing `profile.sii`'s `face` and `male` (the game already does it; the owner left it out).
+
+## 2026-11-23: The city list is the game's, not only the save's garages
+
+**Decided:** the editor's cities are the save's (a garage unit for every city that has one, owned or not, and the visited list) together with the game's own city definitions (`city_data` in `def/city.sii` and each map DLC's `city.*.sii`), kept to the base game's and those of the map DLCs the save was made with, and, once the map is read, to those with a city area on it. The workspace gives the session that list (`Session::set_game_cities`); `save::cities_including` merges it with the save's, and Visit every city covers it.
+
+**Why:** small towns have no garage, so a list made from garages missed about 160 of the game's cities: on the map, in the list, the finder and Visit every city. Every map DLC's files ship with the game, owned or not, hence the filter by the save's DLCs; a few definitions are ports and border posts with no area on the map.
+
+**Considered:** the map's city areas alone (they also name places that aren't cities); the save's companies (a town without companies would still be missing).

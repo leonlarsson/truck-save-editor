@@ -9,6 +9,11 @@ fn main() {
     println!("{}: {}", game.name(), dir.display());
     match gamedata::GameData::load(game, &dir, "en_us") {
         Ok(data) => {
+            let mut by_dlc: std::collections::BTreeMap<&str, usize> = Default::default();
+            for (_, dlc) in data.cities() {
+                *by_dlc.entry(dlc.unwrap_or("base")).or_default() += 1;
+            }
+            println!("{} cities: {by_dlc:?}", data.cities().count());
             for level in [0, 5, 30, 100, 182] {
                 println!(
                     "level {level}: starts at {} XP, rank {:?}, coach rank {:?}",

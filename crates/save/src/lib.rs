@@ -64,7 +64,8 @@ pub use jobs::{
 };
 pub use levels::{FALLBACK_STEPS, Level, LevelTable};
 pub use map::{
-    City, Place, cities, lock, unlock, unlocked, unvisit_cities, visit_all_cities, visit_cities,
+    City, Place, cities, cities_including, lock, unlock, unlocked, unvisit_cities,
+    visit_all_cities, visit_cities,
 };
 pub use paint::{
     COLOURS_PER_SAVED, LinearRgb, NewPaintJob, Paint, PaintColour, Rgb8, SAVED_COLOURS,

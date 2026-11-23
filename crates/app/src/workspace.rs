@@ -199,7 +199,11 @@ impl Workspace {
                 this.opening = None;
                 this.show(session, window, cx);
             }
+            this.sync_game_cities(cx);
         });
+        // The map's places come after the rest: then only cities on the map count.
+        let map_read =
+            game_data::observe_map_in(window, cx, |this, _, cx| this.sync_game_cities(cx));
         // Closing the window with unsaved changes asks first, like closing the save does.
         let guard = cx.entity().downgrade();
         window.on_window_should_close(cx, move |window, cx| {
@@ -222,7 +226,7 @@ impl Workspace {
             opened: None,
             opening: None,
             waiting: None,
-            _subscriptions: vec![subscription, language_changed, game_data_loaded],
+            _subscriptions: vec![subscription, language_changed, game_data_loaded, map_read],
         };
         if let Some((profile, slot)) = dev_start_slot() {
             workspace.open(profile, slot, window, cx);
@@ -276,6 +280,36 @@ impl Workspace {
     fn show(&mut self, session: Session, window: &mut Window, cx: &mut Context<Self>) {
         let session = cx.new(|_| session);
         self.build_pages(session, window, cx);
+        self.sync_game_cities(cx);
+    }
+
+    /// Gives the open save the game's cities it may have: those of the base game and the map DLCs
+    /// it was made with (every DLC's files ship with the game, owned or not), and, once the map is
+    /// read, only those with an area on it (a few definitions are border posts and ports). Towns
+    /// without a garage aren't in the save until visited; this is how the editor knows them.
+    fn sync_game_cities(&self, cx: &mut Context<Self>) {
+        let (Some(opened), Some(all)) = (&self.opened, game_data::cities(cx)) else {
+            return;
+        };
+        let on_map: Option<std::collections::BTreeSet<String>> =
+            game_data::map_places(cx).map(|places| {
+                places
+                    .iter()
+                    .filter(|place| place.kind == gamedata::MapPlaceKind::CityArea)
+                    .map(|place| place.city.clone())
+                    .collect()
+            });
+        opened.session.update(cx, |session, cx| {
+            let cities: Vec<String> = all
+                .into_iter()
+                .filter(|(token, dlc)| {
+                    session.has_dlc(dlc.as_deref())
+                        && on_map.as_ref().is_none_or(|on_map| on_map.contains(token))
+                })
+                .map(|(token, _)| token)
+                .collect();
+            session.set_game_cities(cities, cx);
+        });
     }
 
     /// Makes the pages for an open save. Also after a language change: pages make some of their

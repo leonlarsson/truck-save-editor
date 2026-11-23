@@ -65,6 +65,10 @@ pub struct GameData {
     strings: HashMap<String, String>,
     /// Every city in the installed game and its maps: token → key of its name in the text.
     city_names: std::collections::BTreeMap<String, String>,
+    /// The map DLC each city comes with (token → DLC id); the base game's aren't in it. Every
+    /// DLC's files ship with the game, owned or not, so a save's cities are the base game's and
+    /// those of the map DLCs it was made with.
+    city_dlcs: BTreeMap<String, String>,
     /// Cities with a truck dealer.
     dealer_cities: BTreeSet<String>,
     /// City token → its country's short code (`verona` → `I`).
@@ -150,7 +154,17 @@ impl GameData {
                 continue;
             };
             vehicles::add_models(&mut archive, &mut data.models);
-            for_each_definition(&mut archive, "city", |document| cities.add(document));
+            let dlc = archive_dlc(&mut archive, &path);
+            for_each_definition(&mut archive, "city", |document| {
+                if let Some(dlc) = &dlc {
+                    for unit in document.units_of_kind("city_data") {
+                        if let Some(token) = unit.id.strip_prefix("city.") {
+                            data.city_dlcs.insert(token.to_string(), dlc.clone());
+                        }
+                    }
+                }
+                cities.add(document)
+            });
             for_each_definition(&mut archive, "country", |document| {
                 cities.add_countries(document)
             });
@@ -248,6 +262,17 @@ impl GameData {
     /// The short code of a city's country, as the game shows it after the city's name (`I`).
     pub fn city_country_code(&self, token: &str) -> Option<&str> {
         self.city_country_codes.get(token).map(String::as_str)
+    }
+
+    /// Every city the installed game defines, by token, with the map DLC it comes with (`None`
+    /// for the base game's). See `city_dlcs`: what a save may use is what it was made with.
+    pub fn cities(&self) -> impl Iterator<Item = (&str, Option<&str>)> {
+        self.city_names.keys().map(|token| {
+            (
+                token.as_str(),
+                self.city_dlcs.get(token).map(String::as_str),
+            )
+        })
     }
 
     /// A city's name as the game shows it (`malmo` → `Malmö`): its `city_name_localized` text.

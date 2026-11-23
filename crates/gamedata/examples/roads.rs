@@ -26,4 +26,18 @@ fn main() {
         garages,
         started.elapsed()
     );
+    // The game's cities without an area on the map.
+    if let Ok(data) =
+        gamedata::GameData::load(save::Game::Ets2, std::path::Path::new(&dir), "en_us")
+    {
+        let missing: Vec<String> = data
+            .cities()
+            .filter(|(token, _)| !cities.contains(token))
+            .map(|(token, dlc)| format!("{token} ({})", dlc.unwrap_or("base")))
+            .collect();
+        println!(
+            "{} defined cities have no area on the map: {missing:?}",
+            missing.len()
+        );
+    }
 }

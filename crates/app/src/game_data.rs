@@ -46,6 +46,25 @@ pub fn map_places(cx: &App) -> Option<Arc<Vec<gamedata::MapPlace>>> {
         .and_then(|read| read.0.as_ref().map(|read| read.places.clone()))
 }
 
+/// Every city in the installed game, by token, with the map DLC it comes with (`None` for the
+/// base game's): see `gamedata::GameData::cities`.
+pub fn cities(cx: &App) -> Option<Vec<(String, Option<String>)>> {
+    data(cx).map(|data| {
+        data.cities()
+            .map(|(token, dlc)| (token.to_string(), dlc.map(str::to_string)))
+            .collect()
+    })
+}
+
+/// Calls back when the map's roads and places have been read (after the rest of the data).
+pub fn observe_map_in<V: 'static>(
+    window: &mut gpui_kit::Window,
+    cx: &mut gpui_kit::Context<V>,
+    on_read: impl Fn(&mut V, &mut gpui_kit::Window, &mut gpui_kit::Context<V>) + 'static,
+) -> gpui_kit::Subscription {
+    cx.observe_global_in::<MapRoads>(window, on_read)
+}
+
 /// The map's roads and junctions with where they are, once read.
 pub fn map_roads(cx: &App) -> Option<Arc<Vec<gamedata::MapRoad>>> {
     cx.try_global::<MapRoads>()
