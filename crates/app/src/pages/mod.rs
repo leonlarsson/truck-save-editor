@@ -2,6 +2,7 @@
 
 pub mod all_data;
 pub mod cities;
+pub mod coach_career;
 pub mod details;
 pub mod drivers;
 pub mod fleet;
@@ -33,6 +34,7 @@ use gpui_kit::assets::IconName;
 pub enum Page {
     Overview,
     Statistics,
+    CoachCareer,
     Fleet,
     Garages,
     Drivers,
@@ -46,9 +48,10 @@ pub enum Page {
 }
 
 impl Page {
-    pub const ALL: [Page; 12] = [
+    pub const ALL: [Page; 13] = [
         Page::Overview,
         Page::Statistics,
+        Page::CoachCareer,
         Page::Fleet,
         Page::Garages,
         Page::Drivers,
@@ -60,16 +63,23 @@ impl Page {
         Page::GameSettings,
         Page::Settings,
     ];
-    pub const CAREER: [Page; 2] = [Page::Overview, Page::Statistics];
+    /// Coach career shows only for a save with a coach career (see `is_shown`).
+    pub const CAREER: [Page; 3] = [Page::Overview, Page::Statistics, Page::CoachCareer];
     pub const COMPANY: [Page; 4] = [Page::Fleet, Page::Garages, Page::Drivers, Page::Jobs];
     /// The map's pages: the cities, the map itself (the game's World map), the Gallery.
     pub const MAP: [Page; 3] = [Page::Cities, Page::WorldMap, Page::Gallery];
     pub const ADVANCED: [Page; 2] = [Page::AllData, Page::GameSettings];
 
+    /// Whether the sidebar and the palette offer the page: Coach career only with a coach career.
+    pub fn is_shown(self, has_coach_career: bool) -> bool {
+        self != Page::CoachCareer || has_coach_career
+    }
+
     pub fn title(self, cx: &App) -> SharedString {
         match self {
             Page::Overview => t!(cx, "page-overview"),
             Page::Statistics => t!(cx, "page-statistics"),
+            Page::CoachCareer => t!(cx, "page-coach-career"),
             Page::Fleet => t!(cx, "page-fleet"),
             Page::Garages => t!(cx, "page-garages"),
             Page::Drivers => t!(cx, "page-drivers"),
@@ -88,6 +98,7 @@ impl Page {
         match self {
             Page::Overview => "overview",
             Page::Statistics => "statistics",
+            Page::CoachCareer => "coach-career",
             Page::Fleet => "fleet",
             Page::Garages => "garages",
             Page::Drivers => "drivers",
@@ -105,6 +116,7 @@ impl Page {
         match self {
             Page::Overview => IconName::Gauge,
             Page::Statistics => IconName::ChartNoAxesColumn,
+            Page::CoachCareer => IconName::Bus,
             Page::Fleet => IconName::Truck,
             Page::Garages => IconName::Warehouse,
             Page::Drivers => IconName::Users,

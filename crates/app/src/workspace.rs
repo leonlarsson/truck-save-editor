@@ -56,15 +56,6 @@ gpui_kit::actions!(
         SaveChanges,
         /// Enter on a table row: open its detail panel.
         OpenDetails,
-        GoToPage1,
-        GoToPage2,
-        GoToPage3,
-        GoToPage4,
-        GoToPage5,
-        GoToPage6,
-        GoToPage7,
-        GoToPage8,
-        GoToPage9,
         /// Ctrl+,: the editor's own settings (as in most apps), at the sidebar's foot.
         OpenSettings,
     ]
@@ -180,6 +171,7 @@ struct Opened {
     session: Entity<Session>,
     overview: Entity<OverviewPage>,
     statistics: Entity<crate::pages::statistics::StatisticsPage>,
+    coach_career: Entity<crate::pages::coach_career::CoachCareerPage>,
     fleet: Entity<FleetPage>,
     garages: Entity<GaragesPage>,
     drivers: Entity<DriversPage>,
@@ -363,6 +355,9 @@ impl Workspace {
         let overview = cx.new(|cx| OverviewPage::new(session.clone(), window, cx));
         let statistics =
             cx.new(|cx| crate::pages::statistics::StatisticsPage::new(session.clone(), window, cx));
+        let coach_career = cx.new(|cx| {
+            crate::pages::coach_career::CoachCareerPage::new(session.clone(), window, cx)
+        });
         let fleet = cx.new(|cx| FleetPage::new(session.clone(), window, cx));
         let garages = cx.new(|cx| GaragesPage::new(session.clone(), window, cx));
         let drivers = cx.new(|cx| DriversPage::new(session.clone(), window, cx));
@@ -381,6 +376,7 @@ impl Workspace {
             session,
             overview,
             statistics,
+            coach_career,
             fleet,
             garages,
             drivers,
@@ -402,12 +398,10 @@ impl Workspace {
         self.opened.as_ref().map(|opened| opened.session.clone())
     }
 
-    /// Ctrl+1 … Ctrl+9: the pages in the sidebar's order (Settings, the tenth, is Ctrl+,).
-    fn go_to_page(&mut self, index: usize, cx: &mut Context<Self>) {
-        if let Some(page) = Page::ALL.get(index) {
-            self.page = *page;
-            cx.notify();
-        }
+    /// Shows Coach career: the coach commands land there, so what they changed is in view.
+    fn show_coach_career(&mut self, cx: &mut Context<Self>) {
+        self.page = Page::CoachCareer;
+        cx.notify();
     }
 
     /// Opens the command palette (only while a save is open: every command acts on it).
@@ -448,14 +442,17 @@ impl Workspace {
                     };
                 }),
             ),
-            PaletteCommand::MaxCoachSkills => edit(
-                cx,
-                Box::new(|career| {
-                    if career.coach_skills.is_some() {
-                        career.coach_skills = Some(save::CoachSkills::maxed());
-                    }
-                }),
-            ),
+            PaletteCommand::MaxCoachSkills => {
+                edit(
+                    cx,
+                    Box::new(|career| {
+                        if career.coach_skills.is_some() {
+                            career.coach_skills = Some(save::CoachSkills::maxed());
+                        }
+                    }),
+                );
+                self.show_coach_career(cx);
+            }
             PaletteCommand::AllAdr => {
                 edit(cx, Box::new(|career| career.skills.adr = save::ADR_ALL))
             }
@@ -507,9 +504,11 @@ impl Workspace {
             }
             PaletteCommand::PerfectCoachSatisfaction => {
                 session.update(cx, |session, cx| session.perfect_coach_satisfaction(cx));
+                self.show_coach_career(cx);
             }
             PaletteCommand::DiscoverBusStops => {
                 session.update(cx, |session, cx| session.discover_bus_stops(cx));
+                self.show_coach_career(cx);
             }
             PaletteCommand::Save => {
                 if session.read(cx).change_count() > 0 {
@@ -1046,7 +1045,16 @@ impl Workspace {
     }
 
     fn menu(&self, pages: &[Page], cx: &mut Context<Self>) -> SidebarMenu {
-        SidebarMenu::new().children(pages.iter().map(|&page| {
+        let has_coach_career = self
+            .opened
+            .as_ref()
+            .is_some_and(|opened| opened.session.read(cx).career().coach_experience.is_some());
+        let pages: Vec<Page> = pages
+            .iter()
+            .copied()
+            .filter(|page| page.is_shown(has_coach_career))
+            .collect();
+        SidebarMenu::new().children(pages.into_iter().map(|page| {
             SidebarMenuItem::new(page.title(cx))
                 .icon(Icon::new(page.icon()))
                 .active(page == self.page)
@@ -1154,6 +1162,12 @@ impl Workspace {
                 .size_full()
                 .child(opened.statistics.clone())
                 .into_any_element(),
+            Page::CoachCareer => div()
+                .id("coach-career-scroll")
+                .size_full()
+                .overflow_y_scroll()
+                .child(opened.coach_career.clone())
+                .into_any_element(),
             Page::Fleet => div()
                 .size_full()
                 .child(opened.fleet.clone())
@@ -1221,15 +1235,6 @@ impl Render for Workspace {
             .on_action(
                 cx.listener(|this, _: &OpenPalette, window, cx| this.open_palette(window, cx)),
             )
-            .on_action(cx.listener(|this, _: &GoToPage1, _, cx| this.go_to_page(0, cx)))
-            .on_action(cx.listener(|this, _: &GoToPage2, _, cx| this.go_to_page(1, cx)))
-            .on_action(cx.listener(|this, _: &GoToPage3, _, cx| this.go_to_page(2, cx)))
-            .on_action(cx.listener(|this, _: &GoToPage4, _, cx| this.go_to_page(3, cx)))
-            .on_action(cx.listener(|this, _: &GoToPage5, _, cx| this.go_to_page(4, cx)))
-            .on_action(cx.listener(|this, _: &GoToPage6, _, cx| this.go_to_page(5, cx)))
-            .on_action(cx.listener(|this, _: &GoToPage7, _, cx| this.go_to_page(6, cx)))
-            .on_action(cx.listener(|this, _: &GoToPage8, _, cx| this.go_to_page(7, cx)))
-            .on_action(cx.listener(|this, _: &GoToPage9, _, cx| this.go_to_page(8, cx)))
             .on_action(cx.listener(|this, _: &OpenSettings, _, cx| {
                 this.page = Page::Settings;
                 cx.notify();

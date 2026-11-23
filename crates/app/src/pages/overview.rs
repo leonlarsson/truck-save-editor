@@ -1,4 +1,5 @@
 //! Overview: the big levers first. Money, experience, skills and ADR, each one click from maxed.
+//! The coach career has a page of its own (Coach career).
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::{
@@ -15,29 +16,21 @@ use gpui_kit::{
     ParentElement as _, Render, SharedString, StatefulInteractiveElement as _, Styled as _,
     Subscription, Window, div, rems,
 };
-use save::{ADR_ALL, CoachSkills, LevelTable, MAX_COACH_SKILL_LEVEL, MAX_SKILL_LEVEL, Skills};
+use save::{ADR_ALL, LevelTable, MAX_SKILL_LEVEL, Skills};
 
-use crate::format::{compact, thousands};
+use crate::format::compact;
 use crate::game_data;
 use crate::i18n::t;
-use crate::labels::{
-    ADR_CLASS_COUNT, adr_class, coach_skill_description, coach_skill_name, skill_description,
-    skill_name,
-};
+use crate::labels::{ADR_CLASS_COUNT, adr_class, skill_description, skill_name};
 use crate::session::Session;
 use crate::ui::{
-    AmountChanged, AmountField, GameIconView, LevelPicker, Section, Stat, StepButtons, page_body,
+    AmountChanged, AmountField, GameIconView, LevelPicker, Section, StepButtons, page_body,
 };
 
 pub struct OverviewPage {
     session: Entity<Session>,
     money: Entity<AmountField>,
     experience: Entity<AmountField>,
-    /// Coach experience (Coaches DLC); `None` for saves from before coaches.
-    coach_experience: Option<Entity<AmountField>>,
-    /// The coach services' passengers and the coach distance; `None` without a coach career.
-    coach_passengers: Option<Entity<AmountField>>,
-    coach_distance: Option<Entity<AmountField>>,
     /// The company's name (the profile's); `None` when the profile file couldn't be read.
     company: Option<Entity<InputState>>,
     /// The profile's name (in the profile file, like the company's).
@@ -62,33 +55,6 @@ impl OverviewPage {
                 .min(0)
                 .suffix(t!(cx, "experience-unit"))
         });
-        let coach_experience = career.coach_experience.map(|value| {
-            cx.new(|cx| {
-                AmountField::new(value, t!(cx, "coach-experience-label"), window, cx)
-                    .min(0)
-                    .suffix(t!(cx, "experience-unit"))
-            })
-        });
-
-        let coach = session.read(cx).coach_stats();
-        let coach_passengers = coach.as_ref().map(|stats| {
-            cx.new(|cx| {
-                AmountField::new(stats.passengers, t!(cx, "coach-passengers"), window, cx)
-                    .id("coach-passengers-input")
-                    .min(0)
-                    .compact()
-            })
-        });
-        let coach_distance = coach.as_ref().map(|stats| {
-            cx.new(|cx| {
-                AmountField::new(stats.distance_km, t!(cx, "coach-distance"), window, cx)
-                    .id("coach-distance-input")
-                    .min(0)
-                    .suffix("km")
-                    .compact()
-            })
-        });
-
         let mut _subscriptions = vec![
             cx.subscribe(&money, |this, _, AmountChanged(value), cx| {
                 let value = *value;
@@ -104,26 +70,6 @@ impl OverviewPage {
                 cx.notify();
             }),
         ];
-        if let Some(field) = &coach_experience {
-            _subscriptions.push(cx.subscribe(field, |this, _, AmountChanged(value), cx| {
-                let value = *value;
-                this.edit(cx, |career| career.coach_experience = Some(value));
-            }));
-        }
-        if let Some(field) = &coach_passengers {
-            _subscriptions.push(cx.subscribe(field, |this, _, AmountChanged(value), cx| {
-                let value = *value;
-                this.session
-                    .update(cx, |session, cx| session.set_coach_passengers(value, cx));
-            }));
-        }
-        if let Some(field) = &coach_distance {
-            _subscriptions.push(cx.subscribe(field, |this, _, AmountChanged(value), cx| {
-                let value = *value;
-                this.session
-                    .update(cx, |session, cx| session.set_coach_distance(value, cx));
-            }));
-        }
         let company = session
             .read(cx)
             .company_name()
@@ -164,9 +110,6 @@ impl OverviewPage {
             session,
             money,
             experience,
-            coach_experience,
-            coach_passengers,
-            coach_distance,
             company,
             profile,
             _subscriptions,
@@ -175,21 +118,10 @@ impl OverviewPage {
 
     fn sync_fields(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let career = self.session.read(cx).career().clone();
-        let mut fields = vec![
+        let fields = vec![
             (self.money.clone(), career.money),
             (self.experience.clone(), career.experience),
         ];
-        if let (Some(field), Some(value)) = (&self.coach_experience, career.coach_experience) {
-            fields.push((field.clone(), value));
-        }
-        if let Some(stats) = self.session.read(cx).coach_stats() {
-            if let Some(field) = &self.coach_passengers {
-                fields.push((field.clone(), stats.passengers));
-            }
-            if let Some(field) = &self.coach_distance {
-                fields.push((field.clone(), stats.distance_km));
-            }
-        }
         for (field, value) in fields {
             if field.read(cx).value() != value {
                 field.update(cx, |field, cx| field.set_value(value, window, cx));
@@ -244,108 +176,14 @@ impl OverviewPage {
         let experience = self.session.read(cx).career().experience;
         let section =
             Section::new(t!(cx, "experience")).description(t!(cx, "experience-description"));
-        self.with_level(
+        with_level(
             section,
             experience,
-            &self.experience.clone(),
+            &self.experience,
             Career::Truck,
+            &self.session,
             cx,
         )
-    }
-
-    fn render_coach_experience(
-        &self,
-        field: &Entity<AmountField>,
-        cx: &mut Context<Self>,
-    ) -> Section {
-        let experience = self.session.read(cx).career().coach_experience.unwrap_or(0);
-        let section = Section::new(t!(cx, "coach-experience"))
-            .description(t!(cx, "coach-experience-description"));
-        self.with_level(section, experience, field, Career::Coach, cx)
-    }
-
-    /// The level (big), how far into it, the XP field, and buttons to move whole levels.
-    fn with_level(
-        &self,
-        section: Section,
-        experience: i64,
-        field: &Entity<AmountField>,
-        career: Career,
-        cx: &mut Context<Self>,
-    ) -> Section {
-        let table = career.levels(cx);
-        let level = table.level(experience);
-        let rank = career.rank(cx, level.number);
-        let percent = (level.fraction() * 100.0).floor() as i64;
-        section
-            .child(
-                v_flex()
-                    .gap_2()
-                    .child(
-                        // A long rank name (in German, say) pushes the progress onto a line of
-                        // its own rather than into it.
-                        h_flex()
-                            .justify_between()
-                            .items_end()
-                            .flex_wrap()
-                            .gap_x_4()
-                            .child(
-                                v_flex()
-                                    .child(div().text_2xl().font_semibold().child(t!(
-                                        cx,
-                                        "level-number",
-                                        level = level.number
-                                    )))
-                                    .children(rank.map(|rank| {
-                                        div()
-                                            .text_sm()
-                                            .text_color(cx.theme().muted_foreground)
-                                            .child(rank)
-                                    })),
-                            )
-                            .child(
-                                div()
-                                    .text_sm()
-                                    .whitespace_nowrap()
-                                    .text_color(cx.theme().muted_foreground)
-                                    .child(t!(
-                                        cx,
-                                        "level-progress",
-                                        percent = percent,
-                                        next = level.number + 1
-                                    )),
-                            ),
-                    )
-                    .child(
-                        Progress::new(career.progress_id())
-                            .value(level.fraction() * 100.0)
-                            .accessibility_label(t!(cx, "level-progress-label")),
-                    ),
-            )
-            .child(field.clone())
-            .child(
-                h_flex()
-                    .gap_2()
-                    .flex_wrap()
-                    .children([1i64, 10].map(|levels| {
-                        StepButtons::new(
-                            (career.step_id(), levels as usize),
-                            t!(cx, "level-step", count = levels),
-                        )
-                        .on_step(cx.listener(
-                            move |this, direction: &i64, _, cx| {
-                                let direction = *direction;
-                                let table = career.levels(cx);
-                                this.edit(cx, |c| {
-                                    let current = career.experience(c);
-                                    let target =
-                                        (table.level(current).number + direction * levels).max(0);
-                                    career.set_experience(c, table.experience_for(target));
-                                });
-                            },
-                        ))
-                    })),
-            )
     }
 
     fn render_skills(&self, cx: &mut Context<Self>) -> Section {
@@ -391,151 +229,6 @@ impl OverviewPage {
                     })),
             )
             .children(rows)
-    }
-
-    fn render_coach_skills(&self, cx: &mut Context<Self>) -> Option<Section> {
-        let skills = self.session.read(cx).career().coach_skills?;
-        let rows = (0..skills.levels().len()).map(|index| {
-            let name = coach_skill_name(cx, index);
-            let (field, level) = skills.levels()[index];
-            h_flex()
-                .justify_between()
-                .gap_4()
-                .py_1()
-                .child(skill_label(
-                    skill_icon(field, level, cx),
-                    name.clone(),
-                    coach_skill_description(cx, index),
-                    cx,
-                ))
-                .child(
-                    LevelPicker::new(("coach-skill", index), name)
-                        .max(MAX_COACH_SKILL_LEVEL)
-                        .value(skills.levels()[index].1)
-                        .on_change(cx.listener(move |this, level: &u8, _, cx| {
-                            let level = *level;
-                            this.edit(cx, |career| {
-                                if let Some(skills) = &mut career.coach_skills {
-                                    skills.set_level(index, level);
-                                }
-                            });
-                        })),
-                )
-        });
-        Some(
-            Section::new(t!(cx, "coach-skills"))
-                .description(t!(cx, "coach-skills-description"))
-                .action(
-                    Button::new("max-coach-skills")
-                        .small()
-                        .outline()
-                        .label(t!(cx, "skills-max"))
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            this.edit(cx, |career| {
-                                if career.coach_skills.is_some() {
-                                    career.coach_skills = Some(CoachSkills::maxed());
-                                }
-                            });
-                        })),
-                )
-                .children(rows),
-        )
-    }
-
-    /// The coach career's services as the game's statistics show them (worked out from the
-    /// services it logged), the passengers and distance to edit, and making every service perfect
-    /// or finding every bus stop.
-    fn render_coach_services(&self, cx: &mut Context<Self>) -> Option<Section> {
-        let stats = self.session.read(cx).coach_stats()?;
-        let (passengers, distance) = (self.coach_passengers.clone()?, self.coach_distance.clone()?);
-        let percent = |satisfaction: Option<f32>, cx: &mut Context<Self>| -> SharedString {
-            match satisfaction {
-                Some(satisfaction) => t!(
-                    cx,
-                    "percent",
-                    amount = (satisfaction * 100.0).round() as i64
-                ),
-                None => "–".into(),
-            }
-        };
-        let numbers = h_flex()
-            .flex_wrap()
-            .gap_x_10()
-            .gap_y_4()
-            .child(Stat::new(
-                t!(cx, "coach-service-count"),
-                SharedString::from(thousands(stats.services as i64)),
-            ))
-            .child(Stat::new(
-                t!(cx, "coach-average-satisfaction"),
-                percent(stats.average_satisfaction, cx),
-            ))
-            .child(Stat::new(
-                t!(cx, "coach-best-satisfaction"),
-                percent(stats.best_satisfaction, cx),
-            ))
-            .child(Stat::new(
-                t!(cx, "coach-stops"),
-                t!(
-                    cx,
-                    "coach-stops-found",
-                    found = stats.stops_found,
-                    count = stats.stops_total
-                ),
-            ));
-        let field = |label: SharedString, field: Entity<AmountField>| {
-            v_flex()
-                .gap_1p5()
-                .w(rems(16.))
-                .child(div().text_sm().child(label))
-                .child(field)
-        };
-        let is_perfect = stats
-            .average_satisfaction
-            .is_none_or(|average| average >= 1.0);
-        let has_found_all = stats.stops_found >= stats.stops_total;
-        Some(
-            Section::new(t!(cx, "coach-services"))
-                .description(t!(cx, "coach-services-description"))
-                .child(numbers)
-                .child(
-                    h_flex()
-                        .gap_4()
-                        .flex_wrap()
-                        .child(field(t!(cx, "coach-passengers"), passengers))
-                        .child(field(t!(cx, "coach-distance"), distance)),
-                )
-                .child(
-                    h_flex()
-                        .gap_2()
-                        .flex_wrap()
-                        .child(
-                            Button::new("perfect-satisfaction")
-                                .small()
-                                .outline()
-                                .label(t!(cx, "coach-perfect-satisfaction"))
-                                .tooltip(t!(cx, "coach-perfect-satisfaction-tooltip"))
-                                .disabled(is_perfect)
-                                .on_click(cx.listener(|this, _, _, cx| {
-                                    this.session.update(cx, |session, cx| {
-                                        session.perfect_coach_satisfaction(cx)
-                                    });
-                                })),
-                        )
-                        .child(
-                            Button::new("discover-bus-stops")
-                                .small()
-                                .outline()
-                                .label(t!(cx, "coach-discover-stops"))
-                                .tooltip(t!(cx, "coach-discover-stops-tooltip"))
-                                .disabled(has_found_all)
-                                .on_click(cx.listener(|this, _, _, cx| {
-                                    this.session
-                                        .update(cx, |session, cx| session.discover_bus_stops(cx));
-                                })),
-                        ),
-                ),
-        )
     }
 
     /// The player's day: tiredness, the police record and the clock, each with what resets it.
@@ -859,7 +552,7 @@ impl OverviewPage {
 
 /// A skill's icon from the game: the highlight in the theme's accent once the skill is learned,
 /// all quiet while it's at level 0.
-fn skill_icon(field: &str, level: u8, cx: &App) -> Option<GameIconView> {
+pub(crate) fn skill_icon(field: &str, level: u8, cx: &App) -> Option<GameIconView> {
     let icon = game_data::skill_icon(cx, field)?;
     let base = cx.theme().muted_foreground;
     let highlight = if level > 0 {
@@ -877,7 +570,7 @@ fn skill_icon(field: &str, level: u8, cx: &App) -> Option<GameIconView> {
 }
 
 /// A skill's icon, name and what it does.
-fn skill_label(
+pub(crate) fn skill_label(
     icon: Option<GameIconView>,
     name: SharedString,
     description: SharedString,
@@ -936,10 +629,7 @@ impl Render for OverviewPage {
                 })
                 .child({
                     // The big levers side by side, at the same height; they wrap on narrow windows.
-                    let mut cards = vec![self.render_money(cx), self.render_experience(cx)];
-                    if let Some(field) = self.coach_experience.clone() {
-                        cards.push(self.render_coach_experience(&field, cx));
-                    }
+                    let cards = vec![self.render_money(cx), self.render_experience(cx)];
                     h_flex().flex_wrap().items_stretch().gap_6().children(
                         cards
                             .into_iter()
@@ -948,17 +638,104 @@ impl Render for OverviewPage {
                 })
                 .child(self.render_skills(cx))
                 .child(self.render_adr(cx))
-                .children(self.render_coach_skills(cx))
-                .children(self.render_coach_services(cx))
                 .child(self.render_day(cx))
                 .children(self.render_requirements(cx)),
         )
     }
 }
 
+/// An experience card's inside: the level (big), how far into it, the XP field, and buttons to
+/// move whole levels. Shared by Overview (trucks) and Coach career.
+pub(crate) fn with_level<V: 'static>(
+    section: Section,
+    experience: i64,
+    field: &Entity<AmountField>,
+    career: Career,
+    session: &Entity<Session>,
+    cx: &mut Context<V>,
+) -> Section {
+    let table = career.levels(cx);
+    let level = table.level(experience);
+    let rank = career.rank(cx, level.number);
+    let percent = (level.fraction() * 100.0).floor() as i64;
+    section
+        .child(
+            v_flex()
+                .gap_2()
+                .child(
+                    // A long rank name (in German, say) pushes the progress onto a line of
+                    // its own rather than into it.
+                    h_flex()
+                        .justify_between()
+                        .items_end()
+                        .flex_wrap()
+                        .gap_x_4()
+                        .child(
+                            v_flex()
+                                .child(div().text_2xl().font_semibold().child(t!(
+                                    cx,
+                                    "level-number",
+                                    level = level.number
+                                )))
+                                .children(rank.map(|rank| {
+                                    div()
+                                        .text_sm()
+                                        .text_color(cx.theme().muted_foreground)
+                                        .child(rank)
+                                })),
+                        )
+                        .child(
+                            div()
+                                .text_sm()
+                                .whitespace_nowrap()
+                                .text_color(cx.theme().muted_foreground)
+                                .child(t!(
+                                    cx,
+                                    "level-progress",
+                                    percent = percent,
+                                    next = level.number + 1
+                                )),
+                        ),
+                )
+                .child(
+                    Progress::new(career.progress_id())
+                        .value(level.fraction() * 100.0)
+                        .accessibility_label(t!(cx, "level-progress-label")),
+                ),
+        )
+        .child(field.clone())
+        .child(
+            h_flex()
+                .gap_2()
+                .flex_wrap()
+                .children([1i64, 10].map(|levels| {
+                    StepButtons::new(
+                        (career.step_id(), levels as usize),
+                        t!(cx, "level-step", count = levels),
+                    )
+                    .on_step({
+                        // Each button gets its own handle on the session.
+                        let session = session.clone();
+                        move |direction: &i64, _, cx| {
+                            let direction = *direction;
+                            let table = career.levels(cx);
+                            session.update(cx, |session, cx| {
+                                session.edit_career(cx, |c| {
+                                    let current = career.experience(c);
+                                    let target =
+                                        (table.level(current).number + direction * levels).max(0);
+                                    career.set_experience(c, table.experience_for(target));
+                                })
+                            });
+                        }
+                    })
+                })),
+        )
+}
+
 /// Which career an experience card edits.
 #[derive(Clone, Copy)]
-enum Career {
+pub(crate) enum Career {
     Truck,
     Coach,
 }

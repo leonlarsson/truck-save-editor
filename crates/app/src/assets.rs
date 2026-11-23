@@ -37,7 +37,8 @@ gpui_kit::assets::icon_assets!(
         ChartNoAxesColumn,
         Eye,
         Camera,
-        Building2
+        Building2,
+        Bus
     ]
 );
 

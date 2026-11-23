@@ -1,6 +1,6 @@
-//! Statistics: the career in numbers (deliveries, what they earned, how far the company has
-//! driven, and the coach career's services) and every delivery in the game's delivery log, newest
-//! first. Read-only.
+//! Statistics: the truck career in numbers (deliveries, what they earned, how far the company has
+//! driven) and every delivery in the game's delivery log, newest first. Read-only. The coach
+//! career's are on Coach career.
 
 use gpui_kit::component::{
     ActiveTheme as _, h_flex,
@@ -150,23 +150,6 @@ impl StatisticsPage {
             t!(cx, "stats-cancelled"),
             SharedString::from(thousands(totals.cancelled_jobs)),
         ));
-        // The coach career's, when there is one (edited on Overview).
-        if let Some(coach) = save::coach_stats(&document).filter(|coach| coach.services > 0) {
-            stats.push((
-                t!(cx, "coach-service-count"),
-                SharedString::from(thousands(coach.services as i64)),
-            ));
-            stats.push((
-                t!(cx, "coach-passengers"),
-                SharedString::from(thousands(coach.passengers)),
-            ));
-            if let Some(average) = coach.average_satisfaction {
-                stats.push((
-                    t!(cx, "coach-average-satisfaction"),
-                    t!(cx, "percent", amount = (average * 100.0).round() as i64),
-                ));
-            }
-        }
         self.stats = stats;
 
         let today = totals.game_days;

@@ -33,6 +33,60 @@ pub struct CoachStats {
     pub stops_total: usize,
 }
 
+/// One coach service from the log, as the game's statistics list it.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct CoachService {
+    /// The game day it ended (0 is the career's first).
+    pub day: i64,
+    /// The cities of its first and last stop, by token (`berlin`).
+    pub from_city: String,
+    pub to_city: String,
+    /// How many legs it had (stops after the first).
+    pub stages: i64,
+    pub passengers: i64,
+    /// How happy the passengers were, 0 to 1.
+    pub satisfaction: Option<f32>,
+    pub distance_km: i64,
+    pub reward: i64,
+    pub xp: i64,
+}
+
+/// Every service in the coach job log, oldest first.
+pub fn coach_services(document: &Document) -> Vec<CoachService> {
+    log_entries(document)
+        .iter()
+        .filter_map(|id| document.unit(id))
+        .map(|unit| {
+            let number = |field: &str| unit.single(field).and_then(value::parse_i64).unwrap_or(0);
+            // `"city.berlin"`: a stop is named for its city.
+            let city = |field: &str| {
+                unit.single(field)
+                    .map(value::parse_string)
+                    .map(|name| name.strip_prefix("city.").unwrap_or(&name).to_string())
+                    .unwrap_or_default()
+            };
+            CoachService {
+                day: number("end_time") / crate::DAY_MINUTES,
+                from_city: city("source_bus_stop_name"),
+                to_city: city("target_bus_stop_name"),
+                stages: number("stage_count"),
+                passengers: number("total_passengers"),
+                satisfaction: unit
+                    .single("satisfaction")
+                    .and_then(value::parse_f32)
+                    .map(|satisfaction| satisfaction.clamp(0.0, 1.0)),
+                distance_km: unit
+                    .single("travelled_distance")
+                    .and_then(value::parse_f32)
+                    .map(|km| km.round() as i64)
+                    .unwrap_or(0),
+                reward: number("reward"),
+                xp: number("exp_delta"),
+            }
+        })
+        .collect()
+}
+
 /// The ids of the coach job log's entries, in the log's order.
 fn log_entries(document: &Document) -> Vec<String> {
     let Some(log) = document
@@ -221,7 +275,28 @@ mod tests {
     use super::*;
 
     /// Two services (30 and 10 passengers), three bus stops, one of them found.
-    const SAVE: &str = "SiiNunit\r\n{\r\neconomy : e {\r\n bus_job_log: log\r\n bus_stops: 3\r\n bus_stops[0]: stop.a\r\n bus_stops[1]: stop.b\r\n bus_stops[2]: stop.c\r\n total_distances_by_mode: 3\r\n total_distances_by_mode[0]: 9000\r\n total_distances_by_mode[1]: 450\r\n total_distances_by_mode[2]: 0\r\n}\r\n\r\nbus_job_log : log {\r\n entries: 2\r\n entries[0]: job.1\r\n entries[1]: job.2\r\n}\r\n\r\nbus_job_log_entry : job.1 {\r\n total_passengers: 30\r\n satisfaction: 0.5\r\n}\r\n\r\nbus_job_log_entry : job.2 {\r\n total_passengers: 10\r\n satisfaction: 1\r\n}\r\n\r\nbus_stop : stop.a {\r\n discovered: true\r\n}\r\n\r\nbus_stop : stop.b {\r\n discovered: false\r\n}\r\n\r\nbus_stop : stop.c {\r\n discovered: false\r\n}\r\n\r\n}\r\n";
+    const SAVE: &str = "SiiNunit\r\n{\r\neconomy : e {\r\n bus_job_log: log\r\n bus_stops: 3\r\n bus_stops[0]: stop.a\r\n bus_stops[1]: stop.b\r\n bus_stops[2]: stop.c\r\n total_distances_by_mode: 3\r\n total_distances_by_mode[0]: 9000\r\n total_distances_by_mode[1]: 450\r\n total_distances_by_mode[2]: 0\r\n}\r\n\r\nbus_job_log : log {\r\n entries: 2\r\n entries[0]: job.1\r\n entries[1]: job.2\r\n}\r\n\r\nbus_job_log_entry : job.1 {\r\n source_bus_stop_name: \"city.harbourtown\"\r\n target_bus_stop_name: \"city.hilltown\"\r\n stage_count: 2\r\n exp_delta: 120\r\n reward: 3400\r\n travelled_distance: 211.6\r\n end_time: 3000\r\n total_passengers: 30\r\n satisfaction: 0.5\r\n}\r\n\r\nbus_job_log_entry : job.2 {\r\n total_passengers: 10\r\n satisfaction: 1\r\n}\r\n\r\nbus_stop : stop.a {\r\n discovered: true\r\n}\r\n\r\nbus_stop : stop.b {\r\n discovered: false\r\n}\r\n\r\nbus_stop : stop.c {\r\n discovered: false\r\n}\r\n\r\n}\r\n";
+
+    #[test]
+    fn lists_the_services() {
+        let document = sii::parse_text(SAVE).expect("parses");
+        let services = coach_services(&document);
+        assert_eq!(services.len(), 2);
+        assert_eq!(
+            services[0],
+            CoachService {
+                day: 2,
+                from_city: "harbourtown".to_string(),
+                to_city: "hilltown".to_string(),
+                stages: 2,
+                passengers: 30,
+                satisfaction: Some(0.5),
+                distance_km: 212,
+                reward: 3400,
+                xp: 120,
+            }
+        );
+    }
 
     #[test]
     fn reads_the_services_as_the_game_counts_them() {

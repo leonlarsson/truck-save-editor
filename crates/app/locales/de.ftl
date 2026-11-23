@@ -964,6 +964,7 @@ picks-row = { $name } auswählen
 
 ## Statistics
 page-statistics = Statistiken
+page-coach-career = Reisebus-Karriere
 stats-deliveries = Abgeschlossene Aufträge
 stats-income = Vergütung aus Aufträgen
 stats-xp = XP aus Aufträgen
@@ -988,6 +989,14 @@ column-when = Wann
 column-income = Vergütung
 column-xp = XP
 column-damage = Beschädigung
+column-passengers = Fahrgäste
+column-satisfaction = Zufriedenheit
+coach-earned = Mit Fahrten verdient
+coach-log-note = Aus dem Reisebus-Fahrtenbuch des Spiels. Nur lesen: Das Spiel führt diese Zahlen selbst.
+coach-log-search = Nach Stadt suchen
+coach-log-table = Reisebusfahrten
+coach-log-none = Noch keine Reisebusfahrten
+coach-log-none-body = Jede Reisebusfahrt, die du fährst, erscheint hier, die neueste zuerst.
 
 ## What the save needs
 needs = DLCs und Mods

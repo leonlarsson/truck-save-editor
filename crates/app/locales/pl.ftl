@@ -1012,6 +1012,7 @@ picks-row = Wybierz: { $name }
 
 ## Statistics
 page-statistics = Statystyki
+page-coach-career = Kariera kierowcy autokaru
 stats-deliveries = Dostawy
 stats-income = Zarobione na dostawach
 stats-xp = PD z dostaw
@@ -1037,6 +1038,14 @@ column-when = Kiedy
 column-income = Dochód
 column-xp = PD
 column-damage = Uszkodzenia
+column-passengers = Pasażerowie
+column-satisfaction = Zadowolenie
+coach-earned = Zarobione na kursach
+coach-log-note = Z dziennika kursów autokarowych gry. Tylko do odczytu: gra sama prowadzi te liczby.
+coach-log-search = Szukaj po mieście
+coach-log-table = Kursy autokarowe
+coach-log-none = Brak kursów autokarowych
+coach-log-none-body = Każdy przejechany kurs autokarowy pojawi się tutaj, najnowszy na górze.
 
 ## What the save needs
 needs = DLC i modyfikacje

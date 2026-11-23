@@ -392,3 +392,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** one sidebar item named Map led to cities, roads, the truck and the gallery behind a List | Map | Gallery switch, which said little; the owner suggested Map as the group. Each page now holds one thing, named as the game names it.
 
 **Considered:** an Exploration page with Cities | Map | Gallery tabs (the game's Career Progress heading); naming the switch Cities | Map | Gallery on one page.
+
+## 2026-11-23: Coach career is a page of its own; pages have no Ctrl+number shortcuts
+
+**Decided:** everything about the coach career moves to a Coach career page under Career, shown in the sidebar and the palette only for a save with a coach career: coach experience and skills, the coach services (passengers and distance to edit, Perfect satisfaction, Discover every bus stop) and every service in the coach job log (`save::coach_services`). Overview and Statistics are the truck career's; Fleet keeps its Trucks, Coaches and Trailers. Palette commands about coaches open Coach career. Pages lose their Ctrl+1…9 shortcuts (replaces that part of "The map is a sidebar group" above); the palette (Ctrl+K) and the sidebar reach them, and Settings keeps Ctrl+,.
+
+**Why:** the two careers were mixed on Overview (both experience cards side by side, truck skills, ADR, coach skills and coach services one after another). A Truck | Coach switch in the sidebar was tried and dropped: most of the app (Jobs, Garages, Drivers, the map) doesn't change with it, so a global switch promised more than it did. Number shortcuts shifted whenever a page was added, and stopped at nine.
+
+**Considered:** the global switch (above); tabs on each page with both careers (the coach career spread over three pages); splitting Career into Trucking and Coaching with the company on Overview (a bigger reshuffle).

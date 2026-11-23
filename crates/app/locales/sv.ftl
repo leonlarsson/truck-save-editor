@@ -960,6 +960,7 @@ picks-row = Välj { $name }
 
 ## Statistics
 page-statistics = Statistik
+page-coach-career = Busskarriär
 stats-deliveries = Leveranser
 stats-income = Intjänat på leveranser
 stats-xp = XP från leveranser
@@ -984,6 +985,14 @@ column-when = När
 column-income = Inkomst
 column-xp = XP
 column-damage = Skada
+column-passengers = Passagerare
+column-satisfaction = Nöjdhet
+coach-earned = Intjänat på uppdrag
+coach-log-note = Från spelets logg över bussuppdrag. Skrivskyddat: spelet håller själv reda på de här siffrorna.
+coach-log-search = Sök på stad
+coach-log-table = Långfärdsbussuppdrag
+coach-log-none = Inga bussuppdrag än
+coach-log-none-body = Varje bussuppdrag du kör visas här, det senaste först.
 
 ## What the save needs
 needs = DLC och moddar

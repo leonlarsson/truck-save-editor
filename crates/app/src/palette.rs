@@ -55,6 +55,7 @@ pub enum PaletteCommand {
 fn groups(has_coaches: bool) -> Vec<Vec<PaletteCommand>> {
     let pages = Page::ALL
         .iter()
+        .filter(|page| page.is_shown(has_coaches))
         .map(|page| PaletteCommand::Go(*page))
         .collect();
     let mut actions = vec![
@@ -234,7 +235,7 @@ fn item(command: PaletteCommand, cx: &App) -> CommandItem {
         .label(label)
         .icon(Icon::new(icon))
         .keywords(keywords.iter().copied());
-    // Pages show their shortcut (Ctrl+1 …). The item dispatches the action too, which for going
+    // Settings shows its shortcut (Ctrl+,). The item dispatches the action too, which for going
     // to a page is harmless alongside the palette's own handling; other commands don't get one,
     // or they'd run twice.
     match command {
@@ -247,28 +248,10 @@ fn item(command: PaletteCommand, cx: &App) -> CommandItem {
 }
 
 fn page_shortcut(page: Page) -> Option<Box<dyn gpui_kit::Action>> {
-    use crate::workspace::{
-        GoToPage1, GoToPage2, GoToPage3, GoToPage4, GoToPage5, GoToPage6, GoToPage7, GoToPage8,
-        GoToPage9, OpenSettings,
-    };
-    // Settings has its own shortcut, Ctrl+,; the other pages go by their place in the sidebar.
-    if page == Page::Settings {
-        return Some(Box::new(OpenSettings));
-    }
-    let index = Page::ALL.iter().position(|p| *p == page)?;
-    let action: Box<dyn gpui_kit::Action> = match index {
-        0 => Box::new(GoToPage1),
-        1 => Box::new(GoToPage2),
-        2 => Box::new(GoToPage3),
-        3 => Box::new(GoToPage4),
-        4 => Box::new(GoToPage5),
-        5 => Box::new(GoToPage6),
-        6 => Box::new(GoToPage7),
-        7 => Box::new(GoToPage8),
-        8 => Box::new(GoToPage9),
-        _ => return None,
-    };
-    Some(action)
+    // Only Settings has a shortcut, Ctrl+, (as in most apps); pages are reached from the sidebar
+    // and here.
+    (page == Page::Settings)
+        .then(|| Box::new(crate::workspace::OpenSettings) as Box<dyn gpui_kit::Action>)
 }
 
 /// Opens the palette over the window; confirming a command runs it on the workspace.

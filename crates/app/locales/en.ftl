@@ -960,6 +960,7 @@ picks-row = Pick { $name }
 
 ## Statistics
 page-statistics = Statistics
+page-coach-career = Coach career
 stats-deliveries = Deliveries
 stats-income = Earned from deliveries
 stats-xp = XP from deliveries
@@ -984,6 +985,14 @@ column-when = When
 column-income = Income
 column-xp = XP
 column-damage = Damage
+column-passengers = Passengers
+column-satisfaction = Satisfaction
+coach-earned = Earned from services
+coach-log-note = From the game's coach job log. Read-only: the game keeps these numbers itself.
+coach-log-search = Search by city
+coach-log-table = Coach services
+coach-log-none = No coach services yet
+coach-log-none-body = Each coach service you drive shows here, newest first.
 
 ## What the save needs
 needs = DLC and mods

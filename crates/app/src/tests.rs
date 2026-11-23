@@ -23,10 +23,15 @@ struct TempSlot(PathBuf);
 
 impl TempSlot {
     fn new(name: &str) -> Self {
+        Self::with_save(name, SAVE)
+    }
+
+    /// A slot holding another made-up save.
+    fn with_save(name: &str, save: &str) -> Self {
         let dir = std::env::temp_dir().join(format!("tse-test-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("makes the slot folder");
-        std::fs::write(dir.join("game.sii"), SAVE).expect("writes the save");
+        std::fs::write(dir.join("game.sii"), save).expect("writes the save");
         // The profile folder is the slot folder here; its profile file has made-up login fields.
         std::fs::write(dir.join("profile.sii"), PROFILE).expect("writes the profile");
         Self(dir)
@@ -248,14 +253,14 @@ fn renaming_the_company_changes_only_its_name(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn ctrl_and_a_number_goes_to_a_page_and_enter_opens_a_row(cx: &mut TestAppContext) {
+fn the_palette_goes_to_a_page_and_enter_opens_a_row(cx: &mut TestAppContext) {
     let slot = TempSlot::new("keyboard");
     let (handle, _) = open(cx, &slot);
-    act(cx, handle, |window, cx| window.press("ctrl-3", cx));
+    run_command(cx, handle, "fleet");
     act(cx, handle, |window, _| {
         assert!(
             window.try_find("refuel-all").is_some(),
-            "Ctrl+3 shows Fleet"
+            "the palette shows Fleet"
         );
     });
 
@@ -278,7 +283,7 @@ fn ctrl_and_a_number_goes_to_a_page_and_enter_opens_a_row(cx: &mut TestAppContex
 fn escape_leaves_a_field_then_closes_its_panel(cx: &mut TestAppContext) {
     let slot = TempSlot::new("escape");
     let (handle, _) = open(cx, &slot);
-    act(cx, handle, |window, cx| window.press("ctrl-3", cx));
+    run_command(cx, handle, "fleet");
     act(cx, handle, |window, cx| {
         window.click(("details", 0usize), cx)
     });
@@ -310,7 +315,7 @@ fn escape_leaves_a_field_then_closes_its_panel(cx: &mut TestAppContext) {
 fn a_search_with_no_matches_offers_to_clear_it(cx: &mut TestAppContext) {
     let slot = TempSlot::new("no-matches");
     let (handle, _) = open(cx, &slot);
-    act(cx, handle, |window, cx| window.press("ctrl-3", cx));
+    run_command(cx, handle, "fleet");
     act(cx, handle, |window, cx| window.click("filter-search", cx));
     act(cx, handle, |window, cx| window.input("no such truck", cx));
     act(cx, handle, |window, _| {
@@ -430,7 +435,7 @@ fn session(
 fn the_current_job_can_be_cancelled_and_brought_back(cx: &mut TestAppContext) {
     let slot = TempSlot::new("cancel-job");
     let (handle, workspace) = open(cx, &slot);
-    act(cx, handle, |window, cx| window.press("ctrl-6", cx));
+    run_command(cx, handle, "jobs");
     let session = session(&workspace, cx);
     let has_job =
         |cx: &mut TestAppContext| cx.update(|cx| session.read(cx).current_job().is_some());
@@ -456,7 +461,7 @@ fn the_current_job_can_be_cancelled_and_brought_back(cx: &mut TestAppContext) {
 fn the_current_job_can_lose_its_deadline(cx: &mut TestAppContext) {
     let slot = TempSlot::new("job-deadline");
     let (handle, workspace) = open(cx, &slot);
-    act(cx, handle, |window, cx| window.press("ctrl-6", cx));
+    run_command(cx, handle, "jobs");
     let session = session(&workspace, cx);
     let deadline = |cx: &mut TestAppContext| {
         cx.update(|cx| session.read(cx).current_job().and_then(|job| job.deadline))
@@ -596,4 +601,42 @@ fn road_changes_that_leave_the_save_as_it_is_are_no_change(cx: &mut TestAppConte
     cx.run_until_parked();
     assert_eq!(change_count(&workspace, cx), 0);
     cx.update(|cx| assert!(session.read(cx).changes(cx).is_empty()));
+}
+
+#[gpui_kit::test]
+fn the_coach_career_has_a_page_of_its_own(cx: &mut TestAppContext) {
+    // A coach career: coach experience, and its skills at level 0.
+    let save = SAVE.replace(
+        " experience_points: 5000\r\n",
+        " experience_points: 5000\r\n bus_experience_points: 300\r\n",
+    );
+    let slot = TempSlot::with_save("coach-career", &save);
+    let (handle, workspace) = open(cx, &slot);
+    // Overview is the truck career's: no coach sections there.
+    act(cx, handle, |window, _| {
+        assert!(window.try_find("max-skills").is_some());
+        assert!(window.try_find("coach-level-progress").is_none());
+    });
+    run_command(cx, handle, "coach career");
+    act(cx, handle, |window, _| {
+        assert!(window.try_find("coach-level-progress").is_some());
+        assert!(window.try_find("max-skills").is_none());
+    });
+    // One level up from the page's own buttons.
+    act(cx, handle, |window, cx| {
+        window
+            .within(("coach-level-step", 1usize))
+            .click("plus", cx)
+    });
+    assert_eq!(change_count(&workspace, cx), 1);
+}
+
+#[gpui_kit::test]
+fn a_save_without_coaches_has_no_coach_career_page(cx: &mut TestAppContext) {
+    let slot = TempSlot::new("no-coach-career");
+    let (handle, _) = open(cx, &slot);
+    run_command(cx, handle, "coach career");
+    act(cx, handle, |window, _| {
+        assert!(window.try_find("coach-level-progress").is_none());
+    });
 }
