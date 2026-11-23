@@ -62,6 +62,8 @@ pub struct VehicleDetail {
     parts: Vec<PartPicker>,
     /// Each part's wear (current-format vehicles keep it on themselves; older ones have none).
     wear: Vec<WearSlider>,
+    /// The paint job and its colours (`None` for a vehicle without paint the editor knows).
+    paint: Option<Entity<super::paint::PaintEditor>>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -178,6 +180,13 @@ impl VehicleDetail {
                 })
             })
             .collect();
+        // Paint the editor knows: a paint job in a model's folder.
+        let paint_model = save::vehicle_paint(&session.read(cx).preview(), &id)
+            .and_then(|paint| save::paint_model(&paint.data_path).map(str::to_string));
+        let paint = paint_model.map(|model| {
+            let (session, id) = (session.clone(), id.clone());
+            cx.new(|cx| super::paint::PaintEditor::new(session, id, model, window, cx))
+        });
         let mut _subscriptions = vec![
             cx.subscribe_in(
                 &plate_colours,
@@ -297,6 +306,7 @@ impl VehicleDetail {
             plate_colours,
             parts,
             wear,
+            paint,
             _subscriptions,
         }
     }
@@ -827,6 +837,11 @@ impl Render for VehicleDetail {
                         ),
                 )
             }))
+            .children(
+                self.paint
+                    .clone()
+                    .map(|paint| group(t!(cx, "paint"), paint)),
+            )
             .child(group(t!(cx, "column-wear"), wear))
             .child(super::actions_row(
                 Button::new("repair-vehicle")

@@ -324,3 +324,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** the profile folder is where the game looks; writing it with the profile file keeps one backup and one way to restore. 256 is a guess at the size the game writes (it isn't in the game's data files); the in-game check settles it.
 
 **Considered:** writing the picture straight away (outside the save, Undo and backups); keeping the picture's own size (a huge photo in the profile folder).
+
+## 2026-11-23: Paint jobs and colours come from the game's own paint job definitions
+
+**Decided:** a vehicle's paint is its `vehicle_paint_job_accessory`: `data_path` names the paint job, and `base_color` and `mask_r/g/b_color` are its colours, linear light from 0 to 1 (shown and picked as sRGB, converted both ways in `save::paint`). The paint jobs offered are the model's `accessory_paint_job_data` definitions in every installed archive (`gamedata::model_paint_jobs`), one per name, in the version whose `suitable_for` names one of the vehicle's parts (`<file>.<model>.<folder>`, worked out from its accessories) or names none. Choosing one sets `data_path`, `refund` (its price, as the game keeps it) and the colours it comes in; a colour can then be changed where the definition doesn't lock it (a missing lock is a lock). The saved colours are `economy.user_colors[]`, 32 slots of `0xAABBGGRR` in sRGB (0 is empty), worked out from a save whose saved colours equal colours on its vehicles exactly once converted; they're shared as `#RRGGBB` text (`-` for an empty slot).
+
+**Why:** the definitions say what the game allows: which paint jobs a model has, which fit its cabin, and which colours can change. Writing only what they allow keeps vehicles the game can draw.
+
+**Considered:** listing every definition (the same paint job three times, one per cabin height, two of them wrong for the vehicle); letting every colour change (the game ignores or overrides locked ones).

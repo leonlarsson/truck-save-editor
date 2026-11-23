@@ -771,6 +771,29 @@ truck-engine = Engine
 truck-transmission = Transmission
 truck-part-pick = Choose…
 truck-part-loading = Reading the game…
+paint = Paint
+paint-job = Paint job
+paint-job-pick = Choose a paint job
+paint-base = Base colour
+paint-colour-1 = First colour
+paint-colour-2 = Second colour
+paint-colour-3 = Third colour
+paint-locked = This paint job's colours are set by the game.
+saved-colours = Saved colours
+saved-colours-count = { $count ->
+    [0] None
+    [one] 1 colour
+   *[other] { $count } colours
+}
+saved-colours-open = Saved colours…
+saved-colours-description = The colours saved in the game's paint screen, for the whole company. They show as quick picks in every vehicle's paint.
+saved-colours-slot = Saved colour { $slot }
+saved-colours-copy = Copy as text
+saved-colours-copy-tooltip = Copies the colours as text (#RRGGBB for each) to share.
+saved-colours-copied = Colours copied
+saved-colours-paste = Paste text
+saved-colours-paste-tooltip = Takes colours shared as text (#RRGGBB, - for an empty slot) from the clipboard, from the first slot on.
+saved-colours-not-colours = The clipboard doesn't hold colours as text: #RRGGBB for each, separated by spaces.
 truck-badge = Side badge
 truck-remove-badge = Remove it
 truck-remove-badge-tooltip = Takes the engine badge off the sides of the cab (the badge at the front stays).

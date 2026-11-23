@@ -775,6 +775,29 @@ truck-engine = Motor
 truck-transmission = Getriebe
 truck-part-pick = Wählen…
 truck-part-loading = Spiel wird gelesen…
+paint = Lackierung
+paint-job = Lackierung
+paint-job-pick = Eine Lackierung wählen
+paint-base = Grundfarbe
+paint-colour-1 = Erste Farbe
+paint-colour-2 = Zweite Farbe
+paint-colour-3 = Dritte Farbe
+paint-locked = Die Farben dieser Lackierung legt das Spiel fest.
+saved-colours = Gespeicherte Farben
+saved-colours-count = { $count ->
+    [0] Keine
+    [one] 1 Farbe
+   *[other] { $count } Farben
+}
+saved-colours-open = Gespeicherte Farben…
+saved-colours-description = Die im Lackierbildschirm des Spiels gespeicherten Farben, für die ganze Firma. Sie erscheinen als Schnellauswahl bei jeder Lackierung.
+saved-colours-slot = Gespeicherte Farbe { $slot }
+saved-colours-copy = Als Text kopieren
+saved-colours-copy-tooltip = Kopiert die Farben als Text (#RRGGBB je Farbe) zum Teilen.
+saved-colours-copied = Farben kopiert
+saved-colours-paste = Text einfügen
+saved-colours-paste-tooltip = Übernimmt als Text geteilte Farben (#RRGGBB, - für einen leeren Platz) aus der Zwischenablage, ab dem ersten Platz.
+saved-colours-not-colours = Die Zwischenablage enthält keine Farben als Text: #RRGGBB je Farbe, durch Leerzeichen getrennt.
 truck-badge = Seitenemblem
 truck-remove-badge = Entfernen
 truck-remove-badge-tooltip = Entfernt das Motoremblem an den Seiten des Fahrerhauses (das Emblem vorn bleibt).

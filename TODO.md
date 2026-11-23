@@ -119,8 +119,9 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [ ] In game (owner): Perfect satisfaction, Discover every bus stop, a new passengers total and coach distance, saved as a new slot. Does the game's statistics screen (Coach Services) show them, and do the found bus stops show on the map?
 - [x] A profile picture: chosen in the editor (PNG, JPEG or BMP), cut square from the middle, written as the profile's `avatar.png` (256 × 256) when saving, with the profile's backup.
 - [ ] In game (owner): a picture chosen for a spare profile. Does the game show it on the profile screen and in game, at a good size? (Setting one in the game itself once would tell the size the game writes; 256 is a guess.) Does it follow the profile through Steam Cloud?
-- [ ] Truck and trailer colours: edit the custom colours, and save and share them.
-- [ ] Paint jobs: change a truck's or trailer's paint job, from the game's own list.
+- [x] Paint in the truck and trailer panel: the paint job, from the game's own list for the model (one per name, in the version that fits the vehicle's cabin), and the colours the paint job lets you change, with the saved colours as quick picks.
+- [x] Saved colours (Fleet → Saved colours…, and the palette): the 32 colours saved in the game's paint screen, each editable, copied as text to share and pasted from text.
+- [ ] In game (owner): another paint job on a truck and on a trailer, a custom colour, and a few saved colours changed, saved as a new slot. Do the vehicles look right (the colours as picked, the paint job fitting the cabin), and does the game's paint screen show the saved colours?
 - [ ] Freight market jobs: make a job by picking where from, where to, the cargo, the trailer and how urgent.
 
 ## Later

@@ -3,6 +3,7 @@
 
 mod amount_field;
 mod change_list;
+mod colour;
 mod empty_state;
 mod fill_table;
 mod filter_bar;
@@ -18,6 +19,7 @@ mod text_table;
 
 pub use amount_field::{AmountChanged, AmountField};
 pub use change_list::ChangeList;
+pub use colour::{to_hsla, to_rgb8};
 pub use empty_state::EmptyState;
 pub use fill_table::{FillsWidth, fill_table, fill_widths};
 pub use filter_bar::{FilterBar, FilterChanged, fold, table_or_empty};

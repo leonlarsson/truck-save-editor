@@ -28,7 +28,7 @@ pub use roads::{
     sector_contents, sector_roads,
 };
 pub use texture::{decode_rgba, distance_field_coverage};
-pub use vehicles::{Part, PartKind, model_parts};
+pub use vehicles::{PaintJob, Part, PartKind, model_paint_jobs, model_parts};
 
 pub type Result<T> = std::result::Result<T, Error>;
 

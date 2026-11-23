@@ -417,6 +417,9 @@ impl Workspace {
             PaletteCommand::VisitEveryCity => {
                 session.update(cx, |session, cx| session.visit_all_cities(cx));
             }
+            PaletteCommand::SavedColours => {
+                crate::pages::saved_colours::open(session.clone(), window, cx);
+            }
             PaletteCommand::PerfectCoachSatisfaction => {
                 session.update(cx, |session, cx| session.perfect_coach_satisfaction(cx));
             }

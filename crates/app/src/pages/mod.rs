@@ -14,6 +14,7 @@ pub mod open_save;
 pub mod overview;
 pub mod position;
 pub mod profile_tools;
+pub mod saved_colours;
 pub mod settings;
 pub mod statistics;
 

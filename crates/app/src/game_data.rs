@@ -397,6 +397,61 @@ pub fn model_parts(cx: &mut App, model: &str, kind: gamedata::PartKind) -> Optio
     None
 }
 
+/// The paint jobs read so far, by model.
+#[derive(Default)]
+struct PaintJobs(HashMap<String, Option<Arc<Vec<gamedata::PaintJob>>>>);
+
+impl Global for PaintJobs {}
+
+/// The paint jobs a model can have (`volvo.fh16`), as the game defines them (texts still keys:
+/// see `paint_job_name`). The first ask starts reading them in the background and returns `None`;
+/// the window redraws when they're there.
+pub fn model_paint_jobs(cx: &mut App, model: &str) -> Option<Arc<Vec<gamedata::PaintJob>>> {
+    if !cx.has_global::<PaintJobs>() {
+        cx.set_global(PaintJobs::default());
+    }
+    if let Some(jobs) = cx.global::<PaintJobs>().0.get(model) {
+        return jobs.clone();
+    }
+    let install_dir = data(cx)?.install_dir.clone();
+    cx.global_mut::<PaintJobs>()
+        .0
+        .insert(model.to_string(), None);
+    let model = model.to_string();
+    cx.spawn(async move |cx| {
+        let jobs = cx
+            .background_spawn({
+                let model = model.clone();
+                async move { gamedata::model_paint_jobs(&install_dir, &model) }
+            })
+            .await;
+        cx.update(|cx| {
+            cx.global_mut::<PaintJobs>()
+                .0
+                .insert(model, Some(Arc::new(jobs)));
+            cx.refresh_windows();
+        });
+    })
+    .detach();
+    None
+}
+
+/// A paint job's name, in the game's words (else from the file's name: `style1.sii` → `style1`).
+pub fn paint_job_name(cx: &App, path: &str) -> String {
+    let known = cx.try_global::<PaintJobs>().and_then(|jobs| {
+        jobs.0.values().flatten().find_map(|list| {
+            let job = list.iter().find(|job| job.path == path)?;
+            Some(data(cx)?.resolve(&job.name))
+        })
+    });
+    known.filter(|name| !name.is_empty()).unwrap_or_else(|| {
+        std::path::Path::new(path)
+            .file_stem()
+            .map(|stem| stem.to_string_lossy().into_owned())
+            .unwrap_or_default()
+    })
+}
+
 /// An engine's or transmission's name by its definition, from those already read (else from the
 /// file's name: `d16g750.sii` → `D16G750`).
 pub fn part_name(cx: &App, path: &str) -> String {

@@ -34,6 +34,17 @@ pub enum VehicleEdit {
         data_path: String,
         price: i64,
     },
+    /// One of the paint's colours (see `crate::paint`).
+    PaintColour {
+        vehicle: String,
+        colour: crate::PaintColour,
+        linear: crate::LinearRgb,
+    },
+    /// Another paint job, in its own colours.
+    PaintJob {
+        vehicle: String,
+        job: crate::NewPaintJob,
+    },
 }
 
 impl VehicleEdit {
@@ -45,7 +56,9 @@ impl VehicleEdit {
             | VehicleEdit::Unrestrict { trailer } => trailer,
             VehicleEdit::Fuel { vehicle, .. }
             | VehicleEdit::RemoveBadge { vehicle }
-            | VehicleEdit::Part { vehicle, .. } => vehicle,
+            | VehicleEdit::Part { vehicle, .. }
+            | VehicleEdit::PaintColour { vehicle, .. }
+            | VehicleEdit::PaintJob { vehicle, .. } => vehicle,
         }
     }
 
@@ -53,6 +66,10 @@ impl VehicleEdit {
     pub fn same_kind(&self, other: &VehicleEdit) -> bool {
         let same_part = match (self, other) {
             (VehicleEdit::Part { part: a, .. }, VehicleEdit::Part { part: b, .. }) => a == b,
+            (
+                VehicleEdit::PaintColour { colour: a, .. },
+                VehicleEdit::PaintColour { colour: b, .. },
+            ) => a == b,
             _ => true,
         };
         std::mem::discriminant(self) == std::mem::discriminant(other)
@@ -274,6 +291,14 @@ pub fn apply_vehicle_edit(document: &mut Document, edit: &VehicleEdit) -> bool {
                 Value::single(price.max(&0).to_string()),
             );
             true
+        }
+        VehicleEdit::PaintColour {
+            vehicle,
+            colour,
+            linear,
+        } => crate::paint::set_paint_colour(document, vehicle, *colour, *linear),
+        VehicleEdit::PaintJob { vehicle, job } => {
+            crate::paint::set_paint_job(document, vehicle, job)
         }
         VehicleEdit::RemoveBadge { vehicle } => {
             let Some(badge) = badge(document, vehicle) else {

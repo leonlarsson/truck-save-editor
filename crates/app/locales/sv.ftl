@@ -771,6 +771,29 @@ truck-engine = Motor
 truck-transmission = Växellåda
 truck-part-pick = Välj…
 truck-part-loading = Läser spelet…
+paint = Lack
+paint-job = Lackering
+paint-job-pick = Välj en lackering
+paint-base = Grundfärg
+paint-colour-1 = Första färgen
+paint-colour-2 = Andra färgen
+paint-colour-3 = Tredje färgen
+paint-locked = Lackeringens färger bestäms av spelet.
+saved-colours = Sparade färger
+saved-colours-count = { $count ->
+    [0] Inga
+    [one] 1 färg
+   *[other] { $count } färger
+}
+saved-colours-open = Sparade färger…
+saved-colours-description = Färgerna som sparats i spelets lackskärm, för hela företaget. De visas som snabbval i varje fordons lack.
+saved-colours-slot = Sparad färg { $slot }
+saved-colours-copy = Kopiera som text
+saved-colours-copy-tooltip = Kopierar färgerna som text (#RRGGBB för varje) att dela.
+saved-colours-copied = Färgerna kopierade
+saved-colours-paste = Klistra in text
+saved-colours-paste-tooltip = Tar färger som delats som text (#RRGGBB, - för en tom plats) från urklipp, från första platsen.
+saved-colours-not-colours = Urklipp innehåller inga färger som text: #RRGGBB för varje, åtskilda med mellanslag.
 truck-badge = Sidoemblem
 truck-remove-badge = Ta bort det
 truck-remove-badge-tooltip = Tar bort motoremblemet från hyttens sidor (emblemet fram sitter kvar).

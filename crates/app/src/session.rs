@@ -120,6 +120,8 @@ struct Pending {
     coach: CoachChanges,
     /// A new picture for the profile, or none (in the profile folder, like its name).
     avatar: Option<AvatarChange>,
+    /// The colours saved in the game's paint screen, slot by slot, when changed.
+    saved_colours: Option<Vec<Option<save::Rgb8>>>,
 }
 
 /// A change to the profile's own picture.
@@ -184,6 +186,7 @@ impl Pending {
             player_edits: Vec::new(),
             coach: CoachChanges::default(),
             avatar: None,
+            saved_colours: None,
         }
     }
 
@@ -278,6 +281,21 @@ fn plate_text(value: &str) -> String {
         }
     }
     clean.trim().to_string()
+}
+
+/// A colour as `#RRGGBB`, as the save dialog shows paint.
+pub fn colour_text([r, g, b]: save::Rgb8) -> String {
+    format!("#{r:02X}{g:02X}{b:02X}")
+}
+
+/// What a paint colour is called: the base colour, or the pattern's first, second or third.
+pub fn paint_colour_label(cx: &App, colour: save::PaintColour) -> SharedString {
+    match colour {
+        save::PaintColour::Base => t!(cx, "paint-base"),
+        save::PaintColour::MaskR => t!(cx, "paint-colour-1"),
+        save::PaintColour::MaskG => t!(cx, "paint-colour-2"),
+        save::PaintColour::MaskB => t!(cx, "paint-colour-3"),
+    }
 }
 
 pub struct Change {
@@ -832,6 +850,7 @@ impl Session {
             + self.pending.player_edits.len()
             + self.pending.coach.count()
             + usize::from(self.pending.avatar.is_some())
+            + usize::from(self.pending.saved_colours.is_some())
             + usize::from(self.pending.roads.is_some())
     }
 
@@ -871,6 +890,21 @@ impl Session {
                     || wear_fields.insert((path.unit.as_str(), path.field.as_str()))
             })
             .count()
+    }
+
+    /// The colours saved in the game's paint screen, slot by slot, as they'll be after saving.
+    pub fn saved_colours(&self) -> Vec<Option<save::Rgb8>> {
+        save::saved_colours(&self.preview())
+    }
+
+    /// Sets the saved colours, slot by slot; the save's own aren't a change.
+    pub fn set_saved_colours(&mut self, colours: Vec<Option<save::Rgb8>>, cx: &mut Context<Self>) {
+        let mut colours = colours;
+        colours.resize(save::SAVED_COLOUR_SLOTS, None);
+        let is_saved = save::saved_colours(&self.loaded.game) == colours;
+        self.change(cx, |pending, _| {
+            pending.saved_colours = (!is_saved).then_some(colours);
+        });
     }
 
     /// The coach career's numbers as they'll be after saving (`None` without a coach career).
@@ -1466,6 +1500,23 @@ impl Session {
                 text.clone().into(),
             );
         }
+        if self.pending.saved_colours.is_some() {
+            let count = |colours: Vec<Option<save::Rgb8>>| colours.iter().flatten().count();
+            add(
+                &company,
+                t!(cx, "saved-colours"),
+                t!(
+                    cx,
+                    "saved-colours-count",
+                    count = count(save::saved_colours(&self.loaded.game))
+                ),
+                t!(
+                    cx,
+                    "saved-colours-count",
+                    count = count(self.saved_colours())
+                ),
+            );
+        }
         if self.pending.coach.count() > 0
             && let (Some(saved), Some(after)) =
                 (save::coach_stats(&self.loaded.game), self.coach_stats())
@@ -1678,6 +1729,27 @@ impl Session {
                     t!(cx, "change-on"),
                     t!(cx, "removal-after"),
                 ),
+                save::VehicleEdit::PaintColour { colour, linear, .. } => {
+                    let saved = save::vehicle_paint(&self.loaded.game, id)
+                        .and_then(|paint| paint.colour(*colour))
+                        .map(|saved| colour_text(save::to_display(saved)))
+                        .unwrap_or_default();
+                    (
+                        paint_colour_label(cx, *colour),
+                        saved.into(),
+                        colour_text(save::to_display(*linear)).into(),
+                    )
+                }
+                save::VehicleEdit::PaintJob { job, .. } => {
+                    let saved = save::vehicle_paint(&self.loaded.game, id)
+                        .map(|paint| crate::game_data::paint_job_name(cx, &paint.data_path))
+                        .unwrap_or_default();
+                    (
+                        t!(cx, "paint-job"),
+                        saved.into(),
+                        crate::game_data::paint_job_name(cx, &job.data_path).into(),
+                    )
+                }
                 save::VehicleEdit::Part {
                     part, data_path, ..
                 } => {
@@ -1969,6 +2041,9 @@ impl Session {
         }
         if self.pending.cancel_job {
             save::cancel_job(&mut slot.game);
+        }
+        if let Some(colours) = &self.pending.saved_colours {
+            save::set_saved_colours(&mut slot.game, colours);
         }
         // The passengers first: setting satisfaction doesn't touch them.
         if let Some(total) = self.pending.coach.passengers {
@@ -2393,6 +2468,28 @@ mod tests {
         }
         assert_eq!(stats(&session, cx).passengers, 40);
         assert_eq!(count(&session, cx), 0);
+    }
+
+    #[gpui_kit::test]
+    fn saved_colours_are_one_change_and_set_back_are_none(cx: &mut TestAppContext) {
+        let session = session(cx);
+        let mut colours = cx.update(|cx| session.read(cx).saved_colours());
+        assert_eq!(colours.len(), save::SAVED_COLOUR_SLOTS);
+        let original = colours.clone();
+
+        colours[0] = Some([0x12, 0x34, 0x56]);
+        colours[5] = Some([0xff, 0x00, 0x80]);
+        session.update(cx, |session, cx| {
+            session.set_saved_colours(colours.clone(), cx)
+        });
+        cx.update(|cx| {
+            let session = session.read(cx);
+            assert_eq!(session.saved_colours(), colours);
+            assert_eq!(session.change_count(), 1);
+        });
+
+        session.update(cx, |session, cx| session.set_saved_colours(original, cx));
+        cx.update(|cx| assert_eq!(session.read(cx).change_count(), 0));
     }
 
     #[gpui_kit::test]

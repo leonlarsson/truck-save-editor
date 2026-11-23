@@ -416,6 +416,20 @@ impl Render for FleetPage {
                 .child(
                     h_flex()
                         .gap_2()
+                        .child(
+                            Button::new("saved-colours")
+                                .small()
+                                .ghost()
+                                .label(t!(cx, "saved-colours-open"))
+                                .tooltip(t!(cx, "saved-colours-description"))
+                                .on_click(cx.listener(|this, _, window, cx| {
+                                    crate::pages::saved_colours::open(
+                                        this.session.clone(),
+                                        window,
+                                        cx,
+                                    )
+                                })),
+                        )
                         .children(has_fuel.then(|| {
                             Button::new("refuel-all")
                                 .small()

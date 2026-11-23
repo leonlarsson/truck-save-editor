@@ -7,6 +7,7 @@ mod city;
 mod driver;
 mod garage;
 mod garage_picker;
+mod paint;
 mod vehicle;
 
 pub use city::{ShowOnMap, open as open_city};
