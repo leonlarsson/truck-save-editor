@@ -7,18 +7,25 @@ A release is a version tag. Pushing `v0.1.0` runs `.github/workflows/release.yml
 - `truck-save-editor-<version>-windows-x64.exe`: the app, on its own (no installer, nothing to unzip). Everything it needs is inside it, the licences of the crates built into it too (Settings → About → Open-source licences; `crates/app/assets/licenses.txt`, made by `mise run licenses` with cargo-about, and checked by CI to match the crates).
 - `SHA256SUMS.txt`: the .exe's checksum.
 - A build provenance attestation for it (GitHub's, signed with Sigstore): `gh attestation verify <file> --repo leonlarsson/truck-save-editor` proves the file came from this repository's release workflow, at the tagged commit.
-- Notes: drafted from the commit messages by git-cliff (`cliff.toml`: `feat`, `fix` and `polish` commits), with the download text from `.github/release-footer.md`. Edit them into something a player wants to read before publishing.
+- Notes: the hand-written `docs/release-notes/<version>.md` (without its opening comment) when there is one, otherwise drafted from the commit messages by git-cliff (`cliff.toml`: `feat`, `fix` and `polish` commits); then the download text from `.github/release-footer.md`.
 
 The .exe carries its version, product name and copyright in its file details (`crates/app/build.rs`), and the C runtime inside it (`.cargo/config.toml`), so it starts on any Windows 10 or 11.
 
 ## Steps
 
-1. **Check it in game.** Changes to how saves are written need the owner's in-game check (see `AGENTS.md`).
-2. **Bump the version** in the root `Cargo.toml` (`[workspace.package] version`), then run `cargo check` so `Cargo.lock` follows, and `mise run licenses` so the licence list does (it names the editor's own crates with their version; CI fails if it's behind). The release builds with `--locked`, and fails if the lock file is behind.
-3. **Preview the notes**: `mise run release-notes`. **Pictures** for the README and the notes: `scripts/screenshots.sh <slot copy> <version>` (see `AGENTS.md` → Verifying); the notes link them by the commit that adds them.
-4. **Commit and tag**: `git commit -am "chore: release 0.1.0"`, `git tag v0.1.0`, `git push origin main v0.1.0`. The workflow refuses a tag that doesn't match the version.
-5. **Try the draft**: when the workflow finishes, download the .exe from the draft release on a Windows PC, run it, open a save and look around.
-6. **Edit the notes and publish.** Hand-written notes for a version go in `docs/release-notes/<version>.md`, to paste over the drafted ones (the download and checksum sections stay). A version with a dash (`0.2.0-beta.1`) is marked as a pre-release.
+1. **Check it in game.** Changes to how saves are written need the owner's in-game check (see `AGENTS.md`). Note what's still untried in `TODO.md`.
+2. **Write the notes**: `docs/release-notes/<version>.md`, for players (see the earlier versions; `mise run release-notes` shows the commits to start from). New, Changed, Fixed; only what changed since the last release (check the last notes so nothing from them is repeated), and no claim the editor doesn't fully meet. The release workflow uses this file as the release's notes, and adds the Download and Check the download sections (`.github/release-footer.md`); without it, the notes are drafted from the commits.
+3. **Take the pictures**: `scripts/screenshots.sh <slot copy> <version>` (about half a minute, from a made-up demo profile; see `AGENTS.md` → Verifying). It refreshes the README's pictures in `docs/screenshots/` and puts the release's in `docs/release-notes/<version>/`. Look at every one, and keep only those the notes use.
+4. **Commit in this order**, so the notes can link pictures that exist:
+   1. the work itself (`feat:`, `fix:` …);
+   2. the pictures and the README (`docs:`);
+   3. the release: put the pictures' commit into the notes' links (`https://raw.githubusercontent.com/leonlarsson/truck-save-editor/<commit>/docs/release-notes/<version>/<name>.png`, check each loads), **bump the version** in the root `Cargo.toml` (`[workspace.package] version`), run `cargo check` so `Cargo.lock` follows and `mise run licenses` so the licence list does (it names the editor's own crates with their version; CI fails if it's behind), run `mise run check`, and commit as `chore: release <version>`.
+
+   Push, and wait for **CI on `main`** to pass: the release workflow builds and packages, but doesn't run the tests.
+5. **Tag**: `git tag v<version>`, then `git push origin v<version>` (a tag isn't sent by a plain `git push`). The workflow refuses a tag that doesn't match the version, and builds with `--locked`.
+6. **Try the draft**: the workflow makes a **draft** release, titled "Truck Save Editor <version>", with the .exe, `SHA256SUMS.txt` and the notes. Until it's published its address reads `…/releases/tag/untagged-…`, and only the owner sees it. Download the .exe on a Windows PC, run it, open a save and look around, and read the notes as a player would.
+7. **Publish**: on GitHub, or `gh release edit v<version> --draft=false --latest`. Check it's marked Latest and the title is "Truck Save Editor <version>". The notes and title can still be edited afterwards; the files and tag can't (see Immutable releases). A version with a dash (`0.2.0-beta.1`) is marked as a pre-release.
+8. **Afterwards**: offer a short forum post for the release (plain BBCode, short bullets; the forum doesn't show inline pictures), and note the release in `TODO.md`.
 
 Once published, a release reaches people through the editor: it asks GitHub for the latest release when it starts (`crates/app/src/updates.rs`) and offers the download. GitHub's "latest release" leaves out drafts and pre-releases, so only a full release is announced.
 

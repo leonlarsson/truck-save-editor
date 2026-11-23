@@ -408,3 +408,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** pictures of a real save would put the player's own values in a public repository, and taking them by hand (or by restarting the app and typing per picture) took about ten minutes and broke when layouts moved. A run now takes about half a minute; the optimised crates bring the game's data and map from about 18 seconds to a few in a development build.
 
 **Considered:** keystrokes and clicks at coordinates (slow, and coordinates break with layouts); restarting per picture (each start reloads the game's data); rendering pictures headless in tests (GPUI's test platform draws nothing).
+
+## 2026-11-23: The release workflow uses the hand-written notes and names the release
+
+**Decided:** the release workflow takes a release's notes from `docs/release-notes/<version>.md` when it exists (without its opening comment), else drafts them from the commits with git-cliff as before, and adds the download and checksum sections either way. It titles the release "<product name> <version>", reading the name from `PRODUCT_NAME` in `crates/app/build.rs`. `docs/releasing.md` lists the whole release in order, with what went wrong before.
+
+**Why:** publishing 0.3.0, the notes had to be pasted over the drafted ones by hand, and the release came out titled "v0.3.0" where the earlier ones read "Truck Save Editor 0.2.0", fixed only after publishing. Steps that have to be remembered get forgotten.
+
+**Considered:** a checklist alone (it was there, and the title still slipped); writing the product name into the workflow (the name is written in one place only).

@@ -95,9 +95,17 @@ jobs:
         run: sha256sum *.exe > SHA256SUMS.txt
       - name: Notes
         run: |
-          # This tag's commits for a release; everything not yet tagged for a rehearsal.
-          if [ "$GITHUB_REF_TYPE" = tag ]; then range=--latest; else range=--unreleased; fi
-          git-cliff $range --strip all > notes.md
+          # The hand-written notes for this version when there are some (without their opening
+          # comment); otherwise drafted from the commits: this tag's for a release, everything not
+          # yet tagged for a rehearsal.
+          written="docs/release-notes/$VERSION.md"
+          if [ -f "$written" ]; then
+            perl -0pe 's/\A\s*<!--.*?-->\s*//s' "$written" > notes.md
+          else
+            if [ "$GITHUB_REF_TYPE" = tag ]; then range=--latest; else range=--unreleased; fi
+            git-cliff $range --strip all > notes.md
+          fi
+          echo >> notes.md
           sed -e "s/{version}/$VERSION/g" -e "s|{repository}|$GITHUB_REPOSITORY|g" \
             .github/release-footer.md >> notes.md
       - name: Attest where the files came from
@@ -113,8 +121,11 @@ jobs:
           # A version with a dash (0.2.0-beta.1) is a pre-release.
           prerelease=""
           case "$VERSION" in *-*) prerelease="--prerelease" ;; esac
+          # Titled like every release: "Truck Save Editor 0.3.0" (the name from crates/app/build.rs,
+          # the one place it's written).
+          product="$(sed -n 's/^const PRODUCT_NAME: &str = "\(.*\)";/\1/p' crates/app/build.rs)"
           gh release create "$GITHUB_REF_NAME" dist/*.exe dist/SHA256SUMS.txt \
-            --draft $prerelease --verify-tag --title "$GITHUB_REF_NAME" --notes-file notes.md
+            --draft $prerelease --verify-tag --title "$product $VERSION" --notes-file notes.md
       - name: Keep the rehearsal
         if: github.ref_type != 'tag'
         uses: actions/upload-artifact@v4
