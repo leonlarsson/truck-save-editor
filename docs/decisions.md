@@ -354,3 +354,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** SCS ships every DLC's archive with the game, owned or not, and Steam checks ownership when the game runs; seen in game: a paint job from a DLC the owner doesn't have was drawn, while the game's own shop didn't offer it. Offering paid DLC content to players who haven't bought it would make the editor a way around paying for DLCs, which it mustn't be (and the game may drop removable DLC content anyway).
 
 **Considered:** offering everything installed (hands out paid content); asking Steam who owns what (needs Steam, and the save's list already says it).
+
+## 2026-11-23: No profile picture
+
+**Decided:** the profile picture is taken out: no `avatar.png` is written, `save::save_profile` (profile file and picture together) is gone again for `save_profile_file`, and the `image` crate is back to no decoders. Replaces "The profile picture is the profile folder's avatar.png" above.
+
+**Why:** checked in game: with the editor's `avatar.png` in the profile folder, Career Selection still showed the profile's face, and the game's own screen for it (My Drivers → Driver Details) only offers the game's faces. The game has no picture of the player's own for a profile, so the feature could never work.
+
+**Considered:** a face picker writing `profile.sii`'s `face` and `male` (the game already does it; the owner left it out).

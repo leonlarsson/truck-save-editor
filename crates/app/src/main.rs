@@ -6,7 +6,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod assets;
-mod avatar;
 mod crash;
 mod format;
 mod game_data;

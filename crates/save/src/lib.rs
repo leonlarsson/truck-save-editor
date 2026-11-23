@@ -80,14 +80,12 @@ pub use player_vehicle::{
     move_player, own_trailer, own_truck, position, schedule_quick_travel,
 };
 pub use preview::{Picture, decode_tga};
-#[cfg(feature = "native")]
-pub use profile_file::{
-    AVATAR_FILE, AvatarWrite, load_profile_file, read_avatar, save_profile, save_profile_file,
-};
 pub use profile_file::{
     company_name, profile_name, set_cached_experience, set_company_name, set_profile_name,
     world_of_trucks_plate,
 };
+#[cfg(feature = "native")]
+pub use profile_file::{load_profile_file, save_profile_file};
 #[cfg(feature = "native")]
 pub use profile_tools::{
     CopyProblem, ProfileBackup, back_up_profile, copy_destination, copy_profile,

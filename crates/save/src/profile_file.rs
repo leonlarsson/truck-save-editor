@@ -110,24 +110,6 @@ mod disk {
         Ok(sii::read(&bytes)?)
     }
 
-    /// The profile's own picture, as the game reads it from the profile folder (`avatar.png`).
-    pub const AVATAR_FILE: &str = "avatar.png";
-
-    /// What saving does to the profile's picture.
-    #[derive(Clone, Copy, Debug, PartialEq)]
-    pub enum AvatarWrite<'a> {
-        Keep,
-        /// A PNG, written as the profile's `avatar.png`.
-        Set(&'a [u8]),
-        /// No picture of its own: the game shows the profile's face.
-        Remove,
-    }
-
-    /// The profile's own picture (`avatar.png`), if it has one.
-    pub fn read_avatar(profile_dir: &Path) -> Option<Vec<u8>> {
-        std::fs::read(profile_dir.join(AVATAR_FILE)).ok()
-    }
-
     /// Writes a profile's `profile.sii`: refused while the game runs, backed up first (with the
     /// profile folder's other files, not its saves), written whole or not at all, and read back
     /// and checked. If the check fails, the backup is put back.
@@ -138,96 +120,34 @@ mod disk {
         backups_root: &Path,
         profile: &str,
     ) -> Result<Backup> {
-        save_profile(
-            game,
-            profile_dir,
-            Some(document),
-            AvatarWrite::Keep,
-            backups_root,
-            profile,
-        )
-    }
-
-    /// Writes what changed in a profile: its `profile.sii` and its picture, either or both. As
-    /// `save_profile_file`: refused while the game runs, backed up first (the profile folder's
-    /// files, the picture too), each written whole and checked, and the backup put back if
-    /// anything fails.
-    pub fn save_profile(
-        game: Game,
-        profile_dir: &Path,
-        document: Option<&Document>,
-        avatar: AvatarWrite<'_>,
-        backups_root: &Path,
-        profile: &str,
-    ) -> Result<Backup> {
         if is_game_running(game) {
             return Err(Error::GameRunning);
         }
         let backup = back_up(profile_dir, backups_root, profile)?;
-        let written = write_profile(profile_dir, document, avatar);
+        let path = profile_dir.join("profile.sii");
+        let text = sii::to_text(document);
+        let written = crate::store::write_atomically(&path, text.as_bytes()).and_then(|()| {
+            let read_back = load_profile_file(profile_dir)
+                .map_err(|error| Error::NotVerified(error.to_string()))?;
+            if sii::to_text(&read_back) == text {
+                Ok(())
+            } else {
+                Err(Error::NotVerified("profile.sii differs".into()))
+            }
+        });
         if let Err(error) = written {
-            put_back(profile_dir, &backup.dir);
+            let original = backup.dir.join("profile.sii");
+            if let Ok(bytes) = std::fs::read(&original) {
+                let _ = crate::store::write_atomically(&path, &bytes);
+            }
             return Err(error);
         }
         Ok(backup)
     }
-
-    fn write_profile(
-        profile_dir: &Path,
-        document: Option<&Document>,
-        avatar: AvatarWrite<'_>,
-    ) -> Result<()> {
-        if let Some(document) = document {
-            let path = profile_dir.join("profile.sii");
-            let text = sii::to_text(document);
-            crate::store::write_atomically(&path, text.as_bytes())?;
-            let read_back = load_profile_file(profile_dir)
-                .map_err(|error| Error::NotVerified(error.to_string()))?;
-            if sii::to_text(&read_back) != text {
-                return Err(Error::NotVerified("profile.sii differs".into()));
-            }
-        }
-        let path = profile_dir.join(AVATAR_FILE);
-        match avatar {
-            AvatarWrite::Keep => {}
-            AvatarWrite::Set(png) => {
-                crate::store::write_atomically(&path, png)?;
-                if read_avatar(profile_dir).as_deref() != Some(png) {
-                    return Err(Error::NotVerified(format!("{AVATAR_FILE} differs")));
-                }
-            }
-            AvatarWrite::Remove => {
-                if path.exists() {
-                    std::fs::remove_file(&path).map_err(io("couldn't remove", &path))?;
-                }
-            }
-        }
-        Ok(())
-    }
-
-    /// After a failed write: the profile file and picture as the backup has them (a picture that
-    /// wasn't there before goes again).
-    fn put_back(profile_dir: &Path, backup_dir: &Path) {
-        if let Ok(bytes) = std::fs::read(backup_dir.join("profile.sii")) {
-            let _ = crate::store::write_atomically(&profile_dir.join("profile.sii"), &bytes);
-        }
-        // Only the picture is ever removed: the profile file is never deleted.
-        let avatar = profile_dir.join(AVATAR_FILE);
-        match std::fs::read(backup_dir.join(AVATAR_FILE)) {
-            Ok(bytes) => {
-                let _ = crate::store::write_atomically(&avatar, &bytes);
-            }
-            Err(_) => {
-                let _ = std::fs::remove_file(&avatar);
-            }
-        }
-    }
 }
 
 #[cfg(feature = "native")]
-pub use disk::{
-    AVATAR_FILE, AvatarWrite, load_profile_file, read_avatar, save_profile, save_profile_file,
-};
+pub use disk::{load_profile_file, save_profile_file};
 
 #[cfg(test)]
 mod tests {
@@ -273,42 +193,5 @@ mod tests {
             }
         }
         assert_eq!(unit.fields.len(), original.fields.len());
-    }
-
-    #[cfg(feature = "native")]
-    #[test]
-    fn writes_checks_and_removes_the_avatar_with_a_backup() {
-        use super::{AVATAR_FILE, AvatarWrite, read_avatar, save_profile};
-        let root = std::env::temp_dir().join(format!("tse-avatar-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&root);
-        let profile = root.join("profile");
-        let backups = root.join("backups");
-        std::fs::create_dir_all(&profile).expect("a profile folder");
-        std::fs::write(profile.join("profile.sii"), "SiiNunit\r\n{\r\n}\r\n").expect("writes");
-
-        let picture = [0x89, b'P', b'N', b'G', 1, 2, 3];
-        let game = crate::Game::Ets2;
-        save_profile(
-            game,
-            &profile,
-            None,
-            AvatarWrite::Set(&picture),
-            &backups,
-            "p",
-        )
-        .expect("saves");
-        assert_eq!(read_avatar(&profile).as_deref(), Some(&picture[..]));
-
-        // Removing it backs up the picture first.
-        let backup =
-            save_profile(game, &profile, None, AvatarWrite::Remove, &backups, "p").expect("saves");
-        assert_eq!(read_avatar(&profile), None);
-        assert_eq!(
-            std::fs::read(backup.dir.join(AVATAR_FILE)).ok().as_deref(),
-            Some(&picture[..])
-        );
-        // The profile file is never touched by the picture.
-        assert!(profile.join("profile.sii").exists());
-        let _ = std::fs::remove_dir_all(&root);
     }
 }

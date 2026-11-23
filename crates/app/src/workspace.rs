@@ -1185,35 +1185,26 @@ fn unsupported_game_warning(session: &Entity<Session>, cx: &App) -> Option<Alert
     })
 }
 
-/// Writes what changed in the profile, its file and its picture, if anything did (`None` when
-/// nothing did). Runs in the background, after the slot.
+/// Writes the profile file, if it changed (`None` when it didn't). Runs in the background, after
+/// the slot.
 fn write_profile(
     game: save::Game,
     profile_dir: &std::path::Path,
-    (document, avatar): (Option<sii::Document>, Option<crate::session::AvatarChange>),
+    document: Option<sii::Document>,
     backups_root: &std::path::Path,
     profile_folder: &str,
 ) -> Option<save::Result<save::Backup>> {
-    use crate::session::AvatarChange;
-    if document.is_none() && avatar.is_none() {
-        return None;
-    }
-    let picture = match &avatar {
-        None => save::AvatarWrite::Keep,
-        Some(AvatarChange::Set(png)) => save::AvatarWrite::Set(png),
-        Some(AvatarChange::Remove) => save::AvatarWrite::Remove,
-    };
-    Some(save::save_profile(
+    let document = document?;
+    Some(save::save_profile_file(
         game,
         profile_dir,
-        document.as_ref(),
-        picture,
+        &document,
         backups_root,
         profile_folder,
     ))
 }
 
-/// Says so when the profile (its file or picture) couldn't be written after the slot was.
+/// Says so when the profile file (the company's name) couldn't be written after the slot was.
 /// Returns whether it was written (or didn't need to be).
 fn report_profile(
     result: Option<save::Result<save::Backup>>,
@@ -1268,7 +1259,7 @@ fn start_save(session: Entity<Session>, window: &mut Window, cx: &mut App) {
             session.game(),
             session.profile_folder(),
             labels::slot_name(cx, session.slot()),
-            (session.prepared_profile(), session.prepared_avatar()),
+            session.prepared_profile(),
             session.profile().dir.clone(),
         )
     };
@@ -1279,7 +1270,7 @@ fn start_save(session: Entity<Session>, window: &mut Window, cx: &mut App) {
             let result = cx
                 .background_spawn(async move {
                     let backup = save::save(game, &slot, &backups_root, &profile_folder)?;
-                    // The slot first; then the profile (its file and picture), if they changed.
+                    // The slot first; then the profile file, only if the company's name changed.
                     let profile =
                         write_profile(game, &profile_dir, profile, &backups_root, &profile_folder);
                     Ok::<_, save::Error>((slot, backup, profile))
@@ -1338,7 +1329,7 @@ fn start_save_as_new_slot(session: Entity<Session>, window: &mut Window, cx: &mu
         (
             session.game(),
             labels::slot_name(cx, session.slot()),
-            (session.prepared_profile(), session.prepared_avatar()),
+            session.prepared_profile(),
             session.profile().dir.clone(),
             session.profile_folder(),
         )
@@ -1607,7 +1598,7 @@ fn start_save_over(
         (
             session.game(),
             labels::slot_name(cx, session.slot()),
-            (session.prepared_profile(), session.prepared_avatar()),
+            session.prepared_profile(),
             session.profile().dir.clone(),
             session.profile_folder(),
         )

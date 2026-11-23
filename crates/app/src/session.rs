@@ -31,8 +31,6 @@ pub struct Session {
     /// The profile's `profile.sii`, as on disk. Held only to write it back with a new company
     /// name; it also holds the World of Trucks login, which nothing here reads or shows.
     profile_file: Option<sii::Document>,
-    /// The profile's own picture (`avatar.png`) as it is on disk, if it has one.
-    saved_avatar: Option<Arc<Vec<u8>>>,
     /// Every change not saved yet.
     pending: Pending,
     /// What `pending` was before each change, latest last: Undo goes back through these.
@@ -118,20 +116,10 @@ struct Pending {
     player_edits: Vec<save::PlayerEdit>,
     /// Changes to the coach career's services and bus stops.
     coach: CoachChanges,
-    /// A new picture for the profile, or none (in the profile folder, like its name).
-    avatar: Option<AvatarChange>,
     /// The colours saved in the game's paint screen, when changed.
     saved_colours: Option<Vec<save::SavedColour>>,
     /// Jobs to put on the market, in the order made.
     new_jobs: Vec<save::NewJob>,
-}
-
-/// A change to the profile's own picture.
-#[derive(Clone, Debug, PartialEq)]
-pub enum AvatarChange {
-    /// A PNG, made from the picture chosen (see `avatar.rs`).
-    Set(Arc<Vec<u8>>),
-    Remove,
 }
 
 /// Changes to the coach career's numbers (see `save::coach_stats`): each is a line of its own.
@@ -187,7 +175,6 @@ impl Pending {
             quick_travel: false,
             player_edits: Vec::new(),
             coach: CoachChanges::default(),
-            avatar: None,
             saved_colours: None,
             new_jobs: Vec::new(),
         }
@@ -409,7 +396,6 @@ impl Session {
             saved_garages: save::garages(&loaded.game),
             saved_drivers: save::drivers(&loaded.game),
             profile_file: save::load_profile_file(&profile.dir).ok(),
-            saved_avatar: save::read_avatar(&profile.dir).map(Arc::new),
             pending: Pending::none(career.clone()),
             undo: Vec::new(),
             redo: Vec::new(),
@@ -755,45 +741,6 @@ impl Session {
         });
     }
 
-    /// Whether the profile can have a picture: a save on its own has no profile folder.
-    pub fn has_profile(&self) -> bool {
-        self.profile_file.is_some()
-    }
-
-    /// The profile's picture as it'll be after saving (a PNG), if it has one.
-    pub fn avatar(&self) -> Option<Arc<Vec<u8>>> {
-        match &self.pending.avatar {
-            Some(AvatarChange::Set(png)) => Some(png.clone()),
-            Some(AvatarChange::Remove) => None,
-            None => self.saved_avatar.clone(),
-        }
-    }
-
-    /// A new picture for the profile (a PNG made from the one chosen).
-    pub fn set_avatar(&mut self, png: Vec<u8>, cx: &mut Context<Self>) {
-        if !self.has_profile() {
-            return;
-        }
-        let png = Arc::new(png);
-        let is_saved = self.saved_avatar.as_ref() == Some(&png);
-        self.change(cx, |pending, _| {
-            pending.avatar = (!is_saved).then_some(AvatarChange::Set(png));
-        });
-    }
-
-    /// No picture of its own: the game shows the profile's face again.
-    pub fn remove_avatar(&mut self, cx: &mut Context<Self>) {
-        let has_saved = self.saved_avatar.is_some();
-        self.change(cx, |pending, _| {
-            pending.avatar = has_saved.then_some(AvatarChange::Remove);
-        });
-    }
-
-    /// What saving does to the profile's picture, if anything.
-    pub fn prepared_avatar(&self) -> Option<AvatarChange> {
-        self.pending.avatar.clone()
-    }
-
     /// The profile file as it would be written, if the company's or the profile's name changed.
     pub fn prepared_profile(&self) -> Option<sii::Document> {
         if self.pending.company_name.is_none() && self.pending.profile_name.is_none() {
@@ -852,7 +799,6 @@ impl Session {
             + usize::from(self.pending.quick_travel)
             + self.pending.player_edits.len()
             + self.pending.coach.count()
-            + usize::from(self.pending.avatar.is_some())
             + usize::from(self.pending.saved_colours.is_some())
             + self.pending.new_jobs.len()
             + usize::from(self.pending.roads.is_some())
@@ -1962,19 +1908,6 @@ impl Session {
                 );
             }
         }
-        if let Some(avatar) = &self.pending.avatar {
-            let none = t!(cx, "avatar-none");
-            let before = if self.saved_avatar.is_some() {
-                t!(cx, "avatar-own")
-            } else {
-                none.clone()
-            };
-            let after = match avatar {
-                AvatarChange::Set(_) => t!(cx, "avatar-new"),
-                AvatarChange::Remove => none,
-            };
-            add(&company, t!(cx, "avatar"), before, after);
-        }
         if let Some(name) = &self.pending.profile_name {
             let before = self
                 .profile_file
@@ -2160,21 +2093,15 @@ impl Session {
             if let Some(profile) = self.prepared_profile() {
                 self.profile_file = Some(profile);
             }
-            self.saved_avatar = self.avatar();
-            (None, None, None)
+            (None, None)
         } else {
             (
                 self.pending.company_name.clone(),
                 self.pending.profile_name.clone(),
-                self.pending.avatar.clone(),
             )
         };
         self.pending = Pending::none(self.saved_career.clone());
-        (
-            self.pending.company_name,
-            self.pending.profile_name,
-            self.pending.avatar,
-        ) = unwritten_names;
+        (self.pending.company_name, self.pending.profile_name) = unwritten_names;
         // What's on disk changed under the history; undoing past a save would describe changes
         // against a save that no longer exists.
         self.undo.clear();

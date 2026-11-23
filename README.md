@@ -35,7 +35,6 @@ The editor tells you when a newer version is out: when it starts, it asks GitHub
 - Money, with shortcuts (2.5m, +1m, −500k).
 - Truck and coach experience, shown as levels with the game's own rank names; set a level directly or step it.
 - Every truck and coach skill, and ADR classes, with Max all.
-- A profile picture: pick any PNG, JPEG or BMP and it becomes the picture the game shows for the profile.
 - Coach services as the game's statistics show them: set the passengers transported and the coach distance, make every service's passengers fully satisfied, or discover every bus stop.
 - Your headquarters city, your company's name and the profile's name.
 - **Your day**: rest (no tiredness, no break due), clear your police record, repair the cargo you're carrying, and set the clock to the morning, noon, evening or night.

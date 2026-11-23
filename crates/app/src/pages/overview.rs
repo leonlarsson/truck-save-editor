@@ -1,11 +1,9 @@
 //! Overview: the big levers first. Money, experience, skills and ADR, each one click from maxed.
 
-use std::sync::Arc;
-
 use gpui_kit::assets::IconName;
 use gpui_kit::component::{
-    ActiveTheme as _, Disableable as _, Icon, Sizable as _, StyledExt as _, WindowExt as _,
-    button::{Button, ButtonVariants as _},
+    ActiveTheme as _, Disableable as _, Icon, Sizable as _, StyledExt as _,
+    button::Button,
     checkbox::Checkbox,
     h_flex,
     input::{Input, InputEvent, InputState},
@@ -15,7 +13,7 @@ use gpui_kit::component::{
 use gpui_kit::{
     AnyElement, App, AppContext as _, Context, Entity, InteractiveElement as _, IntoElement,
     ParentElement as _, Render, SharedString, StatefulInteractiveElement as _, Styled as _,
-    StyledImage as _, Subscription, Window, div, prelude::FluentBuilder as _, rems,
+    Subscription, Window, div, rems,
 };
 use save::{ADR_ALL, CoachSkills, LevelTable, MAX_COACH_SKILL_LEVEL, MAX_SKILL_LEVEL, Skills};
 
@@ -44,9 +42,6 @@ pub struct OverviewPage {
     company: Option<Entity<InputState>>,
     /// The profile's name (in the profile file, like the company's).
     profile: Option<Entity<InputState>>,
-    /// The profile's picture as last drawn, and the image made from it (made again only when the
-    /// picture changes, not on every frame).
-    avatar_image: Option<(Arc<Vec<u8>>, Arc<gpui_kit::Image>)>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -174,135 +169,8 @@ impl OverviewPage {
             coach_distance,
             company,
             profile,
-            avatar_image: None,
             _subscriptions,
         }
-    }
-
-    /// The profile's picture to draw, made into an image once per picture.
-    fn avatar_image(&mut self, cx: &App) -> Option<Arc<gpui_kit::Image>> {
-        let png = self.session.read(cx).avatar()?;
-        if let Some((drawn, image)) = &self.avatar_image
-            && Arc::ptr_eq(drawn, &png)
-        {
-            return Some(image.clone());
-        }
-        let image = Arc::new(gpui_kit::Image::from_bytes(
-            gpui_kit::ImageFormat::Png,
-            png.as_ref().clone(),
-        ));
-        self.avatar_image = Some((png, image.clone()));
-        Some(image)
-    }
-
-    /// Asks for a picture, and makes it the profile's (in the background: big photos take a
-    /// moment to scale).
-    fn choose_avatar(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let prompt = cx.prompt_for_paths(gpui_kit::PathPromptOptions {
-            files: true,
-            directories: false,
-            multiple: false,
-            prompt: Some(t!(cx, "avatar-choose-prompt")),
-        });
-        cx.spawn_in(window, async move |this, cx| {
-            let Ok(Ok(Some(paths))) = prompt.await else {
-                return;
-            };
-            let Some(path) = paths.into_iter().next() else {
-                return;
-            };
-            let made = cx
-                .background_spawn(async move {
-                    std::fs::read(&path)
-                        .ok()
-                        .and_then(|bytes| crate::avatar::make_avatar(&bytes).ok())
-                })
-                .await;
-            let _ = this.update_in(cx, |this, window, cx| match made {
-                Some(png) => this
-                    .session
-                    .update(cx, |session, cx| session.set_avatar(png, cx)),
-                None => {
-                    use gpui_kit::component::notification::{Notification, NotificationType};
-                    window.push_notification(
-                        Notification::new()
-                            .with_type(NotificationType::Error)
-                            .title(t!(cx, "avatar-not-a-picture")),
-                        cx,
-                    );
-                }
-            });
-        })
-        .detach();
-    }
-
-    /// The profile's picture, with choosing another and removing it.
-    fn render_avatar(&mut self, cx: &mut Context<Self>) -> Option<gpui_kit::AnyElement> {
-        if !self.session.read(cx).has_profile() {
-            return None;
-        }
-        let image = self.avatar_image(cx);
-        let has_picture = image.is_some();
-        let theme = cx.theme();
-        let frame = div()
-            .size(rems(5.))
-            .flex_shrink_0()
-            .rounded(theme.radius)
-            .overflow_hidden()
-            .bg(theme.muted)
-            .border_1()
-            .border_color(theme.border)
-            .flex()
-            .items_center()
-            .justify_center()
-            .text_color(theme.muted_foreground)
-            .map(|frame| match image {
-                Some(image) => frame.child(
-                    gpui_kit::img(image)
-                        .size_full()
-                        .object_fit(gpui_kit::ObjectFit::Cover),
-                ),
-                None => frame.child(Icon::new(IconName::User).size_6()),
-            });
-        Some(
-            h_flex()
-                .gap_3()
-                .items_center()
-                .child(frame)
-                .child(
-                    v_flex()
-                        .gap_1p5()
-                        .items_start()
-                        .child(div().text_sm().child(t!(cx, "avatar")))
-                        .child(
-                            h_flex()
-                                .gap_2()
-                                .child(
-                                    Button::new("choose-avatar")
-                                        .small()
-                                        .outline()
-                                        .label(t!(cx, "avatar-choose"))
-                                        .tooltip(t!(cx, "avatar-tooltip"))
-                                        .on_click(cx.listener(|this, _, window, cx| {
-                                            this.choose_avatar(window, cx)
-                                        })),
-                                )
-                                .child(
-                                    Button::new("remove-avatar")
-                                        .small()
-                                        .ghost()
-                                        .label(t!(cx, "avatar-remove"))
-                                        .disabled(!has_picture)
-                                        .on_click(cx.listener(|this, _, _, cx| {
-                                            this.session.update(cx, |session, cx| {
-                                                session.remove_avatar(cx)
-                                            });
-                                        })),
-                                ),
-                        ),
-                )
-                .into_any_element(),
-        )
     }
 
     fn sync_fields(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -1041,7 +909,6 @@ impl Render for OverviewPage {
                     Some(input) => Section::new(t!(cx, "company-section"))
                         .description(t!(cx, "company-name-description"))
                         .action(self.quick_start_button(cx))
-                        .children(self.render_avatar(cx))
                         .child(
                             h_flex()
                                 .gap_4()
