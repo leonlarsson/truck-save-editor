@@ -86,6 +86,9 @@ pub struct Part {
     pub price: i64,
     /// The level it unlocks at.
     pub unlock: i64,
+    /// The DLC it comes with (`eut2_fhpack`), `None` for the base game's: offered only to saves
+    /// made with that DLC (see `crate::archive_dlc`).
+    pub dlc: Option<String>,
 }
 
 /// The engines or transmissions a truck (or coach) model can have, from the base game and every
@@ -96,6 +99,7 @@ pub fn model_parts(install_dir: &std::path::Path, model: &str, kind: PartKind) -
         let Ok(mut archive) = hashfs::Archive::open(&path) else {
             continue;
         };
+        let dlc = crate::archive_dlc(&mut archive, &path);
         for vehicle in ["truck", "bus"] {
             let folder = format!("/def/vehicle/{vehicle}/{model}/{}", kind.folder());
             let Ok(Some(listing)) = archive.list(&folder) else {
@@ -130,6 +134,7 @@ pub fn model_parts(install_dir: &std::path::Path, model: &str, kind: PartKind) -
                         .collect(),
                     price: number("price"),
                     unlock: number("unlock"),
+                    dlc: dlc.clone(),
                 });
             }
         }
@@ -163,6 +168,9 @@ pub struct PaintJob {
     pub masks: [Option<[f32; 3]>; 3],
     pub flake: Option<[f32; 3]>,
     pub flip: Option<[f32; 3]>,
+    /// The DLC it comes with (`eut2_sstrip`), `None` for the base game's: offered only to saves
+    /// made with that DLC, as the game's own shop only offers DLCs the player owns.
+    pub dlc: Option<String>,
 }
 
 /// Reads `(r, g, b)`.
@@ -180,6 +188,7 @@ pub fn model_paint_jobs(install_dir: &std::path::Path, model: &str) -> Vec<Paint
         let Ok(mut archive) = hashfs::Archive::open(&path) else {
             continue;
         };
+        let dlc = crate::archive_dlc(&mut archive, &path);
         for vehicle in ["truck", "bus", "trailer_owned"] {
             let folder = format!("/def/vehicle/{vehicle}/{model}/paint_job");
             let Ok(Some(listing)) = archive.list(&folder) else {
@@ -231,6 +240,7 @@ pub fn model_paint_jobs(install_dir: &std::path::Path, model: &str) -> Vec<Paint
                     ],
                     flake: colour_of("flake_color"),
                     flip: colour_of("flip_color"),
+                    dlc: dlc.clone(),
                 });
             }
         }

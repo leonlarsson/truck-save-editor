@@ -22,8 +22,9 @@ fn main() {
         .flatten()
         .collect();
         println!(
-            "{:>7} {:<40} {:<32} colours: {:<14} fits: {}",
+            "{:>7} {:<14} {:<40} {:<32} colours: {:<14} fits: {}",
             job.price,
+            job.dlc.as_deref().unwrap_or("base"),
             job.path.rsplit('/').next().unwrap_or_default(),
             job.name,
             open.join(" "),

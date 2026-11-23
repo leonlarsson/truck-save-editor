@@ -346,3 +346,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Decided:** `economy.user_colors[]` is read and written as 8 saved colours of 4 slots each (slots 0–3, 4–7 …), each slot `0xAABBGGRR` in sRGB as before. A saved colour is a set of up to four colours (the game saves a paint job's colours together); a single colour uses the first slot of its set. The Saved colours panel shows 8 rows of four pickers; the text form joins a set's colours with `/` (`#FF0000/#00FF00/#0000FF #E0FF00`), and the paint pickers offer every colour of every set as quick picks. Replaces the 32 single colours of the paint entry above.
 
 **Why:** seen in game: three colours written to slots 0–2 showed as one striped swatch, and a save whose slots 0 and 4 hold one colour each shows two plain swatches.
+
+## 2026-11-23: Paint jobs and parts only from DLCs the save was made with
+
+**Decided:** paint jobs, engines and transmissions are offered only from the base game and the DLCs the save lists in `info.sii` (`dlc|…` and `rdlc|…` dependencies: the DLCs the game had active when it saved). Each definition carries its DLC's id, read from its archive's manifest (`<archive>.manifest.sii`, a `dlc_package` with `id`, `gamedata::archive_dlc`); the base game's have none. A vehicle's current paint job or part stays in its list whatever it comes from, so the list shows what it has.
+
+**Why:** SCS ships every DLC's archive with the game, owned or not, and Steam checks ownership when the game runs; seen in game: a paint job from a DLC the owner doesn't have was drawn, while the game's own shop didn't offer it. Offering paid DLC content to players who haven't bought it would make the editor a way around paying for DLCs, which it mustn't be (and the game may drop removable DLC content anyway).
+
+**Considered:** offering everything installed (hands out paid content); asking Steam who owns what (needs Steam, and the save's list already says it).

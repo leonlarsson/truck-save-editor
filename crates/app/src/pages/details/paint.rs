@@ -189,7 +189,18 @@ impl PaintEditor {
         };
         let preview = self.session.read(cx).preview();
         let parts = save::vehicle_part_ids(&preview, &self.vehicle);
-        self.choices = fitting(&all, &parts);
+        // Only paint jobs the player has (the base game's, and DLCs the save was made with), as
+        // the game's paint shop offers, and whatever the vehicle wears now.
+        let current = save::vehicle_paint(&preview, &self.vehicle).map(|paint| paint.data_path);
+        let session = self.session.read(cx);
+        let owned: Vec<gamedata::PaintJob> = all
+            .iter()
+            .filter(|job| {
+                session.has_dlc(job.dlc.as_deref()) || current.as_deref() == Some(job.path.as_str())
+            })
+            .cloned()
+            .collect();
+        self.choices = fitting(&owned, &parts);
         let items: Vec<PaintJobOption> = self
             .choices
             .iter()
@@ -342,6 +353,7 @@ mod tests {
             masks: [None; 3],
             flake: None,
             flip: None,
+            dlc: None,
         }
     }
 

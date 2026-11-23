@@ -343,6 +343,8 @@ pub struct PartChoice {
     pub details: String,
     pub price: i64,
     pub unlock: i64,
+    /// The DLC it comes with, `None` for the base game's (see `Session::has_dlc`).
+    pub dlc: Option<String>,
 }
 
 /// The engines and transmissions of truck models, loaded when a truck's panel first asks.
@@ -375,6 +377,7 @@ pub fn model_parts(cx: &mut App, model: &str, kind: gamedata::PartKind) -> Optio
                         .join(" · "),
                     price: part.price,
                     unlock: part.unlock,
+                    dlc: part.dlc.clone(),
                 })
                 .collect()
         });

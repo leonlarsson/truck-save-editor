@@ -455,6 +455,16 @@ impl VehicleDetail {
                 continue;
             };
             let current = save::vehicle_part(&preview, &self.id, picker.part).map(|(_, path)| path);
+            // Only what the player has (the base game's, and DLCs the save was made with), and
+            // whatever the truck has now.
+            let session = self.session.read(cx);
+            let choices: Vec<game_data::PartChoice> = choices
+                .into_iter()
+                .filter(|choice| {
+                    session.has_dlc(choice.dlc.as_deref())
+                        || current.as_deref() == Some(choice.path.as_str())
+                })
+                .collect();
             let items: Vec<PartOption> = choices
                 .iter()
                 .map(|choice| PartOption {

@@ -332,6 +332,17 @@ fn rank(ranks: &[(i64, String)], level: i64) -> Option<&str> {
         .map(|(_, key)| key.as_str())
 }
 
+/// The DLC an archive belongs to, by its id (`eut2_sstrip`), from its manifest
+/// (`<archive name>.manifest.sii`, a `dlc_package`); `None` for the base game's archives, which
+/// have none. SCS ships every DLC's archive with the game, owned or not (Steam checks ownership
+/// when the game runs), so what a save may use is what it was made with, not what's installed.
+pub(crate) fn archive_dlc(archive: &mut hashfs::Archive, path: &Path) -> Option<String> {
+    let stem = path.file_stem()?.to_str()?;
+    let document = read_document(archive, &format!("/{stem}.manifest.sii")).ok()?;
+    let id = document.first_of_kind("dlc_package")?.single("id")?;
+    Some(sii::value::parse_string(id).to_string())
+}
+
 /// The archives that hold definitions: `def.scs`, then every DLC archive (`dlc_*.scs`), sorted.
 pub(crate) fn def_archives(install_dir: &Path) -> Vec<PathBuf> {
     archives_after(install_dir, "def.scs")

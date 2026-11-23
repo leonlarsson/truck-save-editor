@@ -896,6 +896,22 @@ impl Session {
             .count()
     }
 
+    /// Whether the save may use content from `dlc` (an id like `eut2_sstrip`; `None` is the base
+    /// game's): the DLCs the game had active when it saved, as `info.sii` lists them. Every DLC's
+    /// files come with the game, owned or not, so this, not what's installed, says what the
+    /// player has: the editor offers paint jobs and parts only from those, as the game's shops do.
+    pub fn has_dlc(&self, dlc: Option<&str>) -> bool {
+        let Some(dlc) = dlc else {
+            return true;
+        };
+        self.requirements().iter().any(|requirement| {
+            matches!(
+                requirement.kind,
+                save::RequirementKind::Dlc | save::RequirementKind::RemovableDlc
+            ) && requirement.id == dlc
+        })
+    }
+
     /// Puts a job on the market when saving.
     pub fn add_job(&mut self, job: save::NewJob, cx: &mut Context<Self>) {
         self.change(cx, |pending, _| pending.new_jobs.push(job));
@@ -2523,6 +2539,23 @@ mod tests {
 
         session.update(cx, |session, cx| session.set_saved_colours(original, cx));
         cx.update(|cx| assert_eq!(session.read(cx).change_count(), 0));
+    }
+
+    #[gpui_kit::test]
+    fn offers_only_dlcs_the_save_was_made_with(cx: &mut TestAppContext) {
+        let session = session(cx);
+        let info = "SiiNunit\r\n{\r\nsave_container : _nameless.1 {\r\n dependencies: 2\r\n dependencies[0]: \"dlc|eut2_coaches|DLC - Coaches\"\r\n dependencies[1]: \"rdlc|eut2_christmas|DLC - Christmas Paint Jobs Pack\"\r\n}\r\n\r\n}\r\n";
+        session.update(cx, |session, _| {
+            session.loaded.info = Some(sii::parse_text(info).expect("parses"));
+        });
+        cx.update(|cx| {
+            let session = session.read(cx);
+            // The base game's, a DLC and a paint pack the save has; not one it doesn't.
+            assert!(session.has_dlc(None));
+            assert!(session.has_dlc(Some("eut2_coaches")));
+            assert!(session.has_dlc(Some("eut2_christmas")));
+            assert!(!session.has_dlc(Some("eut2_sstrip")));
+        });
     }
 
     #[gpui_kit::test]
