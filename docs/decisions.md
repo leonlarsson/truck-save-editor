@@ -316,3 +316,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** there's nothing else to edit: the statistics are computed from the log. Changing logged services keeps the number of services real; adding made-up services would write log entries the game never made.
 
 **Considered:** editing each logged service in a table (more control, more to get wrong); adding services to raise the count (the owner picked the simple actions).
+
+## 2026-11-23: The profile picture is the profile folder's avatar.png, written with the profile
+
+**Decided:** the game reads a profile's own picture from `avatar.png` in the profile folder (it has its own "change avatar" too). The editor makes one from any PNG, JPEG or BMP (the largest square from the middle, 256 × 256, `avatar.rs`) and keeps it as a pending change like the profile's name: listed before saving, undone with Undo, written by `save::save_profile` together with `profile.sii`, after the profile folder is backed up (the old picture with it), checked after writing, and put back if anything fails. Removing it deletes the file, so the game shows the profile's face again. The `image` crate gets its PNG, JPEG and BMP decoders.
+
+**Why:** the profile folder is where the game looks; writing it with the profile file keeps one backup and one way to restore. 256 is a guess at the size the game writes (it isn't in the game's data files); the in-game check settles it.
+
+**Considered:** writing the picture straight away (outside the save, Undo and backups); keeping the picture's own size (a huge photo in the profile folder).

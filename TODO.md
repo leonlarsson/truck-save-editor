@@ -117,7 +117,8 @@ Agreed work, in order. Each step should end with something the owner can see or 
 
 - [x] Coach services: the numbers the game's statistics show (worked out from its coach job log), the passengers transported and coach distance to set, Perfect satisfaction for every logged service, Discover every bus stop.
 - [ ] In game (owner): Perfect satisfaction, Discover every bus stop, a new passengers total and coach distance, saved as a new slot. Does the game's statistics screen (Coach Services) show them, and do the found bus stops show on the map?
-- [ ] A custom avatar: a picture chosen in the editor becomes the profile's photo in the game.
+- [x] A profile picture: chosen in the editor (PNG, JPEG or BMP), cut square from the middle, written as the profile's `avatar.png` (256 × 256) when saving, with the profile's backup.
+- [ ] In game (owner): a picture chosen for a spare profile. Does the game show it on the profile screen and in game, at a good size? (Setting one in the game itself once would tell the size the game writes; 256 is a guess.) Does it follow the profile through Steam Cloud?
 - [ ] Truck and trailer colours: edit the custom colours, and save and share them.
 - [ ] Paint jobs: change a truck's or trailer's paint job, from the game's own list.
 - [ ] Freight market jobs: make a job by picking where from, where to, the cargo, the trailer and how urgent.
