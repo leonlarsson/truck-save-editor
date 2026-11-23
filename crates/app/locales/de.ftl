@@ -540,6 +540,7 @@ city-unvisit-tooltip = Markiert die Stadt als nie besucht, wie bei einem neuen P
 city-lock = Sperren
 city-lock-tooltip = Sperrt wieder, als wärst du nie vorbeigefahren.
 city-open-garage = Öffnen
+city-show-on-map = Auf der Karte zeigen
 
 ## Garages
 
@@ -733,6 +734,7 @@ map-view-hint = Scrollen zum Zoomen, Ziehen zum Verschieben, Klicken zum Öffnen
 map-view-zoom-in = Hineinzoomen
 map-view-zoom-out = Herauszoomen
 map-view-fit = Ganze Karte
+map-view-find = Stadt finden…
 
 # Truck and trailer details
 plate-colours = Kennzeichenfarben

@@ -9,7 +9,7 @@ mod garage;
 mod garage_picker;
 mod vehicle;
 
-pub use city::open as open_city;
+pub use city::{ShowOnMap, open as open_city};
 pub use driver::open as open_driver;
 pub use garage::open as open_garage;
 pub use vehicle::open as open_vehicle;

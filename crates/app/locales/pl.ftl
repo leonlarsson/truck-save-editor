@@ -560,6 +560,7 @@ city-unvisit-tooltip = Oznacz miasto jako nigdy nieodwiedzone, jak w nowym profi
 city-lock = Zablokuj
 city-lock-tooltip = Zablokuj ponownie, jakbyś nigdy obok nie przejechał.
 city-open-garage = Otwórz
+city-show-on-map = Pokaż na mapie
 
 ## Garages
 
@@ -765,6 +766,7 @@ map-view-hint = Przewiń, aby powiększyć, przeciągnij, aby przesunąć, klikn
 map-view-zoom-in = Powiększ
 map-view-zoom-out = Pomniejsz
 map-view-fit = Cała mapa
+map-view-find = Znajdź miasto…
 
 # Truck and trailer details
 plate-colours = Kolory tablicy

@@ -735,7 +735,7 @@ impl Session {
             + usize::from(!self.pending.refueled.is_empty())
             + usize::from(!self.pending.upgraded_garages.is_empty())
             + usize::from(!self.pending.maxed_drivers.is_empty())
-            + self.pending.raw_edits.len()
+            + self.raw_edit_count()
             // Every city or some, visited or not, it's one line: the cities visited.
             + usize::from(self.visits_changed())
             + usize::from(self.pending.keep_offers)
@@ -777,6 +777,20 @@ impl Session {
 
     pub fn visit_all_cities(&mut self, cx: &mut Context<Self>) {
         self.change(cx, |pending, _| pending.visit_all());
+    }
+
+    /// Values changed in All data or a detail panel, counted as the save dialog lists them: a
+    /// part's wear is one line however many items it has (each wheel).
+    fn raw_edit_count(&self) -> usize {
+        let mut wear_fields = HashSet::new();
+        self.pending
+            .raw_edits
+            .keys()
+            .filter(|path| {
+                !VEHICLE_WEAR_FIELDS.contains(&path.field.as_str())
+                    || wear_fields.insert((path.unit.as_str(), path.field.as_str()))
+            })
+            .count()
     }
 
     /// Whether any change touches which cities are visited.

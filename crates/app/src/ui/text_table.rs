@@ -1,14 +1,27 @@
 //! A plain table of text cells, for lists that only show text (All data's panes). Virtualized by
 //! GPUI Kit's table, so thousands of rows stay smooth. Rows can be marked to stand out (an edited
-//! value) or to recede (an empty one).
+//! value) or to recede (an empty one). A table whose rows open a panel gets a Details column, a
+//! quiet button at the end of each row, as the other tables have.
 
+use std::rc::Rc;
+
+use gpui_kit::assets::IconName;
 use gpui_kit::component::{
-    ActiveTheme as _, StyledExt as _,
+    ActiveTheme as _, Icon, Sizable as _, StyledExt as _,
+    button::{Button, ButtonVariants as _},
+    h_flex,
     table::{Column, TableDelegate, TableState},
 };
 use gpui_kit::{
-    App, Context, IntoElement, ParentElement as _, Pixels, SharedString, Styled as _, Window, div,
+    AnyElement, App, Context, IntoElement, ParentElement as _, Pixels, SharedString, Styled as _,
+    Window, div,
 };
+
+/// The Details column's width.
+const DETAILS_WIDTH: f32 = 44.;
+
+/// Opens a row's panel: the row's index, as the table shows it.
+type OpenRow = Rc<dyn Fn(usize, &mut Window, &mut App)>;
 
 pub struct TextColumn {
     pub key: &'static str,
@@ -37,6 +50,8 @@ pub struct TextTable {
     /// The table's measured width (see `ui::fill_table`): every column grows into a wider table,
     /// in proportion to its width.
     table_width: Option<Pixels>,
+    /// The Details buttons' label, and what they do, when the rows open a panel.
+    details: Option<(SharedString, OpenRow)>,
 }
 
 impl super::FillsWidth for TextTable {
@@ -55,7 +70,46 @@ impl TextTable {
             columns,
             rows: Vec::new(),
             table_width: None,
+            details: None,
         }
+    }
+
+    /// A Details button at the end of each row, opening its panel (`label` names it for screen
+    /// readers and its tooltip).
+    pub fn with_details(
+        mut self,
+        label: SharedString,
+        open: impl Fn(usize, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.details = Some((label, Rc::new(open)));
+        self
+    }
+
+    /// Whether this column is the Details one (after the text columns).
+    fn is_details(&self, col_ix: usize) -> bool {
+        self.details.is_some() && col_ix == self.columns.len()
+    }
+
+    fn details_button(&self, row_ix: usize) -> AnyElement {
+        let Some((label, open)) = self.details.clone() else {
+            return div().into_any_element();
+        };
+        h_flex()
+            .w_full()
+            .h_full()
+            .items_center()
+            .justify_end()
+            .child(
+                Button::new(("details", row_ix))
+                    .xsmall()
+                    .ghost()
+                    // Quiet: every row has one, and rows also open by double-click and Enter.
+                    .icon(Icon::new(IconName::ChevronRight))
+                    .accessibility_label(label.clone())
+                    .tooltip(label)
+                    .on_click(move |_, window, cx| open(row_ix, window, cx)),
+            )
+            .into_any_element()
     }
 
     fn cell(&self, row: usize, column: usize) -> SharedString {
@@ -79,7 +133,7 @@ impl TableDelegate for TextTable {
     }
 
     fn columns_count(&self, _: &App) -> usize {
-        self.columns.len()
+        self.columns.len() + usize::from(self.details.is_some())
     }
 
     fn rows_count(&self, _: &App) -> usize {
@@ -87,12 +141,20 @@ impl TableDelegate for TextTable {
     }
 
     fn column(&self, col_ix: usize, _: &App) -> Column {
-        let widths: Vec<(f32, bool)> = self
+        let mut widths: Vec<(f32, bool)> = self
             .columns
             .iter()
             .map(|column| (column.width, true))
             .collect();
+        // The Details column keeps its width; the text columns grow.
+        if self.details.is_some() {
+            widths.push((DETAILS_WIDTH, false));
+        }
         let widths = super::fill_widths(&widths, self.table_width);
+        if self.is_details(col_ix) {
+            return Column::new("details", "")
+                .width(widths.get(col_ix).copied().unwrap_or(DETAILS_WIDTH));
+        }
         match self.columns.get(col_ix) {
             Some(column) => Column::new(column.key, column.title.clone())
                 .width(widths.get(col_ix).copied().unwrap_or(column.width)),
@@ -107,6 +169,9 @@ impl TableDelegate for TextTable {
         _: &mut Window,
         cx: &mut Context<TableState<Self>>,
     ) -> impl IntoElement {
+        if self.is_details(col_ix) {
+            return self.details_button(row_ix);
+        }
         let text = self.cell(row_ix, col_ix);
         let look = self
             .rows
@@ -119,6 +184,7 @@ impl TableDelegate for TextTable {
             RowLook::Emphasized => cell.font_semibold().text_color(cx.theme().primary_active),
             RowLook::Muted => cell.text_color(cx.theme().muted_foreground),
         }
+        .into_any_element()
     }
 
     fn cell_label(&self, row_ix: usize, col_ix: usize, _: &App) -> Option<SharedString> {

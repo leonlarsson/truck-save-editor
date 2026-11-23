@@ -3,8 +3,9 @@
 //! unlock or lock its dealer or agency, open its garage. Opened from the map (a click on the city's name) or the
 //! list of cities (double-click or Enter on its row).
 
+use gpui_kit::assets::IconName;
 use gpui_kit::component::{
-    ActiveTheme as _, Sizable as _, WindowExt as _, button::Button, h_flex, v_flex,
+    ActiveTheme as _, Icon, Sizable as _, WindowExt as _, button::Button, h_flex, v_flex,
 };
 use gpui_kit::{
     AnyElement, App, AppContext as _, Context, ElementId, Entity, IntoElement, ParentElement as _,
@@ -17,15 +18,24 @@ use crate::game_data;
 use crate::i18n::t;
 use crate::session::Session;
 
+/// Shows a city on the Map page's map (by token): given by whoever opens the panel there.
+pub type ShowOnMap = std::rc::Rc<dyn Fn(&str, &mut Window, &mut App)>;
+
 pub struct CityDetail {
     session: Entity<Session>,
     /// The city's token (`berlin`).
     token: String,
+    show_on_map: Option<ShowOnMap>,
     _subscriptions: Vec<Subscription>,
 }
 
 impl CityDetail {
-    fn new(session: Entity<Session>, token: String, cx: &mut Context<Self>) -> Self {
+    fn new(
+        session: Entity<Session>,
+        token: String,
+        show_on_map: Option<ShowOnMap>,
+        cx: &mut Context<Self>,
+    ) -> Self {
         let _subscriptions = vec![
             cx.observe(&session, |_, _, cx| cx.notify()),
             // Which cities have a dealer or agency comes from the game's data, read after startup.
@@ -34,6 +44,7 @@ impl CityDetail {
         Self {
             session,
             token,
+            show_on_map,
             _subscriptions,
         }
     }
@@ -194,6 +205,21 @@ impl Render for CityDetail {
                     .child(fact(t!(cx, "column-recruitment"), recruitment, cx))
                     .children(garage.map(|garage| fact(t!(cx, "column-garage-size"), garage, cx))),
             ))
+            // The map moves to the city, and the panel closes so the map shows.
+            .children(self.show_on_map.clone().map(|show_on_map| {
+                let token = self.token.clone();
+                h_flex().child(
+                    Button::new("show-on-map")
+                        .small()
+                        .outline()
+                        .icon(Icon::new(IconName::Map))
+                        .label(t!(cx, "city-show-on-map"))
+                        .on_click(move |_, window, cx| {
+                            show_on_map(&token, window, cx);
+                            window.close_sheet(cx);
+                        }),
+                )
+            }))
             // Not just "not known": say why, and what makes it known.
             .children(is_unknown.then(|| {
                 div()
@@ -205,11 +231,17 @@ impl Render for CityDetail {
     }
 }
 
-/// Opens a city's panel, titled with its name.
-pub fn open(session: Entity<Session>, token: &str, window: &mut Window, cx: &mut App) {
+/// Opens a city's panel, titled with its name; with `show_on_map`, it has Show on map too.
+pub fn open(
+    session: Entity<Session>,
+    token: &str,
+    show_on_map: Option<ShowOnMap>,
+    window: &mut Window,
+    cx: &mut App,
+) {
     let title: SharedString = game_data::city_name(cx, token).into();
     let token = token.to_string();
-    let view = cx.new(|cx| CityDetail::new(session, token, cx));
+    let view = cx.new(|cx| CityDetail::new(session, token, show_on_map, cx));
     window.open_sheet(cx, move |sheet, _, _| {
         sheet
             .title(title.clone())

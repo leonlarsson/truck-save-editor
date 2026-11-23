@@ -536,6 +536,7 @@ city-unvisit-tooltip = Mark the city as never visited, as on a new profile. The 
 city-lock = Lock
 city-lock-tooltip = Lock it again, as if you'd never driven past it.
 city-open-garage = Open
+city-show-on-map = Show on map
 
 ## Garages
 
@@ -729,6 +730,7 @@ map-view-hint = Scroll to zoom, drag to move, click to open
 map-view-zoom-in = Zoom in
 map-view-zoom-out = Zoom out
 map-view-fit = Whole map
+map-view-find = Find a city…
 
 # Truck and trailer details
 plate-colours = Plate colours

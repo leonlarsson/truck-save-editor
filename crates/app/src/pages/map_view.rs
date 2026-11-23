@@ -66,6 +66,8 @@ const CLICK_SLOP: f32 = 4.0;
 /// How much bigger than its marker a garage or the truck is to the pointer, in pixels on each
 /// side: small marks are hard to hit.
 const HIT_MARGIN: f32 = 3.0;
+/// How close a found city is shown: metres a screen pixel covers (the city and its roads).
+const FOUND_ZOOM: f32 = 25.0;
 
 /// What the map shows: the point in the middle (in the game's metres, `x` east and `z` south)
 /// and how many metres one screen pixel covers.
@@ -222,6 +224,8 @@ struct MapName {
     name: SharedString,
     token: String,
     is_visited: bool,
+    /// The city found last (Find a city, or Show on map): marked, and always named.
+    is_found: bool,
 }
 
 /// One of the player's garages on screen.
@@ -375,6 +379,11 @@ pub struct MapView {
     /// What the pointer is over, worked out again on every frame: the map moves under a still
     /// pointer when zoomed.
     hovered: Option<Target>,
+    /// The city found last, by token: marked on the map.
+    found: Option<String>,
+    /// Whether the map still has to move to the found city (it's asked for before the map has
+    /// been laid out, or before the game's places are read).
+    needs_to_show_found: bool,
     _work: Vec<Task<()>>,
 }
 
@@ -398,6 +407,8 @@ impl MapView {
             targets: Vec::new(),
             pointer: None,
             hovered: None,
+            found: None,
+            needs_to_show_found: false,
             _work: Vec::new(),
         }
     }
@@ -536,13 +547,19 @@ impl MapView {
         let Some(area) = self.area.get() else {
             return;
         };
-        let view = *self.view.get_or_insert_with(|| {
+        self.view.get_or_insert_with(|| {
             Self::fitted(
                 index.world,
                 f32::from(area.size.width),
                 f32::from(area.size.height),
             )
         });
+        if self.needs_to_show_found {
+            self.show_found();
+        }
+        let Some(view) = self.view else {
+            return;
+        };
         let Some(driven) = self.driven.clone() else {
             return;
         };
@@ -643,7 +660,19 @@ impl MapView {
             .collect();
         let mut taken: Vec<Bounds<Pixels>> = Vec::new();
         let mut names = Vec::new();
-        for city in &places.cities {
+        // The found city first, so it's always named; then the biggest first.
+        let found = self.found.as_deref();
+        let in_order = places
+            .cities
+            .iter()
+            .filter(|city| Some(city.token.as_str()) == found)
+            .chain(
+                places
+                    .cities
+                    .iter()
+                    .filter(|city| Some(city.token.as_str()) != found),
+            );
+        for city in in_order {
             // Only the game's cities (the map holds other areas named like them).
             let Some(&visited) = visits.get(&city.token) else {
                 continue;
@@ -666,6 +695,7 @@ impl MapView {
                 name,
                 token: city.token.clone(),
                 is_visited: visited > 0,
+                is_found: Some(city.token.as_str()) == found,
             });
         }
         names
@@ -699,6 +729,39 @@ impl MapView {
             .collect()
     }
 
+    /// Moves the map to a city and marks it (Find a city, Show on map); done as soon as the map
+    /// is ready, if it isn't yet.
+    pub fn find_city(&mut self, token: &str, cx: &mut Context<Self>) {
+        self.found = Some(token.to_string());
+        self.needs_to_show_found = true;
+        self.show_found();
+        cx.notify();
+    }
+
+    /// Centres the found city, close up, once the map and the game's places are there.
+    fn show_found(&mut self) {
+        let (Some(token), Some(places), Some(view)) = (&self.found, &self.places, self.view) else {
+            return;
+        };
+        // Where its name goes (the middle of its biggest area), else its garage.
+        let position = places
+            .cities
+            .iter()
+            .find(|city| &city.token == token)
+            .map(|city| (city.x, city.z))
+            .or_else(|| places.garages.get(token).copied());
+        let Some((x, z)) = position else {
+            return;
+        };
+        self.view = Some(View {
+            x,
+            z,
+            // Closer, never farther out than the view already is.
+            metres_per_pixel: view.metres_per_pixel.min(FOUND_ZOOM).max(CLOSEST),
+        });
+        self.needs_to_show_found = false;
+    }
+
     /// What's under the pointer, the topmost first.
     fn target_at(&self, at: Point<Pixels>) -> Option<Target> {
         self.targets
@@ -711,7 +774,14 @@ impl MapView {
     fn open(&self, target: Target, window: &mut Window, cx: &mut Context<Self>) {
         let session = self.session.clone();
         match target {
-            Target::City(token) => details::open_city(session, &token, window, cx),
+            Target::City(token) => {
+                // Already on the map: Show on map just moves to the city again.
+                let map = cx.entity().downgrade();
+                let show_on_map: details::ShowOnMap = std::rc::Rc::new(move |token, _, cx| {
+                    let _ = map.update(cx, |map, cx| map.find_city(token, cx));
+                });
+                details::open_city(session, &token, Some(show_on_map), window, cx)
+            }
             Target::Garage { id, .. } => {
                 let garage = session
                     .read(cx)
@@ -1266,6 +1336,11 @@ impl Render for MapView {
                             theme.foreground
                         } else {
                             theme.muted_foreground
+                        })
+                        // The city found: in the accent colour, so it's seen at once (and not by
+                        // colour alone: it's the one always named, in the middle).
+                        .when(name.is_found, |this| {
+                            this.bg(theme.primary).text_color(theme.primary_foreground)
                         })
                         // Hovered, it reads as a link: a click opens the city.
                         .when(is_hovered, |this| this.underline())

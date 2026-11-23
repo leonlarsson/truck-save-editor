@@ -8,6 +8,7 @@ use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Selectable as _, Sizable as _, WindowExt as _,
     button::{Button, ButtonGroup},
     h_flex,
+    select::{SearchableVec, Select, SelectEvent, SelectState},
     table::{DataTable, TableEvent, TableState},
     v_flex,
 };
@@ -21,7 +22,7 @@ use save::Place;
 use crate::game_data;
 use crate::i18n::t;
 use crate::session::Session;
-use crate::ui::{FilterBar, FilterChanged};
+use crate::ui::{Choice, FilterBar, FilterChanged};
 use crate::ui::{RowLook, TextColumn, TextRow, TextTable};
 use crate::workspace::OpenDetails;
 
@@ -39,6 +40,8 @@ pub struct MapPage {
     position: Entity<crate::pages::position::PositionPicker>,
     /// The roads as a picture, shown instead of the cities when chosen.
     map_view: Entity<crate::pages::map_view::MapView>,
+    /// Find a city on the map (beside the List | Map switch while the map shows).
+    finder: Entity<SelectState<SearchableVec<Choice>>>,
     shows_map: bool,
     _subscriptions: Vec<Subscription>,
 }
@@ -85,7 +88,15 @@ impl MapPage {
                 width: 180.,
             },
         ];
-        let table = cx.new(|cx| TableState::new(TextTable::new(columns), window, cx));
+        // Each row's Details button opens its city, as double-click and Enter do.
+        let page = cx.entity().downgrade();
+        let details = t!(cx, "details-open");
+        let table = cx.new(|cx| {
+            let rows = TextTable::new(columns).with_details(details, move |row, window, cx| {
+                let _ = page.update(cx, |page, cx| page.open_city(row, window, cx));
+            });
+            TableState::new(rows, window, cx)
+        });
         let toggles = vec![
             t!(cx, "map-filter-not-visited"),
             t!(cx, "map-filter-dealer-locked"),
@@ -107,12 +118,34 @@ impl MapPage {
             let session = session.clone();
             cx.new(|cx| crate::pages::position::PositionPicker::new(session, window, cx))
         };
+        let finder = cx.new(|cx| {
+            SelectState::new(SearchableVec::new(Vec::new()), None, window, cx).searchable(true)
+        });
+        let mut _subscriptions = _subscriptions;
+        _subscriptions.push(cx.subscribe_in(
+            &finder,
+            window,
+            |this, _, event: &SelectEvent<SearchableVec<Choice>>, window, cx| {
+                if let SelectEvent::Confirm(Some(token)) = event {
+                    let token = token.to_string();
+                    this.map_view
+                        .update(cx, |map, cx| map.find_city(&token, cx));
+                    // An action, not a setting: the list goes back to its prompt.
+                    this.finder
+                        .update(cx, |select, cx| select.set_selected_index(None, window, cx));
+                }
+            },
+        ));
+        _subscriptions.push(game_data::observe_in(window, cx, |this, window, cx| {
+            this.fill_finder(window, cx)
+        }));
         let map_view = {
             let session = session.clone();
             cx.new(|cx| crate::pages::map_view::MapView::new(session, cx))
         };
         let mut page = Self {
             map_view,
+            finder,
             shows_map: false,
             session,
             table,
@@ -126,7 +159,33 @@ impl MapPage {
             _subscriptions,
         };
         page.reload(cx);
+        page.fill_finder(window, cx);
         page
+    }
+
+    /// The cities to find, by name (in the game's language, so again when its data is read).
+    fn fill_finder(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let mut cities: Vec<Choice> = self
+            .session
+            .read(cx)
+            .cities()
+            .into_iter()
+            .map(|city| Choice {
+                name: game_data::city_name(cx, &city.token).into(),
+                value: city.token.into(),
+            })
+            .collect();
+        cities.sort_by(|a, b| a.name.cmp(&b.name));
+        self.finder.update(cx, |select, cx| {
+            select.set_items(SearchableVec::new(cities), window, cx)
+        });
+    }
+
+    /// Switches to the map and moves it to the city (the city panel's Show on map).
+    fn show_on_map(&mut self, token: &str, cx: &mut Context<Self>) {
+        self.shows_map = true;
+        self.map_view.update(cx, |map, cx| map.find_city(token, cx));
+        cx.notify();
     }
 
     fn reload(&mut self, cx: &mut Context<Self>) {
@@ -206,7 +265,18 @@ impl MapPage {
     /// Opens the panel of the city on this row.
     fn open_city(&mut self, row: usize, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(token) = self.tokens.get(row) {
-            crate::pages::details::open_city(self.session.clone(), token, window, cx);
+            let page = cx.entity().downgrade();
+            let show_on_map: crate::pages::details::ShowOnMap =
+                std::rc::Rc::new(move |token, _, cx| {
+                    let _ = page.update(cx, |page, cx| page.show_on_map(token, cx));
+                });
+            crate::pages::details::open_city(
+                self.session.clone(),
+                token,
+                Some(show_on_map),
+                window,
+                cx,
+            );
         }
     }
 
@@ -429,24 +499,40 @@ impl Render for MapPage {
                     )
                     .child(self.position.clone())
             })
-            // The cities as a list, or the roads as a map.
+            // The cities as a list, or the roads as a map; on the map, finding a city (the
+            // list's search does that for the list).
             .child(
-                ButtonGroup::new("map-view")
-                    .outline()
-                    .small()
+                h_flex()
+                    .gap_3()
+                    .items_center()
                     .child(
-                        Button::new("view-cities")
-                            .label(t!(cx, "map-view-list"))
-                            .selected(!self.shows_map),
+                        ButtonGroup::new("map-view")
+                            .outline()
+                            .small()
+                            .child(
+                                Button::new("view-cities")
+                                    .label(t!(cx, "map-view-list"))
+                                    .selected(!self.shows_map),
+                            )
+                            .child(
+                                Button::new("view-roads")
+                                    .label(t!(cx, "map-view-map"))
+                                    .selected(self.shows_map),
+                            )
+                            .on_click(cx.listener(|this, clicked: &Vec<usize>, _, cx| {
+                                this.shows_map = clicked.first() == Some(&1);
+                                cx.notify();
+                            })),
                     )
-                    .child(
-                        Button::new("view-roads")
-                            .label(t!(cx, "map-view-map"))
-                            .selected(self.shows_map),
-                    )
-                    .on_click(cx.listener(|this, clicked: &Vec<usize>, _, cx| {
-                        this.shows_map = clicked.first() == Some(&1);
-                        cx.notify();
+                    .children(self.shows_map.then(|| {
+                        div().w(gpui_kit::rems(14.)).child(
+                            Select::new(&self.finder)
+                                .small()
+                                .icon(gpui_kit::component::Icon::new(
+                                    gpui_kit::assets::IconName::Search,
+                                ))
+                                .placeholder(t!(cx, "map-view-find")),
+                        )
                     })),
             )
             .map(|this| {

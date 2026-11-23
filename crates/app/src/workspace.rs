@@ -983,8 +983,10 @@ impl Workspace {
             let session = session.read(cx);
             (session.can_undo(), session.can_redo())
         };
+        // The settings pages aren't about the save: no save subtitle there.
+        let is_about_the_save = !matches!(self.page, Page::Settings | Page::GameSettings);
         PageHeader::new(self.page.title(cx))
-            .subtitle(subtitle)
+            .when(is_about_the_save, |header| header.subtitle(subtitle))
             .action(
                 div()
                     .text_sm()

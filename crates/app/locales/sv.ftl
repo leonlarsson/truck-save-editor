@@ -536,6 +536,7 @@ city-unvisit-tooltip = Markera staden som aldrig besökt, som på en ny profil. 
 city-lock = Lås
 city-lock-tooltip = Lås igen, som om du aldrig hade kört förbi.
 city-open-garage = Öppna
+city-show-on-map = Visa på kartan
 
 ## Garages
 
@@ -729,6 +730,7 @@ map-view-hint = Scrolla för att zooma, dra för att flytta, klicka för att öp
 map-view-zoom-in = Zooma in
 map-view-zoom-out = Zooma ut
 map-view-fit = Hela kartan
+map-view-find = Hitta en stad…
 
 # Truck and trailer details
 plate-colours = Skyltens färger
