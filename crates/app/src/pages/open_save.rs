@@ -850,8 +850,16 @@ impl Render for OpenSavePage {
                             .child(t!(cx, "start-choose")),
                     ),
             )
-            // Settings before a save is open too: the language, and the game's folder if it
-            // wasn't found.
+            // Both settings before a save is open too: the editor's (its language), and the
+            // game's (its folder, if it wasn't found).
+            .child(
+                Button::new("start-game-settings")
+                    .ghost()
+                    .small()
+                    .icon(Icon::new(IconName::Gamepad2))
+                    .label(t!(cx, "game-settings-open"))
+                    .on_click(|_, window, cx| crate::pages::game_settings::open_sheet(window, cx)),
+            )
             .child(
                 Button::new("start-settings")
                     .ghost()

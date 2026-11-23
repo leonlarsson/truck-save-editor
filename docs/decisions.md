@@ -300,3 +300,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** the owner asked why only one direction was possible; the save holds both as plain lists, so there's no reason not to. Showing both counts reads the same for more and for fewer.
 
 **Considered:** a per-city map of wanted states in place of four sets (simpler to apply, but the existing all-at-once changes are sets, and the change list would need rewriting).
+
+## 2026-11-23: The sidebar: the save's menu at the top, the editor's settings apart from the game's
+
+**Decided:** the save's card at the top of the sidebar opens a menu: Switch save and Backups (they were buttons at the foot). Settings splits in two: **Game settings**, a page under Advanced (`pages/game_settings.rs`) with the game's folder and the game's own `config.cfg` settings; and **Settings**, the editor's own (language, appearance, backups folder, updates, reset, about), at the sidebar's foot beside light or dark, with Ctrl+, (Ctrl+1…9 stay the nine pages in the groups, Game settings the ninth). The start screen offers both, as side panels. A folder's path, shown on both pages, is `ui::path_text`.
+
+**Why:** Switch save at the foot was hard to find, and it's about the open save, which is what the card at the top names: the usual place for a workspace's own menu. The editor's settings and the game's are different things (one changes the editor, the other the installed game), and the game folder is about the game. Settings at the foot, apart from the save's pages, is where most desktop apps put it.
+
+**Considered:** a Switch save button under the card (visible, but one more row above the pages); both settings pages under Advanced (Settings isn't about the save); the game folder with the editor's settings (the game never sees it, but it's about where the game is). The owner picked the save menu and the game folder in Game settings.

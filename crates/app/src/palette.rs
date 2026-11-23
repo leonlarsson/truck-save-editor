@@ -214,8 +214,12 @@ fn item(command: PaletteCommand, cx: &App) -> CommandItem {
 fn page_shortcut(page: Page) -> Option<Box<dyn gpui_kit::Action>> {
     use crate::workspace::{
         GoToPage1, GoToPage2, GoToPage3, GoToPage4, GoToPage5, GoToPage6, GoToPage7, GoToPage8,
-        GoToPage9,
+        GoToPage9, OpenSettings,
     };
+    // Settings has its own shortcut, Ctrl+,; the other pages go by their place in the sidebar.
+    if page == Page::Settings {
+        return Some(Box::new(OpenSettings));
+    }
     let index = Page::ALL.iter().position(|p| *p == page)?;
     let action: Box<dyn gpui_kit::Action> = match index {
         0 => Box::new(GoToPage1),

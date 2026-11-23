@@ -4,6 +4,7 @@ pub mod all_data;
 pub mod details;
 pub mod drivers;
 pub mod fleet;
+pub mod game_settings;
 pub mod garages;
 pub mod jobs;
 pub mod licences;
@@ -22,7 +23,8 @@ use crate::i18n::t;
 
 use gpui_kit::assets::IconName;
 
-/// Every page the sidebar lists, in order.
+/// Every page, in the sidebar's order: the save's pages in its groups, then Settings (the
+/// editor's own), at its foot.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Page {
     Overview,
@@ -33,11 +35,12 @@ pub enum Page {
     Map,
     Jobs,
     AllData,
+    GameSettings,
     Settings,
 }
 
 impl Page {
-    pub const ALL: [Page; 9] = [
+    pub const ALL: [Page; 10] = [
         Page::Overview,
         Page::Statistics,
         Page::Fleet,
@@ -46,6 +49,7 @@ impl Page {
         Page::Map,
         Page::Jobs,
         Page::AllData,
+        Page::GameSettings,
         Page::Settings,
     ];
     pub const CAREER: [Page; 2] = [Page::Overview, Page::Statistics];
@@ -56,7 +60,7 @@ impl Page {
         Page::Map,
         Page::Jobs,
     ];
-    pub const ADVANCED: [Page; 2] = [Page::AllData, Page::Settings];
+    pub const ADVANCED: [Page; 2] = [Page::AllData, Page::GameSettings];
 
     pub fn title(self, cx: &App) -> SharedString {
         match self {
@@ -68,6 +72,7 @@ impl Page {
             Page::Map => t!(cx, "page-map"),
             Page::Jobs => t!(cx, "page-jobs"),
             Page::AllData => t!(cx, "page-all-data"),
+            Page::GameSettings => t!(cx, "page-game-settings"),
             Page::Settings => t!(cx, "page-settings"),
         }
     }
@@ -83,6 +88,7 @@ impl Page {
             Page::Map => "map",
             Page::Jobs => "jobs",
             Page::AllData => "all-data",
+            Page::GameSettings => "game-settings",
             Page::Settings => "settings",
         }
     }
@@ -97,6 +103,7 @@ impl Page {
             Page::Map => IconName::Map,
             Page::Jobs => IconName::Container,
             Page::AllData => IconName::Database,
+            Page::GameSettings => IconName::Gamepad2,
             Page::Settings => IconName::Settings,
         }
     }

@@ -128,6 +128,7 @@ save = Spara
 save-open = Spara…
 details-open = Detaljer…
 settings-open = Inställningar…
+game-settings-open = Spelinställningar…
 saving = Sparar…
 
 ## Opening, closing and saving
@@ -291,6 +292,7 @@ quick-start-needs-game = Kräver att spelet är installerat på den här datorn:
 ## Settings
 
 page-settings = Inställningar
+page-game-settings = Spelinställningar
 settings-language = Språk
 settings-language-description = Appens språk. Spelets egna namn (städer, last, grader) följer med när spelet har dem på det språket.
 settings-appearance = Utseende
@@ -343,6 +345,7 @@ settings-not-affiliated = Inte knuten till eller godkänd av SCS Software.
 
 palette-open = Kommandon…
 palette-shortcut = Ctrl+K
+settings-shortcut = Ctrl+,
 palette-placeholder = Skriv ett kommando eller en sida…
 palette-group-pages = Gå till
 palette-group-actions = Åtgärder

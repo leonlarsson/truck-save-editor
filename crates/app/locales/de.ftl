@@ -132,6 +132,7 @@ save = Speichern
 save-open = Speichern…
 details-open = Details…
 settings-open = Einstellungen…
+game-settings-open = Spieleinstellungen…
 saving = Wird gespeichert…
 
 ## Opening, closing and saving
@@ -295,6 +296,7 @@ quick-start-needs-game = Dafür muss das Spiel auf diesem PC installiert sein: S
 ## Settings
 
 page-settings = Einstellungen
+page-game-settings = Spieleinstellungen
 settings-language = Sprache
 settings-language-description = Die Sprache der App. Die Namen aus dem Spiel (Städte, Fracht, Ränge) folgen ihr, wenn das Spiel sie in dieser Sprache hat.
 settings-appearance = Darstellung
@@ -347,6 +349,7 @@ settings-not-affiliated = Nicht mit SCS Software verbunden oder von SCS Software
 
 palette-open = Befehle…
 palette-shortcut = Ctrl+K
+settings-shortcut = Ctrl+,
 palette-placeholder = Befehl oder Seite eingeben…
 palette-group-pages = Gehe zu
 palette-group-actions = Aktionen

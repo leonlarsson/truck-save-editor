@@ -5,13 +5,15 @@ use std::path::PathBuf;
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::{
-    ActiveTheme as _, Disableable as _, Icon, Sizable as _, StyledExt as _, WindowExt as _,
+    ActiveTheme as _, Disableable as _, Icon, Selectable as _, Sizable as _, StyledExt as _,
+    WindowExt as _,
     alert::Alert,
     button::{Button, ButtonVariants as _},
     command::CommandState,
     h_flex,
+    menu::{DropdownMenu as _, PopupMenuItem},
     notification::{Notification, NotificationType},
-    sidebar::{Sidebar, SidebarGroup, SidebarMenu, SidebarMenuItem},
+    sidebar::{Sidebar, SidebarGroup, SidebarHeader, SidebarMenu, SidebarMenuItem},
     spinner::Spinner,
     v_flex,
 };
@@ -63,8 +65,14 @@ gpui_kit::actions!(
         GoToPage7,
         GoToPage8,
         GoToPage9,
+        /// Ctrl+,: the editor's own settings (as in most apps), at the sidebar's foot.
+        OpenSettings,
     ]
 );
+
+/// The sidebar's width, and the save's card in it (the width less the sidebar's padding).
+const SIDEBAR_WIDTH: f32 = 232.;
+const SAVE_CARD_WIDTH: f32 = 207.;
 
 /// The key context of the open save's window content.
 pub const KEY_CONTEXT: &str = "Workspace";
@@ -157,6 +165,7 @@ struct Opened {
     all_data: Entity<AllDataPage>,
     map: Entity<MapPage>,
     jobs: Entity<JobsPage>,
+    game_settings: Entity<crate::pages::game_settings::GameSettingsPage>,
     settings: Entity<SettingsPage>,
     _observe: Subscription,
 }
@@ -287,6 +296,8 @@ impl Workspace {
         let all_data = cx.new(|cx| AllDataPage::new(session.clone(), window, cx));
         let map = cx.new(|cx| MapPage::new(session.clone(), window, cx));
         let jobs = cx.new(|cx| JobsPage::new(session.clone(), window, cx));
+        let game_settings =
+            cx.new(|cx| crate::pages::game_settings::GameSettingsPage::new(window, cx));
         let settings = cx.new(|cx| SettingsPage::new(window, cx));
         let _observe = cx.observe(&session, |_, _, cx| cx.notify());
         self.opened = Some(Opened {
@@ -299,6 +310,7 @@ impl Workspace {
             all_data,
             map,
             jobs,
+            game_settings,
             settings,
             _observe,
         });
@@ -311,7 +323,7 @@ impl Workspace {
         self.opened.as_ref().map(|opened| opened.session.clone())
     }
 
-    /// Ctrl+1 … Ctrl+9: the pages in the sidebar's order.
+    /// Ctrl+1 … Ctrl+9: the pages in the sidebar's order (Settings, the tenth, is Ctrl+,).
     fn go_to_page(&mut self, index: usize, cx: &mut Context<Self>) {
         if let Some(page) = Page::ALL.get(index) {
             self.page = *page;
@@ -805,56 +817,80 @@ impl Workspace {
             };
             (labels::slot_name(cx, session.slot()), profile_name)
         };
-        Sidebar::new("sidebar")
-            .w(px(232.))
-            .header(
-                // Plain content, not `SidebarHeader`: that one is a menu trigger and lights up on hover.
-                v_flex()
-                    .w_full()
+        // The save's menu: what's done to the open save as a whole, not to a part of it.
+        let workspace = cx.entity().downgrade();
+        // (No `.id()`: it would wrap the header in a type the dropdown doesn't accept; the header
+        // names itself.)
+        let save_menu = SidebarHeader::new()
+            .child(
+                h_flex()
                     .gap_2()
+                    .min_w_0()
                     .child(
-                        h_flex()
-                            .p_2()
-                            .gap_2()
-                            .child(
-                                div()
-                                    .flex()
-                                    .items_center()
-                                    .justify_center()
-                                    .size_8()
-                                    .flex_shrink_0()
-                                    .rounded(cx.theme().radius)
-                                    .bg(cx.theme().sidebar_primary)
-                                    .text_color(cx.theme().sidebar_primary_foreground)
-                                    .child(Icon::new(IconName::Truck)),
-                            )
-                            .child(
-                                v_flex()
-                                    .min_w_0()
-                                    .child(
-                                        div().text_sm().font_semibold().truncate().child(slot_name),
-                                    )
-                                    .child(
-                                        div()
-                                            .text_xs()
-                                            .truncate()
-                                            .text_color(cx.theme().muted_foreground)
-                                            .child(profile_name),
-                                    ),
-                            ),
+                        div()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .size_8()
+                            .flex_shrink_0()
+                            .rounded(cx.theme().radius)
+                            .bg(cx.theme().sidebar_primary)
+                            .text_color(cx.theme().sidebar_primary_foreground)
+                            .child(Icon::new(IconName::Truck)),
                     )
                     .child(
-                        Button::new("open-palette")
-                            .outline()
-                            .small()
-                            .w_full()
-                            .icon(Icon::new(IconName::Search))
-                            .label(t!(cx, "palette-open"))
-                            .tooltip(t!(cx, "palette-shortcut"))
-                            .on_click(
-                                cx.listener(|this, _, window, cx| this.open_palette(window, cx)),
+                        v_flex()
+                            .min_w_0()
+                            .child(div().text_sm().font_semibold().truncate().child(slot_name))
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .truncate()
+                                    .text_color(cx.theme().muted_foreground)
+                                    .child(profile_name),
                             ),
                     ),
+            )
+            // Says it opens a menu: the card alone reads as a label.
+            .child(
+                Icon::new(IconName::ChevronsUpDown)
+                    .small()
+                    .flex_shrink_0()
+                    .text_color(cx.theme().muted_foreground),
+            )
+            .dropdown_menu(move |menu, _, cx| {
+                let (to_switch, to_backups) = (workspace.clone(), workspace.clone());
+                // As wide as the card it opens from.
+                menu.min_w(px(SAVE_CARD_WIDTH))
+                    .item(
+                        PopupMenuItem::new(t!(cx, "switch-save"))
+                            .icon(Icon::new(IconName::FolderOpen))
+                            .on_click(move |_, window, cx| {
+                                let _ = to_switch.update(cx, |this, cx| this.close(window, cx));
+                            }),
+                    )
+                    .item(
+                        PopupMenuItem::new(t!(cx, "backups"))
+                            .icon(Icon::new(IconName::ArchiveRestore))
+                            .on_click(move |_, window, cx| {
+                                let _ =
+                                    to_backups.update(cx, |this, cx| this.open_backups(window, cx));
+                            }),
+                    )
+            });
+        Sidebar::new("sidebar")
+            .w(px(SIDEBAR_WIDTH))
+            .header(
+                v_flex().w_full().gap_2().child(save_menu).child(
+                    Button::new("open-palette")
+                        .outline()
+                        .small()
+                        .w_full()
+                        .icon(Icon::new(IconName::Search))
+                        .label(t!(cx, "palette-open"))
+                        .tooltip(t!(cx, "palette-shortcut"))
+                        .on_click(cx.listener(|this, _, window, cx| this.open_palette(window, cx))),
+                ),
             )
             .child(SidebarGroup::new(t!(cx, "sidebar-career")).child(self.menu(&Page::CAREER, cx)))
             .child(
@@ -865,36 +901,29 @@ impl Workspace {
             )
             .footer(
                 // Plain content, not `SidebarFooter` (a menu trigger that lights up on hover).
-                // A newer version, when there is one, sits above the footer's buttons.
+                // A newer version, when there is one, sits above the footer's buttons: the
+                // editor's own settings and light or dark, about the editor rather than the save.
                 v_flex().w_full().children(update_notice(cx)).child(
                     h_flex()
-                        .p_2()
+                        // No padding on the left: the button's own lines its icon up with the
+                        // pages' icons above.
+                        .py_2()
+                        .pr_2()
                         .w_full()
                         .justify_between()
                         .child(
-                            h_flex()
-                                .gap_1()
-                                .child(
-                                    Button::new("switch-save")
-                                        .ghost()
-                                        .small()
-                                        .icon(Icon::new(IconName::FolderOpen))
-                                        .label(t!(cx, "switch-save"))
-                                        .on_click(cx.listener(|this, _, window, cx| {
-                                            this.close(window, cx)
-                                        })),
-                                )
-                                .child(
-                                    Button::new("backups")
-                                        .ghost()
-                                        .small()
-                                        .icon(Icon::new(IconName::ArchiveRestore))
-                                        .tooltip(t!(cx, "backups"))
-                                        .accessibility_label(t!(cx, "backups"))
-                                        .on_click(cx.listener(|this, _, window, cx| {
-                                            this.open_backups(window, cx)
-                                        })),
-                                ),
+                            Button::new("settings")
+                                .ghost()
+                                .small()
+                                .icon(Icon::new(Page::Settings.icon()))
+                                .label(Page::Settings.title(cx))
+                                .tooltip(t!(cx, "settings-shortcut"))
+                                // Marked when it's the page shown, as the pages above are.
+                                .selected(self.page == Page::Settings)
+                                .on_click(cx.listener(|this, _, _, cx| {
+                                    this.page = Page::Settings;
+                                    cx.notify();
+                                })),
                         )
                         .child(
                             Button::new("toggle-theme")
@@ -1048,6 +1077,12 @@ impl Workspace {
                 .size_full()
                 .child(opened.jobs.clone())
                 .into_any_element(),
+            Page::GameSettings => div()
+                .id("game-settings-scroll")
+                .size_full()
+                .overflow_y_scroll()
+                .child(opened.game_settings.clone())
+                .into_any_element(),
             Page::Settings => div()
                 .id("settings-scroll")
                 .size_full()
@@ -1090,6 +1125,10 @@ impl Render for Workspace {
             .on_action(cx.listener(|this, _: &GoToPage7, _, cx| this.go_to_page(6, cx)))
             .on_action(cx.listener(|this, _: &GoToPage8, _, cx| this.go_to_page(7, cx)))
             .on_action(cx.listener(|this, _: &GoToPage9, _, cx| this.go_to_page(8, cx)))
+            .on_action(cx.listener(|this, _: &OpenSettings, _, cx| {
+                this.page = Page::Settings;
+                cx.notify();
+            }))
             .bg(cx.theme().background)
             .text_color(cx.theme().foreground)
             .child(self.render_sidebar(&session, cx))

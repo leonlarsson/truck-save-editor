@@ -140,6 +140,7 @@ save = Zapisz
 save-open = Zapisz…
 details-open = Szczegóły…
 settings-open = Ustawienia…
+game-settings-open = Ustawienia gry…
 saving = Zapisywanie…
 
 ## Opening, closing and saving
@@ -308,6 +309,7 @@ quick-start-needs-game = Wymaga gry zainstalowanej na tym komputerze: jej dane m
 ## Settings
 
 page-settings = Ustawienia
+page-game-settings = Ustawienia gry
 settings-language = Język
 settings-language-description = Język aplikacji. Nazwy z samej gry (miasta, ładunki, rangi) też się zmieniają, jeśli gra ma je w tym języku.
 settings-appearance = Wygląd
@@ -360,6 +362,7 @@ settings-not-affiliated = Niepowiązany z SCS Software ani przez nią niepopiera
 
 palette-open = Polecenia…
 palette-shortcut = Ctrl+K
+settings-shortcut = Ctrl+,
 palette-placeholder = Wpisz polecenie lub stronę…
 palette-group-pages = Przejdź do
 palette-group-actions = Akcje

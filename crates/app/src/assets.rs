@@ -14,6 +14,7 @@ gpui_kit::assets::icon_assets!(
         Database,
         FolderOpen,
         FlaskConical,
+        Gamepad2,
         Gauge,
         ArchiveRestore,
         Map,

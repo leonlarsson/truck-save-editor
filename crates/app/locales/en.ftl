@@ -128,6 +128,7 @@ save = Save
 save-open = Save…
 details-open = Details…
 settings-open = Settings…
+game-settings-open = Game settings…
 saving = Saving…
 
 ## Opening, closing and saving
@@ -291,6 +292,7 @@ quick-start-needs-game = Needs the game installed on this PC: its data says whic
 ## Settings
 
 page-settings = Settings
+page-game-settings = Game settings
 settings-language = Language
 settings-language-description = The app's language. The game's own names (cities, cargo, ranks) follow it when the game has them in that language.
 settings-appearance = Appearance
@@ -343,6 +345,7 @@ settings-not-affiliated = Not affiliated with or endorsed by SCS Software.
 
 palette-open = Commands…
 palette-shortcut = Ctrl+K
+settings-shortcut = Ctrl+,
 palette-placeholder = Type a command or a page…
 palette-group-pages = Go to
 palette-group-actions = Actions

@@ -88,8 +88,9 @@ The editor tells you when a newer version is out: when it starts, it asks GitHub
 - The job you're on: cancel it with no fee, or remove its deadline.
 - Every offer on the job market: keep them all for a week.
 
-### The game's own settings
+### Game settings
 
+- Where the game is installed, found by itself or chosen.
 - The developer console, and convoys of up to 128 trucks, in the game's `config.cfg` (backed up before each change).
 
 ### Everything else: All data
@@ -115,10 +116,11 @@ The editor tells you when a newer version is out: when it starts, it asks GitHub
 
 - In English, German, Polish and Swedish, with the game's own names (cities, cargo, ranks) in the same language. German and Polish are first drafts that need a native speaker's review; corrections welcome.
 - Light and dark, or the system's.
-- A **command palette** (Ctrl+K) for every page and bulk action, and the whole app usable from the keyboard: Ctrl+1…9 for pages, Ctrl+S to review and save, Enter to open a row.
+- A **command palette** (Ctrl+K) for every page and bulk action, and the whole app usable from the keyboard: Ctrl+1…9 for pages, Ctrl+, for Settings, Ctrl+S to review and save, Enter to open a row.
 - Uses the game's own data from your install: level tables, rank names, skill limits, city names, icons, truck parts and the map, so it stays right when the game changes.
 - **Report a problem** opens a GitHub issue filled in with what helps; after a crash, the editor offers to report what happened. Nothing is sent without you posting it.
-- Settings for the language, light or dark, the game's folder, updates, and resetting the editor's own settings.
+- The save's menu at the top of the sidebar: switch to another save, or restore a backup.
+- Settings, the editor's own: the language, light or dark, the backups folder, updates, and resetting them.
 
 ## Staying compatible
 
