@@ -851,6 +851,22 @@ impl Session {
         }
     }
 
+    /// The cities with a truck dealer (or a recruitment agency), as the game counts them: of the
+    /// cities it counts (see `set_game_cities`), so a port or a village the game leaves out isn't
+    /// counted for its dealer either. `None` without the game's data.
+    pub fn place_cities(&self, place: save::Place, cx: &App) -> Option<BTreeSet<String>> {
+        let cities = game_data::place_cities(cx, place)?;
+        if self.game_cities.is_empty() {
+            return Some(cities);
+        }
+        Some(
+            cities
+                .into_iter()
+                .filter(|city| self.game_cities.contains(city))
+                .collect(),
+        )
+    }
+
     /// The cities whose dealer (or agency) is unlocked, as it'll be after saving.
     pub fn unlocked(&self, place: Place) -> BTreeSet<String> {
         save::unlocked(&self.preview(), place).into_iter().collect()
@@ -1723,7 +1739,7 @@ impl Session {
                 .collect();
             let after = self.unlocked(place);
             // Counted as the Map page counts them: only where the game has one, of how many.
-            match game_data::place_cities(cx, place) {
+            match self.place_cities(place, cx) {
                 Some(cities) => add(
                     &map,
                     what,

@@ -1028,6 +1028,7 @@ gallery-not-captured = Inte fotograferad än
 gallery-visited-of = { $visited } av { $count } besökta
 gallery-viewpoints-summary = { $visited } av { $count } utsiktsplatser besökta
 gallery-photo-trophies-summary = { $captured } av { $count } fototroféer fotograferade
+gallery-where-kept = Utsiktsplatser sparas i den här sparfilen, så varje sparfil har sina egna. Fototroféer sparas i profilen och delas av alla dess sparfiler.
 gallery-column-name = Namn
 gallery-column-kind = Typ
 gallery-column-country = Land

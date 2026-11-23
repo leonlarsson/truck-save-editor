@@ -1083,6 +1083,7 @@ gallery-not-captured = Jeszcze niezdobyte
 gallery-visited-of = Odwiedzone: { $visited } z { $count }
 gallery-viewpoints-summary = Odwiedzone punkty widokowe: { $visited } z { $count }
 gallery-photo-trophies-summary = Zdobyte trofea fotograficzne: { $captured } z { $count }
+gallery-where-kept = Punkty widokowe są zapisane w tym zapisie gry, więc każdy zapis ma własne. Trofea fotograficzne są zapisane w profilu i wspólne dla wszystkich jego zapisów.
 gallery-column-name = Nazwa
 gallery-column-kind = Rodzaj
 gallery-column-country = Kraj

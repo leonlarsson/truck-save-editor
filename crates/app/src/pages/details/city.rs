@@ -66,7 +66,7 @@ fn place_state(session: &Session, place: Place, token: &str, cx: &App) -> PlaceS
     if session.unlocked(place).contains(token) {
         return PlaceState::Unlocked;
     }
-    match game_data::place_cities(cx, place) {
+    match session.place_cities(place, cx) {
         Some(cities) if cities.contains(token) => PlaceState::Locked,
         Some(_) => PlaceState::Missing,
         None => PlaceState::Unknown,

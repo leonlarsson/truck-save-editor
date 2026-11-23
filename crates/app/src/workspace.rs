@@ -480,7 +480,7 @@ impl Workspace {
                     save::Place::Recruitment
                 };
                 // Without the game nobody knows where they are; the Map page says so.
-                match game_data::place_cities(cx, place) {
+                match session.read(cx).place_cities(place, cx) {
                     Some(cities) => {
                         session.update(cx, |session, cx| session.unlock_all(place, &cities, cx))
                     }

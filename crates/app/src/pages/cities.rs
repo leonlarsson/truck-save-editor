@@ -124,8 +124,8 @@ impl CitiesPage {
         let session = self.session.read(cx);
         let unlocked_dealers = session.unlocked(Place::Dealer);
         let unlocked_recruitments = session.unlocked(Place::Recruitment);
-        let dealer_cities = game_data::place_cities(cx, Place::Dealer);
-        let recruitment_cities = game_data::place_cities(cx, Place::Recruitment);
+        let dealer_cities = session.place_cities(Place::Dealer, cx);
+        let recruitment_cities = session.place_cities(Place::Recruitment, cx);
         self.dealers = count(&unlocked_dealers, dealer_cities.as_ref());
         self.recruitments = count(&unlocked_recruitments, recruitment_cities.as_ref());
 
@@ -215,7 +215,7 @@ impl CitiesPage {
     }
 
     fn unlock(&mut self, place: Place, cx: &mut Context<Self>) {
-        let Some(cities) = game_data::place_cities(cx, place) else {
+        let Some(cities) = self.session.read(cx).place_cities(place, cx) else {
             return;
         };
         self.session

@@ -1028,6 +1028,7 @@ gallery-not-captured = Not captured yet
 gallery-visited-of = { $visited } of { $count } visited
 gallery-viewpoints-summary = { $visited } of { $count } viewpoints visited
 gallery-photo-trophies-summary = { $captured } of { $count } photo trophies captured
+gallery-where-kept = Viewpoints are kept in this save, so each save has its own. Photo trophies are kept in the profile, shared by all its saves.
 gallery-column-name = Name
 gallery-column-kind = Kind
 gallery-column-country = Country

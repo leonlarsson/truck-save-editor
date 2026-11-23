@@ -1032,6 +1032,7 @@ gallery-not-captured = Noch nicht fotografiert
 gallery-visited-of = { $visited } von { $count } besucht
 gallery-viewpoints-summary = { $visited } von { $count } Aussichtspunkten besucht
 gallery-photo-trophies-summary = { $captured } von { $count } Foto-Trophäen fotografiert
+gallery-where-kept = Aussichtspunkte werden in diesem Spielstand gespeichert, jeder Spielstand hat also seine eigenen. Foto-Trophäen gehören zum Profil und gelten für alle seine Spielstände.
 gallery-column-name = Name
 gallery-column-kind = Art
 gallery-column-country = Land

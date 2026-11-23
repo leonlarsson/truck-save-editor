@@ -351,6 +351,13 @@ impl Render for GalleryView {
                             })),
                     ),
             )
+            // Where each is kept, so a change here isn't expected in the profile's other saves.
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(cx.theme().muted_foreground)
+                    .child(t!(cx, "gallery-where-kept")),
+            )
             .child(self.filter.clone())
             // Not hidden without the game: say why.
             .children((!has_game).then(|| {

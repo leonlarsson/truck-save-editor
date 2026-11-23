@@ -140,10 +140,10 @@ impl QuickStart {
             hq_garage: available(Choice::HqGarage),
             visit_cities: available(Choice::VisitCities),
             dealers: available(Choice::Dealers)
-                .then(|| game_data::place_cities(cx, Place::Dealer))
+                .then(|| self.session.read(cx).place_cities(Place::Dealer, cx))
                 .flatten(),
             recruitments: available(Choice::Recruitments)
-                .then(|| game_data::place_cities(cx, Place::Recruitment))
+                .then(|| self.session.read(cx).place_cities(Place::Recruitment, cx))
                 .flatten(),
         };
         self.session

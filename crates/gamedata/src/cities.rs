@@ -19,6 +19,11 @@ pub(crate) struct Cities {
     pub country_names: BTreeMap<String, String>,
 }
 
+/// Cities whose definition lists dealer brands but whose map has no dealer: the game doesn't count
+/// a dealer there (checked against the 1.62 map's dealer prefabs, and a save's Career Progress:
+/// 144 truck dealers, not 146).
+const DEALERS_NOT_ON_MAP: [&str; 2] = ["edirne", "veli_tarnovo"];
+
 impl Cities {
     /// Adds the cities a `city.sii` (or a DLC's `city.*.sii`) defines.
     pub(crate) fn add(&mut self, document: &sii::Document) {
@@ -38,7 +43,7 @@ impl Cities {
                     self.countries.insert(token.to_string(), country);
                 }
             }
-            if !unit.items("vehicle_brands").is_empty() {
+            if !unit.items("vehicle_brands").is_empty() && !DEALERS_NOT_ON_MAP.contains(&token) {
                 self.dealers.insert(token.to_string());
             }
         }
