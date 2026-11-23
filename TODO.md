@@ -122,7 +122,9 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [x] Paint in the truck and trailer panel: the paint job, from the game's own list for the model (one per name, in the version that fits the vehicle's cabin), and the colours the paint job lets you change, with the saved colours as quick picks.
 - [x] Saved colours (Fleet → Saved colours…, and the palette): the 32 colours saved in the game's paint screen, each editable, copied as text to share and pasted from text.
 - [ ] In game (owner): another paint job on a truck and on a trailer, a custom colour, and a few saved colours changed, saved as a new slot. Do the vehicles look right (the colours as picked, the paint job fitting the cabin), and does the game's paint screen show the saved colours?
-- [ ] Freight market jobs: make a job by picking where from, where to, the cargo, the trailer and how urgent.
+- [x] Make a job (Jobs → Make a job…, and the palette): from a company that ships the cargo to one that takes it (the game's company definitions), on a trailer an offer in the save carries that cargo on (with its load and company truck), standard, important or urgent, for a week. The route is an offer's between the same cities, else the map's straight line scaled by the save's own offers.
+- [ ] In game (owner): two jobs made, one between cities that already have an offer between them and one that doesn't, saved as a new slot. Do they show on the freight market, can they be taken and delivered, with the right trailer and a fair distance and pay?
+- [ ] Make a job: the trailer list names trailers by the game's codes (`Container, singl 3e 40`); the game's own trailer names would read better, if its data has them.
 
 ## Later
 

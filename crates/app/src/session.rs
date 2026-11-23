@@ -122,6 +122,8 @@ struct Pending {
     avatar: Option<AvatarChange>,
     /// The colours saved in the game's paint screen, slot by slot, when changed.
     saved_colours: Option<Vec<Option<save::Rgb8>>>,
+    /// Jobs to put on the market, in the order made.
+    new_jobs: Vec<save::NewJob>,
 }
 
 /// A change to the profile's own picture.
@@ -187,6 +189,7 @@ impl Pending {
             coach: CoachChanges::default(),
             avatar: None,
             saved_colours: None,
+            new_jobs: Vec::new(),
         }
     }
 
@@ -851,6 +854,7 @@ impl Session {
             + self.pending.coach.count()
             + usize::from(self.pending.avatar.is_some())
             + usize::from(self.pending.saved_colours.is_some())
+            + self.pending.new_jobs.len()
             + usize::from(self.pending.roads.is_some())
     }
 
@@ -890,6 +894,11 @@ impl Session {
                     || wear_fields.insert((path.unit.as_str(), path.field.as_str()))
             })
             .count()
+    }
+
+    /// Puts a job on the market when saving.
+    pub fn add_job(&mut self, job: save::NewJob, cx: &mut Context<Self>) {
+        self.change(cx, |pending, _| pending.new_jobs.push(job));
     }
 
     /// The colours saved in the game's paint screen, slot by slot, as they'll be after saving.
@@ -1500,6 +1509,21 @@ impl Session {
                 text.clone().into(),
             );
         }
+        for job in &self.pending.new_jobs {
+            let city = |token: &str| crate::game_data::city_name(cx, token);
+            add(
+                &jobs,
+                t!(cx, "new-job"),
+                t!(cx, "new-job-before"),
+                t!(
+                    cx,
+                    "new-job-after",
+                    cargo = crate::game_data::cargo_name(cx, &job.cargo),
+                    from = city(&job.from_city),
+                    to = city(&job.to_city)
+                ),
+            );
+        }
         if self.pending.saved_colours.is_some() {
             let count = |colours: Vec<Option<save::Rgb8>>| colours.iter().flatten().count();
             add(
@@ -2044,6 +2068,9 @@ impl Session {
         }
         if let Some(colours) = &self.pending.saved_colours {
             save::set_saved_colours(&mut slot.game, colours);
+        }
+        for job in &self.pending.new_jobs {
+            save::add_job(&mut slot.game, job);
         }
         // The passengers first: setting satisfaction doesn't touch them.
         if let Some(total) = self.pending.coach.passengers {

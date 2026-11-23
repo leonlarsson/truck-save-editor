@@ -210,6 +210,27 @@ job-place = { $company }, { $city }
 job-urgency-standard = Normal
 job-urgency-important = Viktig
 job-urgency-urgent = Brådskande
+new-job-open = Skapa ett uppdrag…
+new-job-title = Skapa ett uppdrag
+new-job-description = Lägger ut ett uppdrag på fraktmarknaden när du sparar: från ett företag som skickar lasten till ett som tar emot den, på en trailer spelet redan kör lasten på.
+new-job-from = Från
+new-job-cargo = Last
+new-job-to = Till
+new-job-trailer-label = Trailer
+new-job-pick = Välj…
+new-job-company = { $company }, { $city }
+new-job-cargo-on = { $cargo } · { $body }
+new-job-trailer = { $body }, { $chassis } · { $count ->
+    [one] 1 enhet
+   *[other] { $count } enheter
+}
+new-job-add = Lägg till uppdraget
+new-job-added = Uppdraget läggs ut på marknaden när du sparar
+new-job-incomplete = Välj varifrån, last, vart och trailer.
+new-job-no-route = Det finns inget erbjudande mellan städerna att ta sträckan från, och kartan är inte inläst än.
+new-job = Nytt uppdrag
+new-job-before = Inget
+new-job-after = { $cargo }, { $from } → { $to }
 job-expires-in = { $minutes ->
     [one] om 1 minut
    *[other] om { $minutes } minuter

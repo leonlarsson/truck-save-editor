@@ -332,3 +332,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** the definitions say what the game allows: which paint jobs a model has, which fit its cabin, and which colours can change. Writing only what they allow keeps vehicles the game can draw.
 
 **Considered:** listing every definition (the same paint job three times, one per cabin height, two of them wrong for the vehicle); letting every colour change (the game ignores or overrides locked ones).
+
+## 2026-11-23: Making a job copies what the game chose for the cargo
+
+**Decided:** a made job fills a free offer slot of the source company (`company.volatile.<company>.<city>`'s `job_offer[]`, a slot with `cargo: null`), else the offer that expires soonest. What's offered is what the game allows: the companies that ship the cargo and those that take it come from the game's company definitions (`def/company/<company>/{out,in}/*.sii`, `gamedata::company_cargo`), and the trailer (`trailer_variant`, `trailer_definition`), its `units_count`, `fill_ratio` and `company_truck` are copied from an offer in the save that carries the same cargo, so only cargo the save has an offer for can be made. The route is an offer's between the same cities (with its ferry); otherwise the straight line between the cities on the map, scaled by the middle ratio of the save's own offers' distances to their straight lines. A made job lasts a week of game time and is a pending change like any other.
+
+**Why:** a job the game didn't make must still be one it could have made; copying its own choices (trailer, load, truck) and its own company lists keeps it so. Self-scaling the distance avoids guessing how the map's metres relate to the market's kilometres.
+
+**Considered:** building trailers from the cargo's body types in the game's data (more cargo, but a trailer the game might never pair with it); a fixed map scale (unknown, and different per game).

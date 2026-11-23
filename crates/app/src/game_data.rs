@@ -397,6 +397,36 @@ pub fn model_parts(cx: &mut App, model: &str, kind: gamedata::PartKind) -> Optio
     None
 }
 
+/// What every company ships and takes, once read (`None` inside while reading).
+#[derive(Default)]
+struct CompanyCargoState(Option<Option<Arc<gamedata::CompanyCargo>>>);
+
+impl Global for CompanyCargoState {}
+
+/// What every company ships and takes (`gamedata::company_cargo`). The first ask starts reading
+/// it in the background and returns `None`; the window redraws when it's there.
+pub fn company_cargo(cx: &mut App) -> Option<Arc<gamedata::CompanyCargo>> {
+    if !cx.has_global::<CompanyCargoState>() {
+        cx.set_global(CompanyCargoState::default());
+    }
+    if let Some(state) = &cx.global::<CompanyCargoState>().0 {
+        return state.clone();
+    }
+    let install_dir = data(cx)?.install_dir.clone();
+    cx.global_mut::<CompanyCargoState>().0 = Some(None);
+    cx.spawn(async move |cx| {
+        let cargo = cx
+            .background_spawn(async move { gamedata::company_cargo(&install_dir) })
+            .await;
+        cx.update(|cx| {
+            cx.global_mut::<CompanyCargoState>().0 = Some(Some(Arc::new(cargo)));
+            cx.refresh_windows();
+        });
+    })
+    .detach();
+    None
+}
+
 /// The paint jobs read so far, by model.
 #[derive(Default)]
 struct PaintJobs(HashMap<String, Option<Arc<Vec<gamedata::PaintJob>>>>);

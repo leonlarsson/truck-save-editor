@@ -380,17 +380,36 @@ impl Render for JobsPage {
                             .text_color(cx.theme().muted_foreground)
                             .child(summary),
                     )
+                    // The page's actions together, on the right.
                     .child(
-                        Button::new("keep-offers")
-                            .small()
-                            .outline()
-                            .label(t!(cx, "jobs-keep"))
-                            .tooltip(t!(cx, "jobs-keep-tooltip"))
-                            .disabled(self.all_kept || self.total == 0)
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.session
-                                    .update(cx, |session, cx| session.keep_offers(cx));
-                            })),
+                        h_flex()
+                            .gap_2()
+                            .child(
+                                Button::new("new-job")
+                                    .small()
+                                    .outline()
+                                    .label(t!(cx, "new-job-open"))
+                                    .tooltip(t!(cx, "new-job-description"))
+                                    .on_click(cx.listener(|this, _, window, cx| {
+                                        crate::pages::new_job::open(
+                                            this.session.clone(),
+                                            window,
+                                            cx,
+                                        )
+                                    })),
+                            )
+                            .child(
+                                Button::new("keep-offers")
+                                    .small()
+                                    .outline()
+                                    .label(t!(cx, "jobs-keep"))
+                                    .tooltip(t!(cx, "jobs-keep-tooltip"))
+                                    .disabled(self.all_kept || self.total == 0)
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        this.session
+                                            .update(cx, |session, cx| session.keep_offers(cx));
+                                    })),
+                            ),
                     ),
             )
             .children(self.render_current_job(cx))

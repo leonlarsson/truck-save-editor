@@ -58,7 +58,10 @@ pub use garages::{
     move_options, move_to_garage, upgrade_garage,
 };
 pub use info::{SlotInfo, read_info, set_name, update_info};
-pub use jobs::{Job, extend_offers, game_time, jobs};
+pub use jobs::{
+    Job, NewJob, OfferTrailer, Route, add_job, extend_offers, game_time, jobs, known_route,
+    offer_trailers,
+};
 pub use levels::{FALLBACK_STEPS, Level, LevelTable};
 pub use map::{
     City, Place, cities, lock, unlock, unlocked, unvisit_cities, visit_all_cities, visit_cities,

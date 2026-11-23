@@ -10,6 +10,7 @@ pub mod jobs;
 pub mod licences;
 pub mod map;
 pub mod map_view;
+pub mod new_job;
 pub mod open_save;
 pub mod overview;
 pub mod position;

@@ -224,6 +224,29 @@ job-place = { $company }, { $city }
 job-urgency-standard = Standardowe
 job-urgency-important = Ważne
 job-urgency-urgent = Pilne
+new-job-open = Utwórz zlecenie…
+new-job-title = Utwórz zlecenie
+new-job-description = Przy zapisie dodaje zlecenie na giełdę ładunków: od firmy, która wysyła ładunek, do takiej, która go przyjmuje, na naczepie, na której gra już wozi ten ładunek.
+new-job-from = Skąd
+new-job-cargo = Ładunek
+new-job-to = Dokąd
+new-job-trailer-label = Naczepa
+new-job-pick = Wybierz…
+new-job-company = { $company }, { $city }
+new-job-cargo-on = { $cargo } · { $body }
+new-job-trailer = { $body }, { $chassis } · { $count ->
+    [one] 1 jednostka
+    [few] { $count } jednostki
+    [many] { $count } jednostek
+   *[other] { $count } jednostki
+}
+new-job-add = Dodaj zlecenie
+new-job-added = Zlecenie trafi na giełdę przy zapisie
+new-job-incomplete = Wybierz skąd, ładunek, dokąd i naczepę.
+new-job-no-route = Brak oferty między tymi miastami, z której można wziąć dystans, a mapa nie jest jeszcze wczytana.
+new-job = Nowe zlecenie
+new-job-before = Brak
+new-job-after = { $cargo }, { $from } → { $to }
 job-expires-in = { $minutes ->
     [one] za 1 minutę
     [few] za { $minutes } minuty

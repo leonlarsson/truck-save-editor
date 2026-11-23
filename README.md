@@ -90,6 +90,7 @@ The editor tells you when a newer version is out: when it starts, it asks GitHub
 
 - The job you're on: cancel it with no fee, or remove its deadline.
 - Every offer on the job market: keep them all for a week.
+- Make a job: pick where from, the cargo, where to, the trailer and how urgent, and it's on the freight market when the save loads.
 
 ### Game settings
 

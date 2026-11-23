@@ -210,6 +210,27 @@ job-place = { $company }, { $city }
 job-urgency-standard = Standard
 job-urgency-important = Important
 job-urgency-urgent = Urgent
+new-job-open = Make a job…
+new-job-title = Make a job
+new-job-description = Puts a job on the freight market when you save: from a company that ships the cargo to one that takes it, on a trailer the game already carries that cargo on.
+new-job-from = From
+new-job-cargo = Cargo
+new-job-to = To
+new-job-trailer-label = Trailer
+new-job-pick = Choose…
+new-job-company = { $company }, { $city }
+new-job-cargo-on = { $cargo } · { $body }
+new-job-trailer = { $body }, { $chassis } · { $count ->
+    [one] 1 unit
+   *[other] { $count } units
+}
+new-job-add = Add the job
+new-job-added = The job goes on the market when you save
+new-job-incomplete = Choose where from, the cargo, where to and the trailer.
+new-job-no-route = There's no offer between these cities to take the distance from, and the map isn't read yet.
+new-job = New job
+new-job-before = None
+new-job-after = { $cargo }, { $from } → { $to }
 job-expires-in = { $minutes ->
     [one] in 1 minute
    *[other] in { $minutes } minutes

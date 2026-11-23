@@ -214,6 +214,27 @@ job-place = { $company }, { $city }
 job-urgency-standard = Standard
 job-urgency-important = Wichtig
 job-urgency-urgent = Dringend
+new-job-open = Auftrag erstellen…
+new-job-title = Auftrag erstellen
+new-job-description = Stellt beim Speichern einen Auftrag auf den Frachtmarkt: von einer Firma, die die Fracht versendet, zu einer, die sie annimmt, auf einem Auflieger, auf dem das Spiel diese Fracht schon fährt.
+new-job-from = Von
+new-job-cargo = Fracht
+new-job-to = Nach
+new-job-trailer-label = Auflieger
+new-job-pick = Wählen…
+new-job-company = { $company }, { $city }
+new-job-cargo-on = { $cargo } · { $body }
+new-job-trailer = { $body }, { $chassis } · { $count ->
+    [one] 1 Einheit
+   *[other] { $count } Einheiten
+}
+new-job-add = Auftrag hinzufügen
+new-job-added = Der Auftrag kommt beim Speichern auf den Markt
+new-job-incomplete = Wähle Start, Fracht, Ziel und Auflieger.
+new-job-no-route = Kein Angebot zwischen diesen Städten liefert die Strecke, und die Karte ist noch nicht gelesen.
+new-job = Neuer Auftrag
+new-job-before = Keiner
+new-job-after = { $cargo }, { $from } → { $to }
 job-expires-in = { $minutes ->
     [one] in 1 Minute
    *[other] in { $minutes } Minuten
