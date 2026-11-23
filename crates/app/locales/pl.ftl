@@ -847,14 +847,15 @@ saved-colours-count = { $count ->
    *[other] { $count } koloru
 }
 saved-colours-open = Zapisane kolory…
-saved-colours-description = Kolory zapisane na ekranie lakierowania w grze, dla całej firmy. Pojawiają się jako szybki wybór w lakierze każdego pojazdu.
+saved-colours-description = Kolory zapisane na ekranie lakierowania w grze, dla całej firmy: 8, każdy do czterech kolorów (gra zapisuje kolory malowania razem; pojedynczy kolor używa pierwszego). Pojawiają się jako szybki wybór w lakierze każdego pojazdu.
 saved-colours-slot = Zapisany kolor { $slot }
+saved-colours-colour = Zapisany kolor { $slot }, kolor { $colour }
 saved-colours-copy = Kopiuj jako tekst
-saved-colours-copy-tooltip = Kopiuje kolory jako tekst (#RRGGBB dla każdego), aby się nimi podzielić.
+saved-colours-copy-tooltip = Kopiuje kolory jako tekst do udostępnienia: #RRGGBB dla każdego zapisanego koloru, kolory zestawu połączone znakiem /.
 saved-colours-copied = Skopiowano kolory
 saved-colours-paste = Wklej tekst
-saved-colours-paste-tooltip = Pobiera ze schowka kolory udostępnione jako tekst (#RRGGBB, - dla pustego miejsca), od pierwszego miejsca.
-saved-colours-not-colours = Schowek nie zawiera kolorów jako tekstu: #RRGGBB dla każdego, oddzielone spacjami.
+saved-colours-paste-tooltip = Pobiera ze schowka kolory udostępnione jako tekst (#RRGGBB, zestaw połączony znakiem /, - dla pustego), od pierwszego zapisanego koloru.
+saved-colours-not-colours = Schowek nie zawiera kolorów jako tekstu: #RRGGBB dla każdego zapisanego koloru, oddzielone spacjami.
 truck-badge = Emblemat boczny
 truck-remove-badge = Usuń go
 truck-remove-badge-tooltip = Usuwa emblemat silnika z boków kabiny (emblemat z przodu zostaje).

@@ -807,14 +807,15 @@ saved-colours-count = { $count ->
    *[other] { $count } colours
 }
 saved-colours-open = Saved colours…
-saved-colours-description = The colours saved in the game's paint screen, for the whole company. They show as quick picks in every vehicle's paint.
+saved-colours-description = The colours saved in the game's paint screen, for the whole company: 8, each up to four colours (the game saves a paint job's colours together; a single colour uses the first). They show as quick picks in every vehicle's paint.
 saved-colours-slot = Saved colour { $slot }
+saved-colours-colour = Saved colour { $slot }, colour { $colour }
 saved-colours-copy = Copy as text
-saved-colours-copy-tooltip = Copies the colours as text (#RRGGBB for each) to share.
+saved-colours-copy-tooltip = Copies the colours as text to share: #RRGGBB for each saved colour, a set's colours joined by /.
 saved-colours-copied = Colours copied
 saved-colours-paste = Paste text
-saved-colours-paste-tooltip = Takes colours shared as text (#RRGGBB, - for an empty slot) from the clipboard, from the first slot on.
-saved-colours-not-colours = The clipboard doesn't hold colours as text: #RRGGBB for each, separated by spaces.
+saved-colours-paste-tooltip = Takes colours shared as text (#RRGGBB, a set joined by /, - for an empty one) from the clipboard, from the first saved colour on.
+saved-colours-not-colours = The clipboard doesn't hold colours as text: #RRGGBB for each saved colour, separated by spaces.
 truck-badge = Side badge
 truck-remove-badge = Remove it
 truck-remove-badge-tooltip = Takes the engine badge off the sides of the cab (the badge at the front stays).

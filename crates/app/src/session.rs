@@ -120,8 +120,8 @@ struct Pending {
     coach: CoachChanges,
     /// A new picture for the profile, or none (in the profile folder, like its name).
     avatar: Option<AvatarChange>,
-    /// The colours saved in the game's paint screen, slot by slot, when changed.
-    saved_colours: Option<Vec<Option<save::Rgb8>>>,
+    /// The colours saved in the game's paint screen, when changed.
+    saved_colours: Option<Vec<save::SavedColour>>,
     /// Jobs to put on the market, in the order made.
     new_jobs: Vec<save::NewJob>,
 }
@@ -901,15 +901,15 @@ impl Session {
         self.change(cx, |pending, _| pending.new_jobs.push(job));
     }
 
-    /// The colours saved in the game's paint screen, slot by slot, as they'll be after saving.
-    pub fn saved_colours(&self) -> Vec<Option<save::Rgb8>> {
+    /// The colours saved in the game's paint screen, as they'll be after saving.
+    pub fn saved_colours(&self) -> Vec<save::SavedColour> {
         save::saved_colours(&self.preview())
     }
 
-    /// Sets the saved colours, slot by slot; the save's own aren't a change.
-    pub fn set_saved_colours(&mut self, colours: Vec<Option<save::Rgb8>>, cx: &mut Context<Self>) {
+    /// Sets the saved colours; the save's own aren't a change.
+    pub fn set_saved_colours(&mut self, colours: Vec<save::SavedColour>, cx: &mut Context<Self>) {
         let mut colours = colours;
-        colours.resize(save::SAVED_COLOUR_SLOTS, None);
+        colours.resize(save::SAVED_COLOURS, [None; save::COLOURS_PER_SAVED]);
         let is_saved = save::saved_colours(&self.loaded.game) == colours;
         self.change(cx, |pending, _| {
             pending.saved_colours = (!is_saved).then_some(colours);
@@ -1525,7 +1525,13 @@ impl Session {
             );
         }
         if self.pending.saved_colours.is_some() {
-            let count = |colours: Vec<Option<save::Rgb8>>| colours.iter().flatten().count();
+            // Saved colours with any colour in them.
+            let count = |colours: Vec<save::SavedColour>| {
+                colours
+                    .iter()
+                    .filter(|saved| saved.iter().any(Option::is_some))
+                    .count()
+            };
             add(
                 &company,
                 t!(cx, "saved-colours"),
@@ -2501,11 +2507,11 @@ mod tests {
     fn saved_colours_are_one_change_and_set_back_are_none(cx: &mut TestAppContext) {
         let session = session(cx);
         let mut colours = cx.update(|cx| session.read(cx).saved_colours());
-        assert_eq!(colours.len(), save::SAVED_COLOUR_SLOTS);
+        assert_eq!(colours.len(), save::SAVED_COLOURS);
         let original = colours.clone();
 
-        colours[0] = Some([0x12, 0x34, 0x56]);
-        colours[5] = Some([0xff, 0x00, 0x80]);
+        colours[0][0] = Some([0x12, 0x34, 0x56]);
+        colours[5] = [Some([0xff, 0x00, 0x80]), None, Some([0, 0, 0]), None];
         session.update(cx, |session, cx| {
             session.set_saved_colours(colours.clone(), cx)
         });

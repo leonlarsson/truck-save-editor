@@ -67,9 +67,9 @@ pub use map::{
     City, Place, cities, lock, unlock, unlocked, unvisit_cities, visit_all_cities, visit_cities,
 };
 pub use paint::{
-    LinearRgb, NewPaintJob, Paint, PaintColour, Rgb8, SAVED_COLOUR_SLOTS, colours_from_text,
-    colours_to_text, format_colour, paint_model, parse_colour, saved_colours, set_saved_colours,
-    to_display, to_linear, vehicle_paint, vehicle_part_ids,
+    COLOURS_PER_SAVED, LinearRgb, NewPaintJob, Paint, PaintColour, Rgb8, SAVED_COLOURS,
+    SavedColour, colours_from_text, colours_to_text, format_colour, paint_model, parse_colour,
+    saved_colours, set_saved_colours, to_display, to_linear, vehicle_paint, vehicle_part_ids,
 };
 pub use player_state::{
     DAY_MINUTES, PlayerEdit, apply_player_edit, cargo_damage, is_on_job, minutes_since_break,

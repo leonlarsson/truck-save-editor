@@ -340,3 +340,9 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** a job the game didn't make must still be one it could have made; copying its own choices (trailer, load, truck) and its own company lists keeps it so. Self-scaling the distance avoids guessing how the map's metres relate to the market's kilometres.
 
 **Considered:** building trailers from the cargo's body types in the game's data (more cargo, but a trailer the game might never pair with it); a fixed map scale (unknown, and different per game).
+
+## 2026-11-23: Saved colours are 8 sets of four colours
+
+**Decided:** `economy.user_colors[]` is read and written as 8 saved colours of 4 slots each (slots 0–3, 4–7 …), each slot `0xAABBGGRR` in sRGB as before. A saved colour is a set of up to four colours (the game saves a paint job's colours together); a single colour uses the first slot of its set. The Saved colours panel shows 8 rows of four pickers; the text form joins a set's colours with `/` (`#FF0000/#00FF00/#0000FF #E0FF00`), and the paint pickers offer every colour of every set as quick picks. Replaces the 32 single colours of the paint entry above.
+
+**Why:** seen in game: three colours written to slots 0–2 showed as one striped swatch, and a save whose slots 0 and 4 hold one colour each shows two plain swatches.

@@ -7,9 +7,13 @@
 //! (plus `flake_color` and `flip_color` for metallic ones). Colours are three numbers from 0 to 1,
 //! in linear light: `(0.5, 0.2, 0.1)`.
 //!
-//! The saved colours are `economy.user_colors[]`, 32 slots, each a 32-bit number `0xAABBGGRR`
-//! in display (sRGB) values; 0 is an empty slot. (Worked out from a save whose saved colours match
-//! colours on its vehicles exactly once converted.)
+//! The saved colours are `economy.user_colors[]`: 32 slots in 8 groups of 4, one group per saved
+//! colour the game's paint screen shows. A saved colour is a set of up to four colours (the game
+//! saves a paint job's colours together), and a single colour uses only the first slot of its
+//! group. Each slot is a 32-bit number `0xAABBGGRR` in display (sRGB) values; 0 is an empty one.
+//! (The byte order worked out from a save whose saved colours equal colours on its vehicles
+//! exactly once converted; the groups of four seen in game, 2026-11-23: three colours written to
+//! one group showed as one striped swatch.)
 
 use sii::{Document, Value, value};
 
@@ -19,8 +23,12 @@ pub type LinearRgb = [f32; 3];
 /// A colour as shown on screen and in the saved colours: red, green and blue bytes (sRGB).
 pub type Rgb8 = [u8; 3];
 
-/// How many saved colours the game keeps.
-pub const SAVED_COLOUR_SLOTS: usize = 32;
+/// How many saved colours the game keeps, and how many colours each holds.
+pub const SAVED_COLOURS: usize = 8;
+pub const COLOURS_PER_SAVED: usize = 4;
+
+/// One saved colour: up to four colours, a single one in the first.
+pub type SavedColour = [Option<Rgb8>; COLOURS_PER_SAVED];
 
 /// Which of a paint job's colours.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -224,28 +232,30 @@ pub(crate) fn set_paint_job(document: &mut Document, vehicle: &str, job: &NewPai
     true
 }
 
-/// The saved colours, slot by slot (`None` for an empty one). Always `SAVED_COLOUR_SLOTS` long.
-pub fn saved_colours(document: &Document) -> Vec<Option<Rgb8>> {
+/// The saved colours, in the game's order. Always `SAVED_COLOURS` long; an empty one has no
+/// colours.
+pub fn saved_colours(document: &Document) -> Vec<SavedColour> {
     let items = document
         .first_of_kind("economy")
         .map(|economy| economy.items("user_colors").to_vec())
         .unwrap_or_default();
-    (0..SAVED_COLOUR_SLOTS)
-        .map(|slot| {
-            let packed: u32 = items.get(slot)?.parse().ok()?;
-            // An empty slot is 0: no alpha.
-            (packed >> 24 != 0).then_some([
-                (packed & 0xff) as u8,
-                ((packed >> 8) & 0xff) as u8,
-                ((packed >> 16) & 0xff) as u8,
-            ])
-        })
+    let slot = |at: usize| -> Option<Rgb8> {
+        let packed: u32 = items.get(at)?.parse().ok()?;
+        // An empty slot is 0: no alpha.
+        (packed >> 24 != 0).then_some([
+            (packed & 0xff) as u8,
+            ((packed >> 8) & 0xff) as u8,
+            ((packed >> 16) & 0xff) as u8,
+        ])
+    };
+    (0..SAVED_COLOURS)
+        .map(|saved| std::array::from_fn(|colour| slot(saved * COLOURS_PER_SAVED + colour)))
         .collect()
 }
 
-/// Sets the saved colours, slot by slot (more than `SAVED_COLOUR_SLOTS` are left out). False when
-/// the save has no economy.
-pub fn set_saved_colours(document: &mut Document, colours: &[Option<Rgb8>]) -> bool {
+/// Sets the saved colours (more than `SAVED_COLOURS` are left out, missing ones are empty). False
+/// when the save has no economy.
+pub fn set_saved_colours(document: &mut Document, colours: &[SavedColour]) -> bool {
     let Some(id) = document
         .first_of_kind("economy")
         .map(|economy| economy.id.clone())
@@ -255,56 +265,90 @@ pub fn set_saved_colours(document: &mut Document, colours: &[Option<Rgb8>]) -> b
     let Some(mut economy) = document.unit_mut(&id) else {
         return false;
     };
-    let items: Vec<String> = (0..SAVED_COLOUR_SLOTS)
-        .map(|slot| match colours.get(slot).copied().flatten() {
-            Some([r, g, b]) => {
-                let packed =
-                    0xff00_0000 | (u32::from(b) << 16) | (u32::from(g) << 8) | u32::from(r);
-                packed.to_string()
+    let items: Vec<String> = (0..SAVED_COLOURS * COLOURS_PER_SAVED)
+        .map(|at| {
+            let colour = colours
+                .get(at / COLOURS_PER_SAVED)
+                .and_then(|saved| saved[at % COLOURS_PER_SAVED]);
+            match colour {
+                Some([r, g, b]) => {
+                    let packed =
+                        0xff00_0000 | (u32::from(b) << 16) | (u32::from(g) << 8) | u32::from(r);
+                    packed.to_string()
+                }
+                None => "0".to_string(),
             }
-            None => "0".to_string(),
         })
         .collect();
     economy.set("user_colors", Value::Array(items));
     true
 }
 
-/// The saved colours as text to share: `#RRGGBB` for each, `-` for an empty slot, separated by
-/// spaces; empty slots at the end are left out.
-pub fn colours_to_text(colours: &[Option<Rgb8>]) -> String {
+fn colour_text(colour: Option<Rgb8>) -> String {
+    match colour {
+        Some([r, g, b]) => format!("#{r:02X}{g:02X}{b:02X}"),
+        None => "-".to_string(),
+    }
+}
+
+/// The saved colours as text to share: each saved colour separated by spaces, `-` for an empty
+/// one; a set's colours joined by `/` (`#FF0000/#00FF00/#0000FF`, empty ones in it `-`, empty ones
+/// at its end left out). Empty saved colours at the end are left out.
+pub fn colours_to_text(colours: &[SavedColour]) -> String {
     let last = colours
         .iter()
-        .rposition(Option::is_some)
+        .rposition(|saved| saved.iter().any(Option::is_some))
         .map_or(0, |at| at + 1);
     colours[..last]
         .iter()
-        .map(|colour| match colour {
-            Some([r, g, b]) => format!("#{r:02X}{g:02X}{b:02X}"),
-            None => "-".to_string(),
+        .map(|saved| {
+            let used = saved
+                .iter()
+                .rposition(Option::is_some)
+                .map_or(0, |at| at + 1);
+            if used == 0 {
+                return "-".to_string();
+            }
+            saved[..used]
+                .iter()
+                .map(|colour| colour_text(*colour))
+                .collect::<Vec<_>>()
+                .join("/")
         })
         .collect::<Vec<_>>()
         .join(" ")
 }
 
-/// Reads shared colours: `#RRGGBB` (or `RRGGBB`) and `-` for empty, separated by spaces, commas
-/// or new lines. `None` when anything else is in it, or there are more than the game keeps.
-pub fn colours_from_text(text: &str) -> Option<Vec<Option<Rgb8>>> {
-    let colours: Option<Vec<Option<Rgb8>>> = text
+/// Reads shared colours (see `colours_to_text`); `#` is optional, and commas or new lines may
+/// separate them too. `None` when anything else is in it, or there are more than the game keeps.
+pub fn colours_from_text(text: &str) -> Option<Vec<SavedColour>> {
+    let one = |word: &str| -> Option<Option<Rgb8>> {
+        if word == "-" {
+            return Some(None);
+        }
+        let hex = word.strip_prefix('#').unwrap_or(word);
+        if hex.len() != 6 {
+            return None;
+        }
+        let byte = |at: usize| u8::from_str_radix(hex.get(at..at + 2)?, 16).ok();
+        Some(Some([byte(0)?, byte(2)?, byte(4)?]))
+    };
+    let saved: Option<Vec<SavedColour>> = text
         .split(|c: char| c.is_whitespace() || c == ',')
         .filter(|word| !word.is_empty())
         .map(|word| {
-            if word == "-" {
-                return Some(None);
-            }
-            let hex = word.strip_prefix('#').unwrap_or(word);
-            if hex.len() != 6 {
+            let parts: Vec<&str> = word.split('/').collect();
+            if parts.len() > COLOURS_PER_SAVED {
                 return None;
             }
-            let byte = |at: usize| u8::from_str_radix(hex.get(at..at + 2)?, 16).ok();
-            Some(Some([byte(0)?, byte(2)?, byte(4)?]))
+            let mut set: SavedColour = [None; COLOURS_PER_SAVED];
+            for (at, part) in parts.into_iter().enumerate() {
+                set[at] = one(part)?;
+            }
+            Some(set)
         })
         .collect();
-    colours.filter(|colours| !colours.is_empty() && colours.len() <= SAVED_COLOUR_SLOTS)
+    saved.filter(|saved| !saved.is_empty() && saved.len() <= SAVED_COLOURS)
 }
 
 #[cfg(test)]
@@ -382,44 +426,52 @@ mod tests {
     }
 
     #[test]
-    fn reads_and_writes_saved_colours() {
+    fn reads_and_writes_saved_colours_in_sets_of_four() {
+        // Slot 0 grey, slot 2 0xFF00FFE0 (blue 0x00, green 0xFF, red 0xE0): both in the first set.
         let mut document = sii::parse_text(SAVE).expect("parses");
         let colours = saved_colours(&document);
-        assert_eq!(colours.len(), SAVED_COLOUR_SLOTS);
-        // 0xFF9F9F9F, empty, 0xFF00FFE0 (blue 0x00, green 0xFF, red 0xE0).
+        assert_eq!(colours.len(), SAVED_COLOURS);
         assert_eq!(
-            &colours[..3],
-            [Some([0x9f, 0x9f, 0x9f]), None, Some([0xe0, 0xff, 0x00])]
+            colours[0],
+            [
+                Some([0x9f, 0x9f, 0x9f]),
+                None,
+                Some([0xe0, 0xff, 0x00]),
+                None
+            ]
         );
+        assert_eq!(colours[1], [None; 4]);
 
         let mut changed = colours.clone();
-        changed[1] = Some([0x12, 0x34, 0x56]);
+        changed[1] = [Some([0x12, 0x34, 0x56]), None, None, None];
         assert!(set_saved_colours(&mut document, &changed));
         assert_eq!(saved_colours(&document), changed);
         let economy = document.first_of_kind("economy").expect("economy");
-        assert_eq!(economy.items("user_colors").len(), SAVED_COLOUR_SLOTS);
-        assert_eq!(economy.items("user_colors")[2], "4278255584");
+        let items = economy.items("user_colors");
+        assert_eq!(items.len(), SAVED_COLOURS * COLOURS_PER_SAVED);
+        // The second set starts at slot 4.
+        assert_eq!(items[2], "4278255584");
+        assert_eq!(items[4], (0xff56_3412u32).to_string());
     }
 
     #[test]
     fn shares_colours_as_text() {
+        let red = Some([0xff, 0, 0]);
+        let blue = Some([0, 0, 0xff]);
         let colours = vec![
-            Some([0x9f, 0x9f, 0x9f]),
-            None,
-            Some([0xe0, 0xff, 0x00]),
-            None,
+            [Some([0x9f, 0x9f, 0x9f]), None, None, None],
+            [None; 4],
+            [red, None, blue, None],
+            [None; 4],
         ];
         let text = colours_to_text(&colours);
-        assert_eq!(text, "#9F9F9F - #E0FF00");
+        assert_eq!(text, "#9F9F9F - #FF0000/-/#0000FF");
+        assert_eq!(colours_from_text(&text), Some(colours[..3].to_vec()));
+        assert_eq!(colours_from_text("#12345 -"), None);
         assert_eq!(
-            colours_from_text(&text),
-            Some(vec![
-                Some([0x9f, 0x9f, 0x9f]),
-                None,
-                Some([0xe0, 0xff, 0x00])
-            ])
+            colours_from_text("#FF0000/#FF0000/#FF0000/#FF0000/#FF0000"),
+            None
         );
-        assert_eq!(colours_from_text("#12345, -"), None);
         assert_eq!(colours_from_text("nothing"), None);
         assert_eq!(colours_from_text(""), None);
     }

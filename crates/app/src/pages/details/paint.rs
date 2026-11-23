@@ -281,7 +281,8 @@ impl Render for PaintEditor {
             .read(cx)
             .saved_colours()
             .into_iter()
-            .flatten()
+            // Every colour of every saved colour (a set's colours too).
+            .flat_map(|saved| saved.into_iter().flatten())
             .map(to_hsla)
             .collect();
         let saved = Arc::new(saved);

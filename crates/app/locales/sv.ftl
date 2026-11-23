@@ -807,14 +807,15 @@ saved-colours-count = { $count ->
    *[other] { $count } färger
 }
 saved-colours-open = Sparade färger…
-saved-colours-description = Färgerna som sparats i spelets lackskärm, för hela företaget. De visas som snabbval i varje fordons lack.
+saved-colours-description = Färgerna som sparats i spelets lackskärm, för hela företaget: 8, var och en upp till fyra färger (spelet sparar en lackerings färger tillsammans; en enda färg använder den första). De visas som snabbval i varje fordons lack.
 saved-colours-slot = Sparad färg { $slot }
+saved-colours-colour = Sparad färg { $slot }, färg { $colour }
 saved-colours-copy = Kopiera som text
-saved-colours-copy-tooltip = Kopierar färgerna som text (#RRGGBB för varje) att dela.
+saved-colours-copy-tooltip = Kopierar färgerna som text att dela: #RRGGBB för varje sparad färg, en uppsättnings färger sammanfogade med /.
 saved-colours-copied = Färgerna kopierade
 saved-colours-paste = Klistra in text
-saved-colours-paste-tooltip = Tar färger som delats som text (#RRGGBB, - för en tom plats) från urklipp, från första platsen.
-saved-colours-not-colours = Urklipp innehåller inga färger som text: #RRGGBB för varje, åtskilda med mellanslag.
+saved-colours-paste-tooltip = Tar färger som delats som text (#RRGGBB, en uppsättning sammanfogad med /, - för en tom) från urklipp, från första sparade färgen.
+saved-colours-not-colours = Urklipp innehåller inga färger som text: #RRGGBB för varje sparad färg, åtskilda med mellanslag.
 truck-badge = Sidoemblem
 truck-remove-badge = Ta bort det
 truck-remove-badge-tooltip = Tar bort motoremblemet från hyttens sidor (emblemet fram sitter kvar).

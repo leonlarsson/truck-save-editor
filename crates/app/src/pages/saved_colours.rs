@@ -1,6 +1,8 @@
-//! The colours saved in the game's paint screen (32 slots), in a side panel: each a colour picker,
-//! and the lot copied as text to share, or pasted from text someone shared. Changes go through
-//! the session like any other, and show as quick picks in every vehicle's paint colours.
+//! The colours saved in the game's paint screen, in a side panel. The game keeps 8, each a set of
+//! up to four colours (it saves a paint job's colours together; a single colour uses the first),
+//! so each row is one saved colour with its four colour pickers. The lot copies as text to share,
+//! or pastes from text someone shared. Changes go through the session like any other, and show as
+//! quick picks in every vehicle's paint colours.
 
 use gpui_kit::component::{
     ActiveTheme as _, Sizable as _, WindowExt as _,
@@ -12,7 +14,7 @@ use gpui_kit::component::{
 };
 use gpui_kit::{
     App, AppContext as _, ClipboardItem, Context, Entity, IntoElement, ParentElement as _, Render,
-    Styled as _, Subscription, Window, div, px,
+    Styled as _, Subscription, Window, div, px, rems,
 };
 
 use crate::i18n::t;
@@ -21,45 +23,51 @@ use crate::ui::{to_hsla, to_rgb8};
 
 pub struct SavedColours {
     session: Entity<Session>,
-    slots: Vec<Entity<ColorPickerState>>,
+    /// One picker per colour: saved colour by saved colour, four each.
+    pickers: Vec<[Entity<ColorPickerState>; save::COLOURS_PER_SAVED]>,
     _subscriptions: Vec<Subscription>,
 }
 
 impl SavedColours {
     fn new(session: Entity<Session>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let colours = session.read(cx).saved_colours();
-        let slots: Vec<Entity<ColorPickerState>> = colours
+        let pickers: Vec<[Entity<ColorPickerState>; save::COLOURS_PER_SAVED]> = colours
             .iter()
-            .map(|colour| {
-                cx.new(|cx| {
-                    let state = ColorPickerState::new(window, cx);
-                    match colour {
-                        Some(colour) => state.default_value(to_hsla(*colour)),
-                        None => state,
-                    }
+            .map(|saved| {
+                std::array::from_fn(|at| {
+                    let colour = saved[at];
+                    cx.new(|cx| {
+                        let state = ColorPickerState::new(window, cx);
+                        match colour {
+                            Some(colour) => state.default_value(to_hsla(colour)),
+                            None => state,
+                        }
+                    })
                 })
             })
             .collect();
         let mut _subscriptions = vec![cx.observe_in(&session, window, |this, _, window, cx| {
             this.sync(window, cx)
         })];
-        for (slot, state) in slots.iter().enumerate() {
-            _subscriptions.push(cx.subscribe(
-                state,
-                move |this, _, event: &ColorPickerEvent, cx| {
-                    let ColorPickerEvent::Change(colour) = event;
-                    let mut colours = this.session.read(cx).saved_colours();
-                    if let Some(entry) = colours.get_mut(slot) {
-                        *entry = colour.map(to_rgb8);
-                    }
-                    this.session
-                        .update(cx, |session, cx| session.set_saved_colours(colours, cx));
-                },
-            ));
+        for (saved, row) in pickers.iter().enumerate() {
+            for (at, state) in row.iter().enumerate() {
+                _subscriptions.push(cx.subscribe(
+                    state,
+                    move |this, _, event: &ColorPickerEvent, cx| {
+                        let ColorPickerEvent::Change(colour) = event;
+                        let mut colours = this.session.read(cx).saved_colours();
+                        if let Some(set) = colours.get_mut(saved) {
+                            set[at] = colour.map(to_rgb8);
+                        }
+                        this.session
+                            .update(cx, |session, cx| session.set_saved_colours(colours, cx));
+                    },
+                ));
+            }
         }
         Self {
             session,
-            slots,
+            pickers,
             _subscriptions,
         }
     }
@@ -67,15 +75,17 @@ impl SavedColours {
     /// Shows the colours as they'll be after saving (Undo, Paste, Discard change them).
     fn sync(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let colours = self.session.read(cx).saved_colours();
-        for (state, colour) in self.slots.iter().zip(colours) {
-            let shown = state.read(cx).value().map(to_rgb8);
-            if shown == colour {
-                continue;
+        for (row, saved) in self.pickers.iter().zip(colours) {
+            for (state, colour) in row.iter().zip(saved) {
+                let shown = state.read(cx).value().map(to_rgb8);
+                if shown == colour {
+                    continue;
+                }
+                state.update(cx, |state, cx| match colour {
+                    Some(colour) => state.set_value(to_hsla(colour), window, cx),
+                    None => state.clear_value(window, cx),
+                });
             }
-            state.update(cx, |state, cx| match colour {
-                Some(colour) => state.set_value(to_hsla(colour), window, cx),
-                None => state.clear_value(window, cx),
-            });
         }
         cx.notify();
     }
@@ -91,8 +101,8 @@ impl SavedColours {
         );
     }
 
-    /// Takes the colours from text on the clipboard, slot by slot (the slots after them are left
-    /// as they are).
+    /// Takes the colours from text on the clipboard, from the first saved colour on (the ones
+    /// after them are left as they are).
     fn paste(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let pasted = cx
             .read_from_clipboard()
@@ -108,9 +118,9 @@ impl SavedColours {
             return;
         };
         let mut colours = self.session.read(cx).saved_colours();
-        for (slot, colour) in pasted.into_iter().enumerate() {
-            if let Some(entry) = colours.get_mut(slot) {
-                *entry = colour;
+        for (at, saved) in pasted.into_iter().enumerate() {
+            if let Some(entry) = colours.get_mut(at) {
+                *entry = saved;
             }
         }
         self.session
@@ -120,23 +130,33 @@ impl SavedColours {
 
 impl Render for SavedColours {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        // Eight to a row, as the game's paint screen lays them out.
-        let rows: Vec<_> = self
-            .slots
-            .chunks(8)
-            .enumerate()
-            .map(|(row, slots)| {
-                h_flex()
-                    .gap_2()
-                    .children(slots.iter().enumerate().map(|(at, state)| {
-                        ColorPicker::new(state).small().accessibility_label(t!(
-                            cx,
-                            "saved-colours-slot",
-                            slot = row * 8 + at + 1
-                        ))
-                    }))
-            })
-            .collect();
+        let rows: Vec<_> =
+            self.pickers
+                .iter()
+                .enumerate()
+                .map(|(saved, row)| {
+                    h_flex()
+                        .gap_3()
+                        .items_center()
+                        .child(
+                            div()
+                                .w(rems(7.))
+                                .text_sm()
+                                .text_color(cx.theme().muted_foreground)
+                                .child(t!(cx, "saved-colours-slot", slot = saved + 1)),
+                        )
+                        .child(h_flex().gap_2().children(row.iter().enumerate().map(
+                            |(at, state)| {
+                                ColorPicker::new(state).small().accessibility_label(t!(
+                                    cx,
+                                    "saved-colours-colour",
+                                    slot = saved + 1,
+                                    colour = at + 1
+                                ))
+                            },
+                        )))
+                })
+                .collect();
         v_flex()
             .pt_2()
             .gap_4()
