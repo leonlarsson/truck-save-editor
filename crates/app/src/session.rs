@@ -811,7 +811,18 @@ impl Session {
     /// Every city with how often it was visited, as it'll be after saving: the save's, and the
     /// game's towns without a garage.
     pub fn cities(&self) -> Vec<save::City> {
-        save::cities_including(&self.preview(), &self.game_cities)
+        self.known_cities(&self.preview())
+    }
+
+    /// A document's cities as the game counts them: once the game's list is known, only cities in
+    /// it (the save also names places that aren't cities: multiplayer's `truckersmp`, event
+    /// places `x_…`); without the game, the save's own.
+    fn known_cities(&self, document: &sii::Document) -> Vec<save::City> {
+        let mut cities = save::cities_including(document, &self.game_cities);
+        if !self.game_cities.is_empty() {
+            cities.retain(|city| self.game_cities.contains(&city.token));
+        }
+        cities
     }
 
     /// The game's cities the save may have (see `game_cities`): not a change, but Visit every city
@@ -1578,7 +1589,7 @@ impl Session {
             add(
                 &map,
                 t!(cx, "change-cities"),
-                summary(save::cities_including(&self.loaded.game, &self.game_cities)),
+                summary(self.known_cities(&self.loaded.game)),
                 summary(self.cities()),
             );
         }
@@ -2058,7 +2069,12 @@ impl Session {
         let visited: Vec<String> = self.pending.visited_cities.iter().cloned().collect();
         save::visit_cities(&mut slot.game, &visited);
         if self.pending.visit_all_cities {
-            save::visit_all_cities(&mut slot.game, &self.game_cities);
+            // Every city the game counts; without the game's list, every city the save names.
+            if self.game_cities.is_empty() {
+                save::visit_all_cities(&mut slot.game, &[]);
+            } else {
+                save::visit_cities(&mut slot.game, &self.game_cities);
+            }
         }
         let unvisited: Vec<String> = self.pending.unvisited_cities.iter().cloned().collect();
         save::unvisit_cities(&mut slot.game, &unvisited);

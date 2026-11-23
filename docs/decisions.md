@@ -370,3 +370,9 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** small towns have no garage, so a list made from garages missed about 160 of the game's cities: on the map, in the list, the finder and Visit every city. Every map DLC's files ship with the game, owned or not, hence the filter by the save's DLCs; a few definitions are ports and border posts with no area on the map.
 
 **Considered:** the map's city areas alone (they also name places that aren't cities); the save's companies (a town without companies would still be missing).
+
+## 2026-11-23: Cities are counted as the game counts them
+
+**Decided:** of the game's cities (see the entry above), only those with a company or a garage in the save count (`save::cities_with_business`); the save's own city tokens that aren't game cities (multiplayer's `truckersmp`, event places `x_…`) are left out once the game's list is known. Visit every city visits exactly the counted cities. Adds to "The city list is the game's" above.
+
+**Why:** checked against a save's Career Progress: the defined cities of the save's map DLCs, on the map, with a company or a garage, came to exactly the game's count, and its real visited cities to exactly the game's discovered count. The cities left out are ferry ports and a village with no business at all, and the tokens are places the game visited but doesn't count.

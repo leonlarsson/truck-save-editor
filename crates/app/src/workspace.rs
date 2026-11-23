@@ -283,10 +283,12 @@ impl Workspace {
         self.sync_game_cities(cx);
     }
 
-    /// Gives the open save the game's cities it may have: those of the base game and the map DLCs
-    /// it was made with (every DLC's files ship with the game, owned or not), and, once the map is
-    /// read, only those with an area on it (a few definitions are border posts and ports). Towns
-    /// without a garage aren't in the save until visited; this is how the editor knows them.
+    /// Gives the open save the game's cities, as the game counts them: those of the base game and
+    /// the map DLCs it was made with (every DLC's files ship with the game, owned or not), with a
+    /// company or a garage in the save (ferry ports and villages without either aren't counted),
+    /// and, once the map is read, with an area on it (a few definitions are border posts and
+    /// ports). Towns without a garage aren't in the save until visited; this is how the editor
+    /// knows them.
     fn sync_game_cities(&self, cx: &mut Context<Self>) {
         let (Some(opened), Some(all)) = (&self.opened, game_data::cities(cx)) else {
             return;
@@ -300,10 +302,12 @@ impl Workspace {
                     .collect()
             });
         opened.session.update(cx, |session, cx| {
+            let with_business = save::cities_with_business(&session.preview());
             let cities: Vec<String> = all
                 .into_iter()
                 .filter(|(token, dlc)| {
                     session.has_dlc(dlc.as_deref())
+                        && with_business.contains(token)
                         && on_map.as_ref().is_none_or(|on_map| on_map.contains(token))
                 })
                 .map(|(token, _)| token)

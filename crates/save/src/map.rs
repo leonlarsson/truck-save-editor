@@ -67,6 +67,19 @@ pub fn cities_including(document: &Document, more: &[String]) -> Vec<City> {
     cities
 }
 
+/// The cities the save has a company or a garage in: the game counts a city only when it has one
+/// of those (ferry ports and villages without either aren't counted, as its Career Progress shows).
+pub fn cities_with_business(document: &Document) -> std::collections::BTreeSet<String> {
+    let companies = document.units_of_kind("company").filter_map(|unit| {
+        let (_, city) = unit.id.strip_prefix("company.volatile.")?.split_once('.')?;
+        Some(city.to_string())
+    });
+    let garages = document
+        .units_of_kind("garage")
+        .filter_map(|unit| unit.id.strip_prefix("garage.").map(str::to_string));
+    companies.chain(garages).collect()
+}
+
 /// Marks every city as visited (once, for those never visited): the save's, and those in `more`
 /// (the game's whole list). Returns how many were added.
 pub fn visit_all_cities(document: &mut Document, more: &[String]) -> usize {
@@ -262,6 +275,17 @@ mod tests {
             }
         );
         assert_eq!(cities[1].visits, 0);
+    }
+
+    #[test]
+    fn names_the_cities_with_a_company_or_a_garage() {
+        let save = SAVE.replace(
+            "garage : garage.lyon {",
+            "company : company.volatile.acme.harbourtown {\r\n}\r\n\r\ngarage : garage.lyon {",
+        );
+        let document = sii::parse_text(&save).expect("parses");
+        let cities: Vec<String> = cities_with_business(&document).into_iter().collect();
+        assert_eq!(cities, ["berlin", "harbourtown", "lyon"]);
     }
 
     #[test]

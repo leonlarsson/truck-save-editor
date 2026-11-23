@@ -112,7 +112,7 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [ ] In game (owner): one city marked visited, one marked not visited, one dealer unlocked and one locked, saved as a new slot. Do they show as such in game, and does the game count a city again when driven through?
 - [ ] In game (owner): a truck with its engine dragged to about 50 % and its wheels to about 25 % (wear sliders), saved as a new slot. Does the game show that wear, and does its own repair clear it?
 - [x] Every city, not only those with a garage (2026-11-23): small towns have no garage unit, so the city list, the map's names and Visit every city missed them. Now the game's own city list (its map DLCs the save was made with, on the map) joins the save's.
-- [ ] The editor counts about a dozen more cities than the game's Career Progress does: find the ones the game doesn't count (ports and border posts without an area on the map are already left out).
+- [x] The editor counts cities as the game's Career Progress does (2026-11-23): a city counts when it has a company or a garage (ferry ports and villages without either don't), and the save's non-city tokens (`truckersmp`, event places `x_…`) aren't cities.
 - [ ] Map view: roads as lines (needs each road's ends, deeper in its item).
 
 ## More to edit (2026-11-23)

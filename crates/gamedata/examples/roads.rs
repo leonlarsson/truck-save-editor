@@ -39,5 +39,15 @@ fn main() {
             "{} defined cities have no area on the map: {missing:?}",
             missing.len()
         );
+        // `--list`: every defined city, its DLC and whether it has a map area, tab separated.
+        if std::env::args().any(|arg| arg == "--list") {
+            for (token, dlc) in data.cities() {
+                println!(
+                    "city\t{token}\t{}\t{}",
+                    dlc.unwrap_or("base"),
+                    cities.contains(token)
+                );
+            }
+        }
     }
 }
