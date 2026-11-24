@@ -1,12 +1,12 @@
 # Staying compatible with game updates
 
-SCS never published the save format, and it changes with game updates. This page collects what is known to change, why other editors broke, and what this one does about it. Research from November 2026; sources are linked so claims can be rechecked.
+SCS never published the save format, and it changes with game updates. This page collects what is known to change, what can break a save, and what this editor does about it. Research from November 2026; sources are linked so claims can be rechecked.
 
 ## What changes between game versions
 
 - **New value types in binary SII.** Game 1.42 (save version 56) added types that broke SII_Decrypt ("unsupported value type") until it learned `0x2F` and `0x07`; `0x32` came later. SII_Decrypt is now discontinued. ([forum](https://steamcommunity.com/app/270880/discussions/0/3115920924805543459), [commits](https://github.com/TheLazyTomcat/SII_Decrypt/commits/master))
 - **Binary SII versions.** Version 1 stores placements as 7 floats; version 2 and later as 8, with a hidden "bias" for x and z ([type docs](https://raw.githubusercontent.com/TheLazyTomcat/SII_Decrypt/master/Documents/Binary%20SII%20-%20Types.txt)). When version 3 appeared isn't documented; it predates 1.62.
-- **Fields come and go every few versions.** Around save version 97 (2026): `economy.game_time_initial` can be `nil`, `economy_event.param` uses the full u32 range, `player.my_vehicles` was added, `company.state_change_time` was removed, `profile.sii` grew from 17 to 21 `user_data` entries. ([TS SE Tool #148](https://github.com/LIPtoH/TS-SE-Tool/issues/148))
+- **Fields come and go every few versions.** Around save version 97 (2026): `economy.game_time_initial` can be `nil`, `economy_event.param` uses the full u32 range, `player.my_vehicles` was added, `company.state_change_time` was removed, `profile.sii` grew from 17 to 21 `user_data` entries.
 - **New features add units.** Coaches (game 1.62's DLC, November 2026) added owned coaches, passenger jobs and `bus_experience_points`; 1.60 added fatigue, radio and a job widget, which likely added fields. ([SCS blog](https://blog.scssoft.com/2026/08/coaches-vehicle-ownership-job-schedule.html))
 - **`info.sii` gains fields** (1.41 went from save version 53 to 55 with only `info.sii` changes), and should agree with `game.sii`. ([forum](https://steamcommunity.com/app/227300/discussions/0/3046108212586865712))
 - **Profiles upgrade one way.** A newer game upgrades a profile on load; an older game can't read it. The game keeps `profiles(<version>).bak` copies. ([SCS forum](https://forum.scssoft.com/viewtopic.php?t=294989))
@@ -14,13 +14,13 @@ SCS never published the save format, and it changes with game updates. This page
 
 Known save versions (no official table exists): 53→55 at 1.41, 56 at 1.42, 61–74 around 1.43–1.49, 97 in 2026 (ATS), 105 at ETS2 1.62.
 
-## Why other editors broke
+## What can break a save
 
-- **They rebuilt units from a fixed list of fields.** TS SE Tool wrote each unit from its own schema: on newer saves it silently dropped 322 fields the game had added and wrote 454 it no longer used. ([#148](https://github.com/LIPtoH/TS-SE-Tool/issues/148))
-- **A crash mid-write destroyed the save.** An unexpected `nil` threw while writing, and because the file was truncated on open, `game.sii` was left empty.
-- **Hard limits on versions or values**, like only accepting save versions 61–74, or signed integers for values that became unsigned.
-- **Unknown value types stopped decoding** and the tools weren't updated in time; maintainers lost interest. ([#144](https://github.com/LIPtoH/TS-SE-Tool/issues/144), [#140](https://github.com/LIPtoH/TS-SE-Tool/issues/140))
-- **Steam Cloud** profiles weren't found, or broken saves were synced up.
+- **Rebuilding units from a fixed list of fields.** On a newer save, the fields the game has added since are silently dropped, and fields it no longer uses are written back.
+- **A crash mid-write.** If the file is emptied when it's opened and writing then fails (an unexpected `nil`, say), `game.sii` is left empty.
+- **Hard limits on versions or values**, like accepting only a range of save versions, or signed integers for values that became unsigned.
+- **Unknown value types** stop decoding until the code learns them.
+- **Steam Cloud**: profiles not found, or a broken save synced up.
 
 ## What this editor does
 

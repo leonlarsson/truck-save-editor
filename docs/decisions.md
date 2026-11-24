@@ -83,7 +83,7 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 
 **Decided:** recorded in `docs/compatibility.md`: saves are edited in place (unknown units, fields and values pass through untouched); unknown binary types stop reading instead of being guessed at; a fixture corpus per game version and a weekly game-update check keep it honest.
 
-**Why:** research into why other editors broke: rebuilding units from fixed field lists silently dropped data the game had added, and crashes mid-write emptied saves.
+**Why:** the two known ways to damage a save: rebuilding units from fixed field lists silently drops data the game has added, and a crash mid-write can empty the file.
 
 ## 2026-11-21: Read the game's own data from its archives
 
@@ -115,7 +115,7 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 
 **Why:** the city definitions are a stable, documented-by-use format, so reading them keeps dealers right as maps change. Agencies exist only in the binary map sectors, whose format is versioned and was decoded by searching for known tokens: too fragile to run on players' machines. A list that's missing a new city leaves that agency locked, which is harmless; a guess that adds tokens for cities without one might not be.
 
-**Considered:** unlocking every city (other editors do; unknown what the game does with a dealer token for a city without a dealer); scanning the map at startup (slow, and breaks when the map format changes).
+**Considered:** unlocking every city (unknown what the game does with a dealer token for a city without a dealer); scanning the map at startup (slow, and breaks when the map format changes).
 
 ## 2026-11-21: Every page reads one preview of the save
 

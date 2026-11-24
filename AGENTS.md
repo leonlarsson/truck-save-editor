@@ -6,12 +6,12 @@ Guide for AI agents (and humans) working in this repo.
 
 **Truck Save Editor** (a working name) is a save editor for **Euro Truck Simulator 2**: a desktop app written in Rust with [GPUI](https://www.gpui.rs/) (Zed's UI framework) through [GPUI Kit](https://gpui-kit.com) (`gpui-kit`: GPUI plus a styled component library). Windows is the platform that matters, because that's where the game and its saves are. American Truck Simulator runs on the same engine and uses the same file formats, so the code is written for both from the start (a `Game` value carries what differs: folders, Steam app id, currency, units, names), while ETS2 ships first.
 
-The bar: **the best save editor anyone has used.** The ones out there are broken or ugly. Polish, safety and ease of use come before the number of features.
+The bar: **the best save editor anyone has used.** Polish, safety and ease of use come before the number of features.
 
 ## Read first
 
 - `docs/sii-format.md`: the game's file formats (encryption, binary and text SII), which the whole app rests on.
-- `docs/compatibility.md`: what changes between game versions, why other editors broke, and the rules that keep this one working. **Read it before changing how saves are read or written.**
+- `docs/compatibility.md`: what changes between game versions, what can break a save, and the rules that keep this one working. **Read it before changing how saves are read or written.**
 - `docs/decisions.md`: why things are the way they are. **Check it before structural changes.**
 - **Before any UI work**, the two GPUI Kit skills in `.claude/skills/` (copied from the pinned release): `gpui-kit` (API, Coding Guides) and `gpui-kit-design-guides` (Design Guides). They are rules, not inspiration. Never invent an API: check the source of the pinned version in `~/.cargo/registry/src/*/gpui-component-<version>/`.
 - `TODO.md`: agreed, planned work, in order.

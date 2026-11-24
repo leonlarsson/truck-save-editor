@@ -136,9 +136,8 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [ ] Say where things are kept: viewpoints are per save (`game.sii`), photo trophies per profile (its `album` folder). The Gallery says so now (2026-11-23); the rest of the app doesn't yet. Say it where it matters (the Gallery, panels, the save dialog), and look at what else is per profile rather than per save.
 - [ ] Make a job: the trailer list names trailers by the game's codes (`Container, singl 3e 40`); the game's own trailer names would read better, if its data has them.
 
-## Parity and beyond (2026-11-24)
+## Next features (2026-11-24)
 
-Features worth having that the editor doesn't have yet, from a look at what else exists:
 
 - [ ] Cars: the player's car (`player.cars`, ATS's Road Trip car) in Fleet, with fuel, wear, repairs and plate.
 - [ ] Create a new save: a fresh career in a new local profile, from the start screen (see "Starting fresh").
