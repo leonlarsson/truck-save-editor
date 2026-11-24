@@ -91,6 +91,8 @@ impl SlotKind {
 /// A folder looked in for profiles, and what was there.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SearchedFolder {
+    /// The game it was looked in for.
+    pub game: Game,
     pub dir: PathBuf,
     pub location: Location,
     pub source: Source,
@@ -135,6 +137,7 @@ pub fn search(game: Game, added: &[PathBuf]) -> Search {
     for (root, location, source) in profile_roots(game, &steam, added) {
         let found = profiles_in(game, &root, location);
         folders.push(SearchedFolder {
+            game,
             is_there: root.is_dir(),
             profiles: found.len(),
             dir: root,

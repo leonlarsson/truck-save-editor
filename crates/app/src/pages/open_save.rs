@@ -144,14 +144,8 @@ impl OpenSavePage {
                     for game in Game::ALL {
                         let search = save::search(game, &added);
                         has_steam |= !search.steam_dirs.is_empty();
-                        // The other game's usual folders only when it's played here: an ETS2
-                        // player doesn't need to read that ATS isn't installed.
-                        folders.extend(
-                            search
-                                .folders
-                                .into_iter()
-                                .filter(|folder| game == Game::Ets2 || folder.is_there),
-                        );
+                        // Every game's: the folder list shows the picked game's (`render_folders`).
+                        folders.extend(search.folders);
                         profiles.extend(search.profiles.into_iter().map(|profile| {
                             let slots = save::profile_slots(&profile.dir);
                             (profile, slots)
@@ -370,10 +364,7 @@ impl OpenSavePage {
 
         // The chosen game's profiles only (the game picker above chooses the game); each button
         // keeps its place in the whole list, which is what `selected_profile` counts in.
-        let game = profiles
-            .get(self.selected_profile)
-            .map(|(profile, _)| profile.game)
-            .unwrap_or(Game::Ets2);
+        let game = self.picked_game(profiles).unwrap_or(Game::Ets2);
         let shown: Vec<usize> = (0..profiles.len())
             .filter(|&index| profiles[index].0.game == game)
             .collect();
@@ -393,6 +384,13 @@ impl OpenSavePage {
             }))
     }
 
+    /// The game whose profiles are shown: the selected profile's (`None` when nothing was found).
+    fn picked_game(&self, profiles: &[(Profile, Vec<Slot>)]) -> Option<Game> {
+        profiles
+            .get(self.selected_profile)
+            .map(|(profile, _)| profile.game)
+    }
+
     /// The game picker: a card for each game, with how many profiles and saves were found for
     /// it; picking one shows its first profile. A game with nothing found is shown, off, saying so.
     fn render_games(
@@ -400,10 +398,7 @@ impl OpenSavePage {
         profiles: &[(Profile, Vec<Slot>)],
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
-        let chosen = profiles
-            .get(self.selected_profile)
-            .map(|(profile, _)| profile.game)
-            .unwrap_or(Game::Ets2);
+        let chosen = self.picked_game(profiles).unwrap_or(Game::Ets2);
         let cards = Game::ALL.into_iter().map(|game| {
             let of_game: Vec<usize> = (0..profiles.len())
                 .filter(|&index| profiles[index].0.game == game)
@@ -640,8 +635,17 @@ impl OpenSavePage {
         // this PC, say), so they fold into one line; with none found, each one is part of the
         // answer.
         let folds_missing = !found.profiles.is_empty() && !self.shows_missing_folders;
+        // The picked game's folders; with nothing found for either game, both games' (either
+        // could be the answer), each folder once (an added folder is looked in for both).
+        let picked = self.picked_game(&found.profiles);
+        let mut listed: Vec<&std::path::Path> = Vec::new();
         let mut missing = 0;
         for (index, folder) in found.folders.iter().enumerate() {
+            let is_picked_game = picked.is_none_or(|game| folder.game == game);
+            if !is_picked_game || listed.contains(&folder.dir.as_path()) {
+                continue;
+            }
+            listed.push(&folder.dir);
             if folds_missing && !folder.is_there && !added.contains(&folder.dir) {
                 missing += 1;
                 continue;
