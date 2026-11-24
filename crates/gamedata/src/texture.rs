@@ -48,6 +48,8 @@ fn decode_blocks(texture: &Texture, format: TextureFormat, rgba: &mut [u8]) -> O
             let block = texture.data.get(at..at + block_bytes)?;
             match format {
                 TextureFormat::Bc1 => bcdec_rs::bc1(block, &mut block_pixels, 16),
+                TextureFormat::Bc2 => bcdec_rs::bc2(block, &mut block_pixels, 16),
+                TextureFormat::Bc3 => bcdec_rs::bc3(block, &mut block_pixels, 16),
                 TextureFormat::Bc7 => bcdec_rs::bc7(block, &mut block_pixels, 16),
                 TextureFormat::Bc4 => {
                     bcdec_rs::bc4(block, &mut single, 4, false);

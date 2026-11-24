@@ -281,6 +281,8 @@ impl ImageInfo {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TextureFormat {
     Bc1,
+    Bc2,
+    Bc3,
     Bc4,
     Bc5,
     Bc7,
@@ -289,16 +291,21 @@ pub enum TextureFormat {
 }
 
 impl TextureFormat {
-    /// From the image part's code (byte 4's high nibble, byte 5), as `scs_tools` verified it on
-    /// every texture in the game; unknown codes fall back to BC7.
+    /// From the image part's code: a Direct3D format number (`DXGI_FORMAT`), with byte 5 as its
+    /// high bits and byte 4's high nibble as its low four. Unknown numbers fall back to BC7, and
+    /// the data's size settles them (`checked_format`). BC3 was missing at first, so ATS's BC3
+    /// logos were read as BC7 (the same block size) and drew as noise.
     fn from_code(high: u8, low: u8) -> Self {
-        match (high, low) {
-            (0x3, 5) => TextureFormat::Bc5,
-            (0x8 | 0x7, 4) => TextureFormat::Bc1,
-            (0x0, 5) => TextureFormat::Bc4,
-            (0xB | 0xD | 0x8, 5) => TextureFormat::Rgba8,
-            (0xD, 3) => TextureFormat::R8,
-            _ => TextureFormat::Bc7,
+        let dxgi = u16::from(low) << 4 | u16::from(high);
+        match dxgi {
+            71 | 72 => TextureFormat::Bc1,             // BC1, plain and sRGB
+            74 | 75 => TextureFormat::Bc2,             // BC2
+            77 | 78 => TextureFormat::Bc3,             // BC3
+            80 | 81 => TextureFormat::Bc4,             // BC4, unsigned and signed
+            83 | 84 => TextureFormat::Bc5,             // BC5, unsigned and signed
+            87 | 88 | 91 | 93 => TextureFormat::Rgba8, // B8G8R8A8 / B8G8R8X8, plain and sRGB
+            61 => TextureFormat::R8,                   // R8
+            _ => TextureFormat::Bc7,                   // BC7 is 98 and 99
         }
     }
 
@@ -306,7 +313,9 @@ impl TextureFormat {
     pub fn block(self) -> (u32, usize) {
         match self {
             TextureFormat::Bc1 | TextureFormat::Bc4 => (4, 8),
-            TextureFormat::Bc5 | TextureFormat::Bc7 => (4, 16),
+            TextureFormat::Bc2 | TextureFormat::Bc3 | TextureFormat::Bc5 | TextureFormat::Bc7 => {
+                (4, 16)
+            }
             TextureFormat::Rgba8 => (1, 4),
             TextureFormat::R8 => (1, 1),
         }
@@ -498,6 +507,18 @@ fn parse_v1_listing(bytes: &[u8]) -> Listing {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reads_format_codes_as_direct3d_numbers() {
+        // (byte 4's high nibble, byte 5) → format.
+        assert_eq!(TextureFormat::from_code(0x7, 4), TextureFormat::Bc1);
+        assert_eq!(TextureFormat::from_code(0xD, 4), TextureFormat::Bc3);
+        assert_eq!(TextureFormat::from_code(0xE, 4), TextureFormat::Bc3);
+        assert_eq!(TextureFormat::from_code(0x3, 5), TextureFormat::Bc5);
+        assert_eq!(TextureFormat::from_code(0xB, 5), TextureFormat::Rgba8);
+        assert_eq!(TextureFormat::from_code(0xD, 3), TextureFormat::R8);
+        assert_eq!(TextureFormat::from_code(0x3, 6), TextureFormat::Bc7);
+    }
 
     #[test]
     fn parses_listings() {
