@@ -196,7 +196,7 @@ save-profile-failed = Sparfilen skrevs, men inte företagsnamnet: det väntar fo
 ## Warnings
 
 newer-game-warning = Den här sparfilen kommer från en nyare version av spelet än redigeraren har testats med. Allt som redigeraren inte förstår lämnas orört, men kontrollera dina ändringar i spelet och behåll säkerhetskopian.
-ats-warning = Stödet för American Truck Simulator är nytt. Dess sparfiler öppnas och sparas säkert, med en säkerhetskopia, och redigeraren läser spelets egna data, men den vet ännu inte vilka städer som har en rekryteringsbyrå, och mätarställningen redigeras i kilometer. Kontrollera dina ändringar i spelet.
+ats-warning = Stödet för American Truck Simulator är nytt. Dess sparfiler öppnas och sparas säkert, med en säkerhetskopia. Kontrollera dina ändringar i spelet.
 
 ## Undo and redo
 
@@ -685,6 +685,8 @@ fleet-coaches = { $count ->
 fleet-tab-trucks = Lastbilar · { $count }
 fleet-tab-coaches = Bussar · { $count }
 fleet-summary = { $vehicles } · { $worn }
+fleet-none = Inga egna lastbilar än
+fleet-none-body = Köp en lastbil hos en återförsäljare i spelet, så syns den här.
 repair-all = Reparera alla
 repairs = Reparationer
 repairs-before = Slitna

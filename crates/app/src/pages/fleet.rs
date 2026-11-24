@@ -355,7 +355,12 @@ impl Render for FleetPage {
             count = worn_count,
             amount = thousands(worn_count as i64)
         );
-        let summary = t!(cx, "fleet-summary", vehicles = vehicles, worn = worn);
+        // With none, how many need repairs says nothing.
+        let summary = if truck_count == 0 {
+            vehicles
+        } else {
+            t!(cx, "fleet-summary", vehicles = vehicles, worn = worn)
+        };
 
         // Trucks, coaches and trailers each get their own list; the switch shows the kinds the
         // save has (trucks always).
@@ -496,7 +501,10 @@ impl Render for FleetPage {
                                 .accessibility_label(t!(cx, "trucks-table"))
                                 .into_any_element(),
                         ),
-                        None,
+                        Some(
+                            crate::ui::EmptyState::new(t!(cx, "fleet-none"))
+                                .description(t!(cx, "fleet-none-body")),
+                        ),
                         cx,
                     )),
             )

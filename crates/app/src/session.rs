@@ -841,6 +841,12 @@ impl Session {
         cities
     }
 
+    /// Whether the installed game has a city (always, without the game's list): the save also
+    /// lists places from map DLCs that aren't installed, which the game doesn't show.
+    fn is_game_city(&self, token: &str) -> bool {
+        self.game_cities.is_empty() || self.game_cities.iter().any(|city| city == token)
+    }
+
     /// The game's cities the save may have (see `game_cities`): not a change, but Visit every city
     /// covers them, so the preview is made again.
     pub fn set_game_cities(&mut self, cities: Vec<String>, cx: &mut Context<Self>) {
@@ -1208,8 +1214,13 @@ impl Session {
     }
 
     /// The garages as they'll be after saving.
+    /// The company's garages as the save will be after the changes so far: owned ones, and the
+    /// ones for sale in the installed game's cities (the save has a garage for every city of
+    /// every map DLC, installed or not).
     pub fn garages(&self) -> Vec<Garage> {
-        save::garages(&self.preview())
+        let mut garages = save::garages(&self.preview());
+        garages.retain(|garage| garage.is_owned || self.is_game_city(&garage.city));
+        garages
     }
 
     /// Where a truck or driver could move, as the save will be after the changes so far.
@@ -1455,7 +1466,8 @@ impl Session {
     pub fn upgrade_garages(&mut self, buy_all: bool, cx: &mut Context<Self>) {
         self.change(cx, |pending, this| {
             for garage in &this.saved_garages {
-                if !garage.is_large() && (garage.is_owned || buy_all) {
+                let can_buy = buy_all && this.is_game_city(&garage.city);
+                if !garage.is_large() && (garage.is_owned || can_buy) {
                     pending.upgraded_garages.insert(garage.id.clone());
                 }
             }

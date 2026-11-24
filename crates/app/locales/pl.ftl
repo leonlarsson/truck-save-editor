@@ -208,7 +208,7 @@ save-profile-failed = Zapis gry został zapisany, ale nazwa firmy nie: wciąż c
 ## Warnings
 
 newer-game-warning = Ten zapis pochodzi z nowszej wersji gry niż ta, z którą edytor był testowany. Wszystko, czego edytor nie rozumie, zostaje bez zmian, ale sprawdź swoje zmiany w grze i zachowaj kopię zapasową.
-ats-warning = Obsługa American Truck Simulator jest nowa. Zapisy otwierają się i zapisują bezpiecznie, z kopią zapasową, a edytor czyta dane samej gry, ale nie wie jeszcze, które miasta mają agencję pracy, a przebieg edytuje się w kilometrach. Sprawdź zmiany w grze.
+ats-warning = Obsługa American Truck Simulator jest nowa. Zapisy otwierają się i zapisują bezpiecznie, z kopią zapasową. Sprawdź swoje zmiany w grze.
 
 ## Undo and redo
 
@@ -718,6 +718,8 @@ fleet-coaches = { $count ->
 fleet-tab-trucks = Ciężarówki · { $count }
 fleet-tab-coaches = Autokary · { $count }
 fleet-summary = { $vehicles } · { $worn }
+fleet-none = Nie masz jeszcze własnych ciężarówek
+fleet-none-body = Kup ciężarówkę u dealera w grze, a pojawi się tutaj.
 repair-all = Napraw wszystkie
 repairs = Naprawy
 repairs-before = Zużyte

@@ -196,7 +196,7 @@ save-profile-failed = The save was written, but the company name couldn't be: it
 ## Warnings
 
 newer-game-warning = This save is from a newer version of the game than this editor has been tested with. Everything the editor doesn't understand is kept as it is, but check your changes in the game, and keep the backup.
-ats-warning = American Truck Simulator support is new. Its saves open and save safely, with a backup, and the editor reads the game's own data, but it doesn't know yet which cities have a recruitment agency, and the odometer is edited in kilometres. Check your changes in the game.
+ats-warning = American Truck Simulator support is new. Its saves open and save safely, with a backup. Check your changes in the game.
 
 ## Undo and redo
 
@@ -685,6 +685,8 @@ fleet-coaches = { $count ->
 fleet-tab-trucks = Trucks · { $count }
 fleet-tab-coaches = Coaches · { $count }
 fleet-summary = { $vehicles } · { $worn }
+fleet-none = No trucks of your own yet
+fleet-none-body = Buy a truck at a dealer in the game, and it shows up here.
 repair-all = Repair all
 repairs = Repairs
 repairs-before = Worn

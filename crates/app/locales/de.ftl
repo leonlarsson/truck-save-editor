@@ -200,7 +200,7 @@ save-profile-failed = Der Spielstand wurde geschrieben, der Unternehmensname abe
 ## Warnings
 
 newer-game-warning = Dieser Spielstand stammt aus einer neueren Spielversion, als mit diesem Editor getestet wurde. Alles, was der Editor nicht versteht, bleibt unverändert, aber prüfe deine Änderungen im Spiel und behalte die Sicherung.
-ats-warning = Die Unterstützung für American Truck Simulator ist neu. Seine Spielstände werden sicher geöffnet und gespeichert, mit einer Sicherung, und der Editor liest die eigenen Daten des Spiels, weiß aber noch nicht, welche Städte eine Arbeitsagentur haben, und der Kilometerstand wird in Kilometern bearbeitet. Prüfe deine Änderungen im Spiel.
+ats-warning = Die Unterstützung für American Truck Simulator ist neu. Seine Spielstände werden sicher geöffnet und gespeichert, mit einer Sicherung. Prüfe deine Änderungen im Spiel.
 
 ## Undo and redo
 
@@ -689,6 +689,8 @@ fleet-coaches = { $count ->
 fleet-tab-trucks = Lkw · { $count }
 fleet-tab-coaches = Reisebusse · { $count }
 fleet-summary = { $vehicles } · { $worn }
+fleet-none = Noch keine eigenen Lkw
+fleet-none-body = Kaufe im Spiel einen Lkw bei einem Händler, dann erscheint er hier.
 repair-all = Alle reparieren
 repairs = Reparaturen
 repairs-before = Verschlissen
