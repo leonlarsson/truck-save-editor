@@ -138,6 +138,7 @@ Agreed work, in order. Each step should end with something the owner can see or 
 
 ## Next features (2026-11-24)
 
+- [ ] Add trucks and trailers from the app, in both games: buy any model the installed game has (as its dealer configures it) into a garage slot, and copy one you already own.
 
 - [ ] Cars: the player's car (`player.cars`, ATS's Road Trip car) in Fleet, with fuel, wear, repairs and plate.
 - [ ] Create a new save: a fresh career in a new local profile, from the start screen (see "Starting fresh").
