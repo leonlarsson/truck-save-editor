@@ -1512,139 +1512,20 @@ fn start_save_as_new_slot(session: Entity<Session>, window: &mut Window, cx: &mu
 /// The open profile's other slots, newest first: the ones the changes can be saved over.
 fn other_slots(session: &Entity<Session>, cx: &App) -> Vec<save::Slot> {
     let session = session.read(cx);
-    let open = session.slot().dir.clone();
-    let mut slots: Vec<save::Slot> = save::profile_slots(&session.profile().dir)
-        .into_iter()
-        .filter(|slot| slot.dir != open)
-        .collect();
-    slots.sort_by_key(|slot| std::cmp::Reverse(slot.modified));
-    slots
+    crate::slot_picker::other_slots(&session.profile().dir, &session.slot().dir)
 }
 
 /// Asks which of the profile's other slots to save over, then to confirm it.
-/// A slot with its place in the list it came from (for its button's id).
-type NumberedSlot<'a> = (usize, &'a save::Slot);
-
 fn choose_slot_to_save_over(session: Entity<Session>, window: &mut Window, cx: &mut App) {
     let slots = other_slots(&session, cx);
     let original = labels::slot_name(cx, session.read(cx).slot());
     let currency = session.read(cx).game().currency_symbol();
-    window.open_alert_dialog(cx, move |alert, _, cx| {
-        // The player's own saves first, then the game's (which it overwrites as it goes), each
-        // with what tells them apart: the slot, the money, when.
-        let (own, game_made): (Vec<NumberedSlot>, Vec<NumberedSlot>) = slots
-            .iter()
-            .enumerate()
-            .partition(|(_, slot)| slot.kind.is_manual());
-        let muted = cx.theme().muted_foreground;
-        let row = |index: usize, slot: &save::Slot, cx: &mut App| {
-            let name = labels::slot_name(cx, slot);
-            let mut detail: Vec<String> = Vec::new();
-            if let Some(money) = slot.info.money {
-                detail.push(format!("{currency} {}", crate::format::thousands(money)));
-            }
-            if let Some(modified) = slot.modified {
-                detail.push(labels::ago(cx, modified).to_string());
-            }
-            let number = match slot.kind {
-                save::SlotKind::Manual(number) => {
-                    Some(t!(cx, "start-slot-number", number = number))
-                }
-                _ => None,
-            };
-            let session = session.clone();
-            let slot = slot.clone();
-            let original = original.clone();
-            Button::new(("save-over-slot", index))
-                .ghost()
-                .w_full()
-                .child(
-                    h_flex()
-                        .w_full()
-                        .justify_between()
-                        .gap_4()
-                        .child(
-                            h_flex()
-                                .min_w_0()
-                                .gap_2()
-                                .child(div().truncate().child(name.clone()))
-                                .children(number.map(|number| {
-                                    div().flex_shrink_0().text_color(muted).child(number)
-                                })),
-                        )
-                        .child(
-                            div()
-                                .flex_shrink_0()
-                                .text_color(muted)
-                                .child(detail.join(" · ")),
-                        ),
-                )
-                .on_click(move |_, window, cx| {
-                    window.close_dialog(cx);
-                    confirm_save_over(
-                        session.clone(),
-                        slot.clone(),
-                        name.clone(),
-                        original.clone(),
-                        window,
-                        cx,
-                    );
-                })
-                .into_any_element()
-        };
-        let heading = |title: SharedString| {
-            div()
-                .px_3()
-                .pt_2()
-                .text_xs()
-                .font_weight(gpui_kit::FontWeight::MEDIUM)
-                .text_color(muted)
-                .child(title)
-                .into_any_element()
-        };
-        let mut rows: Vec<gpui_kit::AnyElement> = Vec::new();
-        if !own.is_empty() {
-            rows.push(heading(t!(cx, "start-your-saves")));
-            for (index, slot) in own {
-                rows.push(row(index, slot, cx));
-            }
-        }
-        if !game_made.is_empty() {
-            rows.push(heading(t!(cx, "start-game-saves")));
-            for (index, slot) in game_made {
-                rows.push(row(index, slot, cx));
-            }
-        }
-        alert
-            .title(t!(cx, "save-over-pick-title"))
-            .description(
-                v_flex()
-                    .gap_3()
-                    .child(
-                        div()
-                            .text_sm()
-                            .text_color(cx.theme().muted_foreground)
-                            .child(t!(cx, "save-over-pick-body", original = &original)),
-                    )
-                    .child(
-                        v_flex()
-                            .id("save-over-slots")
-                            .max_h(rems(18.))
-                            .overflow_y_scroll()
-                            .gap_1()
-                            .children(rows),
-                    ),
-            )
-            .width(px(560.))
-            .footer(
-                h_flex().w_full().justify_end().child(
-                    Button::new("cancel-save-over")
-                        .outline()
-                        .label(t!(cx, "cancel"))
-                        .on_click(|_, window, cx| window.close_dialog(cx)),
-                ),
-            )
+    let title = t!(cx, "save-over-pick-title");
+    let body = t!(cx, "save-over-pick-body", original = &original);
+    let on_pick: crate::slot_picker::OnPick = std::rc::Rc::new(move |slot, name, window, cx| {
+        confirm_save_over(session.clone(), slot, name, original.clone(), window, cx);
     });
+    crate::slot_picker::pick(slots, currency, title, body, on_pick, window, cx);
 }
 
 fn confirm_save_over(

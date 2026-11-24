@@ -23,6 +23,7 @@ The editor tells you when a newer version is out: when it starts, it asks GitHub
 - Says which profile's saves it shows and where they're kept, with a button to open the folder, and lists every place it looked and what each held.
 - Saves somewhere else (a backup, another drive) can be added: choose the folder or drop it on the window. A single save on its own opens where it is.
 - Warns about a save that needs DLCs or mods you don't have installed.
+- **Duplicate** a save, unchanged, into a new slot (local profiles: on Steam Cloud the game only lists saves it wrote itself).
 - **Profile tools**: back up a whole profile, make a copy of it under a new name (without its World of Trucks login), or copy its game settings (controls, gameplay options) over another profile's.
 
 <picture>

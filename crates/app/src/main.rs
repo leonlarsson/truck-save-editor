@@ -8,6 +8,7 @@
 mod assets;
 mod crash;
 mod dev_script;
+mod duplicate;
 mod format;
 mod game_data;
 mod i18n;
@@ -18,6 +19,7 @@ mod quick_start;
 mod report;
 mod session;
 mod settings;
+mod slot_picker;
 #[cfg(test)]
 mod tests;
 mod theme;

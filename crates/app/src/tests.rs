@@ -640,3 +640,63 @@ fn a_save_without_coaches_has_no_coach_career_page(cx: &mut TestAppContext) {
         assert!(window.try_find("coach-level-progress").is_none());
     });
 }
+
+#[gpui_kit::test]
+fn a_save_is_duplicated_from_the_start_screen(cx: &mut TestAppContext) {
+    // A made-up local profile, "Anna" (her folder is her name in hex), with one save.
+    let root = std::env::temp_dir().join(format!("tse-test-duplicate-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    let slots = root.join("profiles").join("416E6E61").join("save");
+    std::fs::create_dir_all(slots.join("1")).expect("makes the slot");
+    std::fs::write(slots.join("1").join("game.sii"), SAVE).expect("writes the save");
+    let info = "SiiNunit\r\n{\r\nsave_container : _nameless.1 {\r\n name: \"Spring run\"\r\n}\r\n\r\n}\r\n";
+    std::fs::write(slots.join("1").join("info.sii"), info).expect("writes its summary");
+
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::i18n::init(cx);
+        crate::theme::init(cx);
+        crate::bind_keys(cx);
+        crate::settings::update(cx, |settings| {
+            settings.profile_dirs = vec![root.join("profiles")]
+        });
+    });
+    let (handle, _) = cx.update(|cx| {
+        gpui_kit::open_window(
+            WindowOptions {
+                window_bounds: Some(WindowBounds::Windowed(Bounds::new(
+                    Default::default(),
+                    size(px(1200.), px(800.)),
+                ))),
+                ..Default::default()
+            },
+            cx,
+            |window, cx| cx.new(|cx| Workspace::new(window, cx)),
+        )
+        .expect("opens the window")
+    });
+    cx.run_until_parked();
+
+    // Duplicate on the save's row, then Duplicate in the dialog.
+    act(cx, handle, |window, cx| window.click("duplicate-1", cx));
+    act(cx, handle, |window, cx| window.click("ok", cx));
+    cx.run_until_parked();
+
+    // A new slot, named as a copy, holding the same save; the original as it was.
+    let copy = save::load(&slots.join("2")).expect("the copy is there");
+    let original = save::load(&slots.join("1")).expect("the original is there");
+    assert_eq!(
+        save::SlotInfo::read(copy.info.as_ref().expect("a summary"))
+            .name
+            .as_deref(),
+        Some("Spring run (copy)")
+    );
+    assert_eq!(copy.game, original.game);
+    assert_eq!(
+        save::SlotInfo::read(original.info.as_ref().expect("a summary"))
+            .name
+            .as_deref(),
+        Some("Spring run")
+    );
+    let _ = std::fs::remove_dir_all(&root);
+}

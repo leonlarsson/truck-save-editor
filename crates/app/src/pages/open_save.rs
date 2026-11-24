@@ -8,7 +8,7 @@
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::{
-    ActiveTheme as _, Icon, Selectable as _, Sizable as _, StyledExt as _,
+    ActiveTheme as _, Disableable as _, Icon, Selectable as _, Sizable as _, StyledExt as _,
     alert::Alert,
     button::{Button, ButtonGroup, ButtonVariants as _},
     h_flex,
@@ -775,10 +775,16 @@ impl OpenSavePage {
                                         ),
                                 )
                                 .child(
-                                    div()
-                                        .text_sm()
-                                        .text_color(cx.theme().muted_foreground)
-                                        .child(money),
+                                    h_flex()
+                                        .flex_shrink_0()
+                                        .gap_2()
+                                        .child(
+                                            div()
+                                                .text_sm()
+                                                .text_color(cx.theme().muted_foreground)
+                                                .child(money),
+                                        )
+                                        .child(duplicate_button(profile, slot, cx)),
                                 ),
                         )
                 }))
@@ -1017,6 +1023,34 @@ impl Render for OpenSavePage {
 }
 
 /// A preview picture as GPUI draws it (the decoder already gives blue-green-red-alpha order).
+/// A save row's Duplicate button: off, with the reason, where a copy can't be made.
+fn duplicate_button(
+    profile: &Profile,
+    slot: &Slot,
+    cx: &mut Context<OpenSavePage>,
+) -> impl IntoElement {
+    let why_not = crate::duplicate::why_not(profile, cx);
+    let label = t!(cx, "duplicate-tooltip");
+    let (profile, slot) = (profile.clone(), slot.clone());
+    // When a copy is written, the list shows it.
+    let page = cx.entity().downgrade();
+    let on_done: crate::duplicate::OnDone = std::rc::Rc::new(move |_, cx| {
+        let _ = page.update(cx, |page, cx| page.refresh(cx));
+    });
+    Button::new(SharedString::from(format!("duplicate-{}", slot.folder)))
+        .ghost()
+        .xsmall()
+        .icon(Icon::new(IconName::Copy))
+        .accessibility_label(label.clone())
+        .tip(why_not.clone().unwrap_or(label))
+        .disabled(why_not.is_some())
+        .on_click(move |_, window, cx| {
+            // The row opens the save when clicked; this button doesn't.
+            cx.stop_propagation();
+            crate::duplicate::open(profile.clone(), slot.clone(), on_done.clone(), window, cx);
+        })
+}
+
 fn render_image(picture: save::Picture) -> Option<RenderImage> {
     let buffer = image::RgbaImage::from_raw(picture.width, picture.height, picture.bgra)?;
     Some(RenderImage::new(vec![image::Frame::new(buffer)]))
