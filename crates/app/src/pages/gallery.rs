@@ -24,6 +24,7 @@ use gpui_kit::{
 use crate::game_data;
 use crate::i18n::t;
 use crate::session::Session;
+use crate::ui::Tip as _;
 use crate::ui::{FilterBar, FilterChanged, RowLook, TextColumn, TextRow, TextTable};
 use crate::workspace::OpenDetails;
 
@@ -343,7 +344,7 @@ impl Render for GalleryView {
                             .small()
                             .outline()
                             .label(t!(cx, "gallery-visit-all"))
-                            .tooltip(t!(cx, "gallery-visit-all-tooltip"))
+                            .tip(t!(cx, "gallery-visit-all-tooltip"))
                             .disabled(visited >= viewpoints)
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.session
@@ -434,7 +435,7 @@ impl Render for GalleryItemPanel {
                     .small()
                     .outline()
                     .label(t!(cx, "gallery-forget"))
-                    .tooltip(t!(cx, "gallery-forget-tooltip"))
+                    .tip(t!(cx, "gallery-forget-tooltip"))
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.session
                             .update(cx, |session, cx| session.forget_viewpoint(id, cx));
@@ -444,7 +445,7 @@ impl Render for GalleryItemPanel {
                     .small()
                     .outline()
                     .label(t!(cx, "gallery-visit"))
-                    .tooltip(t!(cx, "gallery-visit-tooltip"))
+                    .tip(t!(cx, "gallery-visit-tooltip"))
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.session
                             .update(cx, |session, cx| session.visit_viewpoints(&[id], cx));
@@ -458,7 +459,7 @@ impl Render for GalleryItemPanel {
                 .small()
                 .outline()
                 .label(t!(cx, "gallery-visit"))
-                .tooltip(t!(cx, "gallery-visit-tooltip"))
+                .tip(t!(cx, "gallery-visit-tooltip"))
                 .on_click(cx.listener(move |this, _, _, cx| {
                     this.session
                         .update(cx, |session, cx| session.visit_viewpoints(&[id], cx));
@@ -481,7 +482,7 @@ impl Render for GalleryItemPanel {
                 .small()
                 .outline()
                 .label(t!(cx, "city-show-on-map"))
-                .tooltip(t!(cx, "gallery-map-not-read"))
+                .tip(t!(cx, "gallery-map-not-read"))
                 .disabled(true),
         };
         v_flex()

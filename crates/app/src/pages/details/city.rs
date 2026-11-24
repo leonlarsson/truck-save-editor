@@ -17,6 +17,7 @@ use super::{SHEET_WIDTH, fact, group};
 use crate::game_data;
 use crate::i18n::t;
 use crate::session::Session;
+use crate::ui::Tip as _;
 
 /// Shows a city on the Map page's map (by token): given by whoever opens the panel there.
 pub type ShowOnMap = std::rc::Rc<dyn Fn(&str, &mut Window, &mut App)>;
@@ -113,7 +114,7 @@ impl Render for CityDetail {
             } else {
                 t!(cx, "city-visit")
             })
-            .tooltip(if is_visited {
+            .tip(if is_visited {
                 t!(cx, "city-unvisit-tooltip")
             } else {
                 t!(cx, "city-visit-tooltip")
@@ -155,7 +156,7 @@ impl Render for CityDetail {
                 } else {
                     t!(cx, "city-unlock")
                 })
-                .tooltip(if is_unlocked {
+                .tip(if is_unlocked {
                     t!(cx, "city-lock-tooltip")
                 } else {
                     t!(cx, "city-unlock-tooltip")

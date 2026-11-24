@@ -16,6 +16,7 @@ mod section;
 mod stat;
 mod step_buttons;
 mod text_table;
+mod tooltip;
 
 pub use amount_field::{AmountChanged, AmountField};
 pub use change_list::ChangeList;
@@ -32,6 +33,7 @@ pub use section::Section;
 pub use stat::Stat;
 pub use step_buttons::StepButtons;
 pub use text_table::{RowLook, TextColumn, TextRow, TextTable};
+pub use tooltip::Tip;
 
 /// The order a click on a column heading sorts by: ascending first, then the other way.
 pub fn next_sort(

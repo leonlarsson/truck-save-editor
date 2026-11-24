@@ -19,6 +19,7 @@ use gpui_kit::{
 
 use crate::i18n::t;
 use crate::session::Session;
+use crate::ui::Tip as _;
 use crate::ui::{to_hsla, to_rgb8};
 
 pub struct SavedColours {
@@ -175,7 +176,7 @@ impl Render for SavedColours {
                             .small()
                             .outline()
                             .label(t!(cx, "saved-colours-copy"))
-                            .tooltip(t!(cx, "saved-colours-copy-tooltip"))
+                            .tip(t!(cx, "saved-colours-copy-tooltip"))
                             .on_click(cx.listener(|this, _, window, cx| this.copy(window, cx))),
                     )
                     .child(
@@ -183,7 +184,7 @@ impl Render for SavedColours {
                             .small()
                             .ghost()
                             .label(t!(cx, "saved-colours-paste"))
-                            .tooltip(t!(cx, "saved-colours-paste-tooltip"))
+                            .tip(t!(cx, "saved-colours-paste-tooltip"))
                             .on_click(cx.listener(|this, _, window, cx| this.paste(window, cx))),
                     ),
             )

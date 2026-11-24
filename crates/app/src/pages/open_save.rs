@@ -32,6 +32,7 @@ use crate::APP_NAME;
 use crate::format::thousands;
 use crate::i18n::t;
 use crate::labels;
+use crate::ui::Tip as _;
 
 /// How many of the game's own saves show before "Show more".
 const GAME_SAVES_SHOWN: usize = 3;
@@ -452,7 +453,7 @@ impl OpenSavePage {
                     .xsmall()
                     .icon(Icon::new(IconName::FolderOpen))
                     .label(t!(cx, "start-folder-show"))
-                    .tooltip(SharedString::from(folder.to_string_lossy().into_owned()))
+                    .tip(SharedString::from(folder.to_string_lossy().into_owned()))
                     .on_click(move |_, _, cx| cx.open_with_system(&folder)),
             )
     }
@@ -512,7 +513,7 @@ impl OpenSavePage {
                         .ghost()
                         .xsmall()
                         .icon(Icon::new(IconName::Close))
-                        .tooltip(t!(cx, "start-folder-remove"))
+                        .tip(t!(cx, "start-folder-remove"))
                         .accessibility_label(t!(cx, "start-folder-remove"))
                         .on_click(
                             cx.listener(move |this, _, _, cx| this.remove_folder(dir.clone(), cx)),
@@ -1083,7 +1084,7 @@ fn show_folder_button(
         .ghost()
         .xsmall()
         .icon(Icon::new(IconName::FolderOpen))
-        .tooltip(t!(cx, "start-folder-show"))
+        .tip(t!(cx, "start-folder-show"))
         .accessibility_label(t!(cx, "start-folder-show"))
         .on_click(move |_, _, cx| cx.open_with_system(&dir))
 }

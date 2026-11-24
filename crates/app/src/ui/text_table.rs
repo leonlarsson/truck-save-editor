@@ -5,6 +5,7 @@
 
 use std::rc::Rc;
 
+use crate::ui::Tip as _;
 use gpui_kit::assets::IconName;
 use gpui_kit::component::{
     ActiveTheme as _, Icon, Sizable as _, StyledExt as _,
@@ -106,7 +107,7 @@ impl TextTable {
                     // Quiet: every row has one, and rows also open by double-click and Enter.
                     .icon(Icon::new(IconName::ChevronRight))
                     .accessibility_label(label.clone())
-                    .tooltip(label)
+                    .tip(label)
                     .on_click(move |_, window, cx| open(row_ix, window, cx)),
             )
             .into_any_element()

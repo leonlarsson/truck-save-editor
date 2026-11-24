@@ -33,6 +33,7 @@ use crate::i18n::t;
 use crate::pages::details;
 use crate::pages::gallery::{self, GalleryKind};
 use crate::session::Session;
+use crate::ui::Tip as _;
 
 /// A tile's side, in screen pixels.
 const TILE: f32 = 256.0;
@@ -1107,7 +1108,7 @@ impl Render for MapView {
             Button::new(id)
                 .ghost()
                 .xsmall()
-                .tooltip(if shown {
+                .tip(if shown {
                     t!(cx, "map-view-hide")
                 } else {
                     t!(cx, "map-view-show")
@@ -1232,13 +1233,13 @@ impl Render for MapView {
                     .child(
                         Button::new("zoom-in")
                             .label("+")
-                            .tooltip(t!(cx, "map-view-zoom-in"))
+                            .tip(t!(cx, "map-view-zoom-in"))
                             .accessibility_label(t!(cx, "map-view-zoom-in")),
                     )
                     .child(
                         Button::new("zoom-out")
                             .label("−")
-                            .tooltip(t!(cx, "map-view-zoom-out"))
+                            .tip(t!(cx, "map-view-zoom-out"))
                             .accessibility_label(t!(cx, "map-view-zoom-out")),
                     )
                     .child(Button::new("zoom-fit").label(t!(cx, "map-view-fit")))

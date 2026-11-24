@@ -23,6 +23,7 @@ use crate::game_data;
 use crate::i18n::t;
 use crate::labels::{ADR_CLASS_COUNT, adr_class, skill_description, skill_name};
 use crate::session::Session;
+use crate::ui::Tip as _;
 use crate::ui::{
     AmountChanged, AmountField, GameIconView, LevelPicker, Section, StepButtons, page_body,
 };
@@ -399,7 +400,7 @@ impl OverviewPage {
                         .small()
                         .outline()
                         .label(t!(cx, "day-rest"))
-                        .tooltip(t!(cx, "day-rest-tooltip"))
+                        .tip(t!(cx, "day-rest-tooltip"))
                         .disabled(minutes == 0)
                         .on_click(cx.listener(|this, _, _, cx| {
                             this.session.update(cx, |session, cx| {
@@ -430,7 +431,7 @@ impl OverviewPage {
                     .small()
                     .outline()
                     .label(t!(cx, "day-record-clear-button"))
-                    .tooltip(t!(cx, "day-record-tooltip"))
+                    .tip(t!(cx, "day-record-tooltip"))
                     .disabled(offences == 0)
                     .on_click(cx.listener(|this, _, _, cx| {
                         this.session.update(cx, |session, cx| {

@@ -416,3 +416,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** publishing 0.3.0, the notes had to be pasted over the drafted ones by hand, and the release came out titled "v0.3.0" where the earlier ones read "Truck Save Editor 0.2.0", fixed only after publishing. Steps that have to be remembered get forgotten.
 
 **Considered:** a checklist alone (it was there, and the title still slipped); writing the product name into the workflow (the name is written in one place only).
+
+## 2026-11-24: Tooltips wrap: `.tip(text)` instead of `.tooltip(text)`
+
+**Decided:** every tooltip is set with `.tip(text)` (`crates/app/src/ui/tooltip.rs`), which breaks the text into lines of about 60 characters at spaces and then sets the component's own tooltip. Implemented for Button and Checkbox, the components the app gives tooltips to.
+
+**Why:** the kit draws a tooltip as wide as its text, so a long explanation (why a button is off, what an action does) ran off the screen as one line. The kit's Tooltip can take a maximum width, but its components build their tooltip themselves and, in the pinned version, offer no way to pass a styled one.
+
+**Considered:** setting a width per tooltip (not possible through the components); shortening every tooltip (the explanations are the point); patching the kit (it's pinned and upgraded as a change of its own).

@@ -20,6 +20,7 @@ use crate::game_data;
 use crate::i18n::t;
 use crate::pages::details;
 use crate::session::Session;
+use crate::ui::Tip as _;
 use crate::ui::{FillsWidth, fill_widths};
 use crate::ui::{FilterBar, FilterChanged};
 use crate::workspace::OpenDetails;
@@ -204,7 +205,7 @@ impl GaragesPage {
                 .outline()
                 .danger()
                 .label(t!(cx, "picks-remove"))
-                .tooltip(t!(cx, "remove-tooltip"))
+                .tip(t!(cx, "remove-tooltip"))
                 .on_click(cx.listener(move |this, _, window, cx| {
                     let removals: Vec<save::Removal> = remove_ids
                         .iter()
@@ -291,7 +292,7 @@ impl Render for GaragesPage {
                                 .small()
                                 .outline()
                                 .label(t!(cx, "garages-upgrade-owned"))
-                                .tooltip(t!(cx, "garages-upgrade-owned-tooltip"))
+                                .tip(t!(cx, "garages-upgrade-owned-tooltip"))
                                 .disabled(owned == large)
                                 .on_click(cx.listener(|this, _, _, cx| this.upgrade(false, cx))),
                         )
@@ -300,7 +301,7 @@ impl Render for GaragesPage {
                                 .small()
                                 .outline()
                                 .label(t!(cx, "garages-buy-all"))
-                                .tooltip(t!(cx, "garages-buy-all-tooltip"))
+                                .tip(t!(cx, "garages-buy-all-tooltip"))
                                 .disabled(large == count)
                                 .on_click(cx.listener(|this, _, _, cx| this.upgrade(true, cx))),
                         ),
@@ -639,7 +640,7 @@ impl TableDelegate for GarageTable {
                         // Enter. Named for screen readers, explained by its tooltip.
                         .icon(Icon::new(IconName::ChevronRight))
                         .accessibility_label(t!(cx, "details-open"))
-                        .tooltip(t!(cx, "details-open"))
+                        .tip(t!(cx, "details-open"))
                         .on_click(move |_, window, cx| {
                             details::open_garage(session.clone(), &garage, window, cx)
                         }),

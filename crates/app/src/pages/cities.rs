@@ -20,6 +20,7 @@ use save::Place;
 use crate::game_data;
 use crate::i18n::t;
 use crate::session::Session;
+use crate::ui::Tip as _;
 use crate::ui::{FilterBar, FilterChanged};
 use crate::ui::{RowLook, TextColumn, TextRow, TextTable};
 use crate::workspace::OpenDetails;
@@ -319,7 +320,7 @@ impl Render for CitiesPage {
                                     .small()
                                     .outline()
                                     .label(t!(cx, "map-visit-all"))
-                                    .tooltip(t!(cx, "map-visit-all-tooltip"))
+                                    .tip(t!(cx, "map-visit-all-tooltip"))
                                     .disabled(self.visited == self.count)
                                     .on_click(cx.listener(|this, _, _, cx| {
                                         this.session
@@ -331,7 +332,7 @@ impl Render for CitiesPage {
                                     .small()
                                     .outline()
                                     .label(t!(cx, "map-unlock-dealers"))
-                                    .tooltip(t!(cx, "map-unlock-dealers-tooltip"))
+                                    .tip(t!(cx, "map-unlock-dealers-tooltip"))
                                     .disabled(!has_game_data || self.dealers.is_complete())
                                     .on_click(
                                         cx.listener(|this, _, _, cx| {
@@ -344,7 +345,7 @@ impl Render for CitiesPage {
                                     .small()
                                     .outline()
                                     .label(t!(cx, "map-unlock-recruitments"))
-                                    .tooltip(t!(cx, "map-unlock-recruitments-tooltip"))
+                                    .tip(t!(cx, "map-unlock-recruitments-tooltip"))
                                     .disabled(!has_game_data || self.recruitments.is_complete())
                                     .on_click(cx.listener(|this, _, _, cx| {
                                         this.unlock(Place::Recruitment, cx)

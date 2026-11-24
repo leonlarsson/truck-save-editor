@@ -21,6 +21,7 @@ use super::{SHEET_WIDTH, fact, group};
 use crate::game_data;
 use crate::i18n::t;
 use crate::session::Session;
+use crate::ui::Tip as _;
 use crate::ui::{AmountChanged, AmountField, GameIconView};
 
 /// The wear fields a vehicle keeps on itself (the current format), with their labels' keys.
@@ -708,7 +709,7 @@ impl Render for VehicleDetail {
                                         .xsmall()
                                         .outline()
                                         .label(t!(cx, "player-drive"))
-                                        .tooltip(t!(cx, "player-drive-tooltip"))
+                                        .tip(t!(cx, "player-drive-tooltip"))
                                         .disabled(problem.is_some())
                                         .on_click(cx.listener(move |this, _, _, cx| {
                                             let id = id.clone();
@@ -751,7 +752,7 @@ impl Render for VehicleDetail {
                                         .xsmall()
                                         .outline()
                                         .label(t!(cx, "player-pull"))
-                                        .tooltip(t!(cx, "player-pull-tooltip"))
+                                        .tip(t!(cx, "player-pull-tooltip"))
                                         .disabled(problem.is_some())
                                         .on_click(cx.listener(move |this, _, _, cx| {
                                             let edit = save::PlayerEdit::TakeTrailer {
@@ -780,7 +781,7 @@ impl Render for VehicleDetail {
                                 .xsmall()
                                 .ghost()
                                 .label(t!(cx, "truck-remove-badge"))
-                                .tooltip(t!(cx, "truck-remove-badge-tooltip"))
+                                .tip(t!(cx, "truck-remove-badge-tooltip"))
                                 .on_click(cx.listener(move |this, _, _, cx| {
                                     let edit = save::VehicleEdit::RemoveBadge {
                                         vehicle: id.clone(),

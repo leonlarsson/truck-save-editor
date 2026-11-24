@@ -23,6 +23,7 @@ use crate::i18n::t;
 use crate::labels::{coach_skill_description, coach_skill_name};
 use crate::pages::overview::{Career, skill_icon, skill_label, with_level};
 use crate::session::Session;
+use crate::ui::Tip as _;
 use crate::ui::{
     AmountChanged, AmountField, FilterBar, FilterChanged, LevelPicker, RowLook, Section, Stat,
     TextColumn, TextRow, TextTable, page_body,
@@ -359,7 +360,7 @@ impl CoachCareerPage {
                             .small()
                             .outline()
                             .label(t!(cx, "coach-perfect-satisfaction"))
-                            .tooltip(t!(cx, "coach-perfect-satisfaction-tooltip"))
+                            .tip(t!(cx, "coach-perfect-satisfaction-tooltip"))
                             .disabled(is_perfect)
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.session.update(cx, |session, cx| {
@@ -372,7 +373,7 @@ impl CoachCareerPage {
                             .small()
                             .outline()
                             .label(t!(cx, "coach-discover-stops"))
-                            .tooltip(t!(cx, "coach-discover-stops-tooltip"))
+                            .tip(t!(cx, "coach-discover-stops-tooltip"))
                             .disabled(has_found_all)
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.session

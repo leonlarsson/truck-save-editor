@@ -18,6 +18,7 @@ use crate::game_data;
 use crate::i18n::t;
 use crate::labels::{ADR_CLASS_COUNT, adr_class, skill_name};
 use crate::session::Session;
+use crate::ui::Tip as _;
 use crate::ui::{AmountChanged, AmountField, GameIconView, LevelPicker};
 
 pub struct DriverDetail {
@@ -117,7 +118,7 @@ impl DriverDetail {
             .small()
             .ghost()
             .label(label)
-            .tooltip(t!(cx, "driver-truck-open"))
+            .tip(t!(cx, "driver-truck-open"))
             .on_click(move |_, window, cx| {
                 super::open_vehicle(session.clone(), &vehicle, window, cx)
             })

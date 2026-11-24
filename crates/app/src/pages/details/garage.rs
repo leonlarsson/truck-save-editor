@@ -17,6 +17,7 @@ use crate::game_data;
 use crate::i18n::t;
 use crate::session::Session;
 use crate::ui::GameIconView;
+use crate::ui::Tip as _;
 
 pub struct GarageDetail {
     session: Entity<Session>,
@@ -51,7 +52,7 @@ fn open_row(
                 .ghost()
                 .small()
                 .w_full()
-                .tooltip(tooltip)
+                .tip(tooltip)
                 .child(div().flex_1().min_w_0().child(content))
                 .on_click(move |_, window, cx| on_click(window, cx)),
         )

@@ -20,6 +20,7 @@ use crate::i18n::t;
 use crate::pages::map_view::MapView;
 use crate::session::Session;
 use crate::ui::Choice;
+use crate::ui::Tip as _;
 
 /// Where to move the map: a city (by token), or a point in the game's metres.
 #[derive(Clone, Debug, PartialEq)]
@@ -156,7 +157,7 @@ impl Render for WorldMapPage {
                                     .small()
                                     .outline()
                                     .label(t!(cx, "map-forget-roads"))
-                                    .tooltip(t!(cx, "map-forget-roads-tooltip"))
+                                    .tip(t!(cx, "map-forget-roads-tooltip"))
                                     .disabled(self.session.read(cx).discovered_roads().1 == 0)
                                     .on_click(cx.listener(|this, _, _, cx| {
                                         this.session
@@ -172,7 +173,7 @@ impl Render for WorldMapPage {
                                     .small()
                                     .outline()
                                     .label(t!(cx, "map-discover-roads"))
-                                    .tooltip(if roads.is_some() {
+                                    .tip(if roads.is_some() {
                                         t!(cx, "map-discover-roads-tooltip")
                                     } else {
                                         t!(cx, "map-discover-roads-needs-game")

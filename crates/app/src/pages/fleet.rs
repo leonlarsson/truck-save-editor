@@ -21,6 +21,7 @@ use crate::game_data;
 use crate::i18n::t;
 use crate::pages::details;
 use crate::session::Session;
+use crate::ui::Tip as _;
 use crate::ui::{FillsWidth, fill_widths};
 use crate::ui::{FilterBar, FilterChanged, GameIconView};
 use crate::workspace::OpenDetails;
@@ -285,7 +286,7 @@ impl FleetPage {
             bar = bar.action(
                 action("picks-remove", t!(cx, "picks-remove"))
                     .danger()
-                    .tooltip(t!(cx, "remove-tooltip"))
+                    .tip(t!(cx, "remove-tooltip"))
                     .on_click(cx.listener(move |this, _, window, cx| {
                         let removals: Vec<save::Removal> = remove_ids
                             .iter()
@@ -421,7 +422,7 @@ impl Render for FleetPage {
                                 .small()
                                 .ghost()
                                 .label(t!(cx, "saved-colours-open"))
-                                .tooltip(t!(cx, "saved-colours-description"))
+                                .tip(t!(cx, "saved-colours-description"))
                                 .on_click(cx.listener(|this, _, window, cx| {
                                     crate::pages::saved_colours::open(
                                         this.session.clone(),
@@ -435,7 +436,7 @@ impl Render for FleetPage {
                                 .small()
                                 .outline()
                                 .label(t!(cx, "refuel-all"))
-                                .tooltip(t!(cx, "refuel-all-tooltip"))
+                                .tip(t!(cx, "refuel-all-tooltip"))
                                 .disabled(empty_tanks == 0)
                                 .on_click(cx.listener(|this, _, _, cx| {
                                     let kind = this.kind;
@@ -888,7 +889,7 @@ impl TableDelegate for TruckTable {
                             // and Enter. Named for screen readers, explained by its tooltip.
                             .icon(Icon::new(IconName::ChevronRight))
                             .accessibility_label(t!(cx, "details-open"))
-                            .tooltip(t!(cx, "details-open"))
+                            .tip(t!(cx, "details-open"))
                             .on_click(move |_, window, cx| {
                                 details::open_vehicle(session.clone(), &vehicle, window, cx)
                             }),

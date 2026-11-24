@@ -45,6 +45,7 @@ use crate::quick_start;
 use crate::session::Session;
 use crate::theme;
 use crate::ui::PageHeader;
+use crate::ui::Tip as _;
 use save::VehicleKind;
 
 gpui_kit::actions!(
@@ -611,7 +612,7 @@ impl Workspace {
                                     .ghost()
                                     .small()
                                     .icon(Icon::new(IconName::FolderOpen))
-                                    .tooltip(t!(cx, "backup-show"))
+                                    .tip(t!(cx, "backup-show"))
                                     .accessibility_label(t!(cx, "backup-show"))
                                     .on_click(move |_, _, cx| cx.reveal_path(&reveal)),
                             )
@@ -856,7 +857,7 @@ impl Workspace {
                                 .outline()
                                 .label(t!(cx, "save-as-new-slot"))
                                 .disabled(is_cloud || is_loose)
-                                .tooltip(if is_loose {
+                                .tip(if is_loose {
                                     t!(cx, "save-as-new-slot-loose")
                                 } else {
                                     t!(cx, "save-as-new-slot-tooltip")
@@ -872,7 +873,7 @@ impl Workspace {
                                 .outline()
                                 .label(t!(cx, "save-over-other"))
                                 .disabled(!has_other_slots)
-                                .tooltip(t!(cx, "save-over-other-tooltip"))
+                                .tip(t!(cx, "save-over-other-tooltip"))
                                 .on_click(move |_, window, cx| {
                                     window.close_dialog(cx);
                                     choose_slot_to_save_over(over_other.clone(), window, cx);
@@ -1008,7 +1009,7 @@ impl Workspace {
                         .w_full()
                         .icon(Icon::new(IconName::Search))
                         .label(t!(cx, "palette-open"))
-                        .tooltip(t!(cx, "palette-shortcut"))
+                        .tip(t!(cx, "palette-shortcut"))
                         .on_click(cx.listener(|this, _, window, cx| this.open_palette(window, cx))),
                 ),
             )
@@ -1038,7 +1039,7 @@ impl Workspace {
                                 .small()
                                 .icon(Icon::new(Page::Settings.icon()))
                                 .label(Page::Settings.title(cx))
-                                .tooltip(t!(cx, "settings-shortcut"))
+                                .tip(t!(cx, "settings-shortcut"))
                                 // Marked when it's the page shown, as the pages above are.
                                 .selected(self.page == Page::Settings)
                                 .on_click(cx.listener(|this, _, _, cx| {
@@ -1055,7 +1056,7 @@ impl Workspace {
                                 } else {
                                     IconName::Moon
                                 }))
-                                .tooltip(if is_dark {
+                                .tip(if is_dark {
                                     t!(cx, "theme-light")
                                 } else {
                                     t!(cx, "theme-dark")
@@ -1131,7 +1132,7 @@ impl Workspace {
                         Button::new("undo")
                             .ghost()
                             .icon(Icon::new(IconName::Undo2))
-                            .tooltip(t!(cx, "undo-tooltip"))
+                            .tip(t!(cx, "undo-tooltip"))
                             .accessibility_label(t!(cx, "undo"))
                             .disabled(!can_undo || is_saving)
                             .on_click(cx.listener(|this, _, window, cx| {
@@ -1142,7 +1143,7 @@ impl Workspace {
                         Button::new("redo")
                             .ghost()
                             .icon(Icon::new(IconName::Redo2))
-                            .tooltip(t!(cx, "redo-tooltip"))
+                            .tip(t!(cx, "redo-tooltip"))
                             .accessibility_label(t!(cx, "redo"))
                             .disabled(!can_redo || is_saving)
                             .on_click(cx.listener(|this, _, window, cx| {
@@ -1172,7 +1173,7 @@ impl Workspace {
                     })
                     .loading(is_saving)
                     .disabled(changes == 0 || is_saving)
-                    .tooltip(t!(cx, "save-tooltip"))
+                    .tip(t!(cx, "save-tooltip"))
                     .on_click(cx.listener(|this, _, window, cx| this.confirm_save(window, cx))),
             )
     }
@@ -1931,7 +1932,7 @@ fn update_notice(cx: &App) -> Option<impl IntoElement> {
                 .small()
                 .icon(Icon::new(IconName::ArrowDown))
                 .label(t!(cx, "updates-banner", version = version))
-                .tooltip(t!(cx, "updates-download"))
+                .tip(t!(cx, "updates-download"))
                 .on_click(move |_, _, cx| cx.open_url(&url)),
         ),
     )

@@ -19,6 +19,7 @@ use crate::format::thousands;
 use crate::game_data;
 use crate::i18n::t;
 use crate::session::{KEEP_OFFERS_MINUTES, Session};
+use crate::ui::Tip as _;
 use crate::ui::{FillsWidth, fill_widths};
 use crate::ui::{FilterBar, FilterChanged, GameIconView, Section};
 
@@ -389,7 +390,7 @@ impl Render for JobsPage {
                                     .small()
                                     .outline()
                                     .label(t!(cx, "new-job-open"))
-                                    .tooltip(t!(cx, "new-job-description"))
+                                    .tip(t!(cx, "new-job-description"))
                                     .on_click(cx.listener(|this, _, window, cx| {
                                         crate::pages::new_job::open(
                                             this.session.clone(),
@@ -403,7 +404,7 @@ impl Render for JobsPage {
                                     .small()
                                     .outline()
                                     .label(t!(cx, "jobs-keep"))
-                                    .tooltip(t!(cx, "jobs-keep-tooltip"))
+                                    .tip(t!(cx, "jobs-keep-tooltip"))
                                     .disabled(self.all_kept || self.total == 0)
                                     .on_click(cx.listener(|this, _, _, cx| {
                                         this.session

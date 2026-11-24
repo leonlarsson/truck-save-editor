@@ -15,6 +15,7 @@ pub use driver::open as open_driver;
 pub use garage::open as open_garage;
 pub use vehicle::open as open_vehicle;
 
+use crate::ui::Tip as _;
 use gpui_kit::component::{ActiveTheme as _, StyledExt as _, h_flex, v_flex};
 use gpui_kit::{App, IntoElement, ParentElement as _, SharedString, Styled as _, div, rems};
 
@@ -88,7 +89,7 @@ pub fn actions_row(
                     .outline()
                     .danger()
                     .label(label)
-                    .tooltip(crate::i18n::t!(cx, "remove-tooltip"))
+                    .tip(crate::i18n::t!(cx, "remove-tooltip"))
                     .disabled(problem.is_some())
                     .on_click(move |_, window, cx| {
                         let removal = removal.clone();

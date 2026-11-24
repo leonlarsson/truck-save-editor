@@ -17,6 +17,7 @@ use gpui_kit::{
 use crate::i18n::t;
 use crate::labels;
 use crate::session::Session;
+use crate::ui::Tip as _;
 
 pub struct PositionPicker {
     session: Entity<Session>,
@@ -140,7 +141,7 @@ impl Render for PositionPicker {
                             .small()
                             .outline()
                             .label(t!(cx, "player-quick-travel"))
-                            .tooltip(t!(cx, "player-quick-travel-tooltip"))
+                            .tip(t!(cx, "player-quick-travel-tooltip"))
                             .disabled(travel_problem.is_some() || is_travel_asked)
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.session
