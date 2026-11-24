@@ -396,7 +396,10 @@ palette-group-app = Save and app
 palette-go = { $page }
 palette-max-truck-skills = Max all truck skills
 palette-max-coach-skills = Max all coach skills
-palette-all-adr = All ADR classes
+palette-all-adr = { $game ->
+    [ats] All hazard classes
+   *[other] All ADR classes
+}
 palette-repair-trucks = Repair all trucks
 palette-repair-coaches = Repair all coaches
 palette-repair-trailers = Repair all trailers
@@ -500,7 +503,10 @@ skill-just-in-time = Just-in-time delivery
 skill-just-in-time-description = Urgent jobs with tight deadlines
 skill-ecodriving = Ecodriving
 skill-ecodriving-description = Uses less fuel
-adr = ADR
+adr = { $game ->
+    [ats] Hazardous cargo
+   *[other] ADR
+}
 adr-description = Dangerous goods your driver may haul.
 adr-all = All classes
 adr-none = None
@@ -641,7 +647,10 @@ drivers-summary = { $count ->
    *[other] { $maxed } fully skilled
 }
 drivers-max-all = Max all drivers
-drivers-max-all-tooltip = Every skill at its highest level and all ADR classes, for every hired driver.
+drivers-max-all-tooltip = { $game ->
+    [ats] Every skill at its highest level and all hazard classes, for every hired driver.
+   *[other] Every skill at its highest level and all ADR classes, for every hired driver.
+}
 drivers-maxed = { $count ->
     [one] 1 driver maxed out
    *[other] { $count } drivers maxed out
@@ -650,7 +659,10 @@ column-hometown = Hometown
 column-location = Now in
 column-experience = Experience
 column-skills = Skills
-column-adr = ADR
+column-adr = { $game ->
+    [ats] Hazardous cargo
+   *[other] ADR
+}
 drivers-table = Drivers
 skills-short = { $long } · { $value } · { $fragile } · { $urgent } · { $eco }
 adr-count = { $count } of { $total }
@@ -703,9 +715,13 @@ fleet-trailers = { $count ->
 }
 fleet-tab-trailers = Trailers · { $count }
 no-garage = No garage
-distance-km = { $amount } km
-distance-mi = { $amount } mi
 percent = { $amount }%
+amount-with-unit = { $amount } { $unit }
+unit-km = km
+unit-mi = mi
+unit-kg = kg
+unit-lb = lb
+unit-t = t
 trucks-table = Vehicles
 unknown-truck = Unknown model
 
@@ -755,7 +771,6 @@ removal-after = Removed
 change-career = Career
 change-you = You
 change-cities = Cities
-change-tonnes = { $tonnes } t
 change-wear = { $part } wear
 change-on = On
 changes-none = Nothing differs from the save on disk.
@@ -834,18 +849,21 @@ truck-remove-badge-tooltip = Takes the engine badge off the sides of the cab (th
 trailer-load = Load
 trailer-cargo = Cargo
 trailer-empty-weight = Empty weight
-trailer-countries = Countries
+trailer-countries = { $game ->
+    [ats] States
+   *[other] Countries
+}
 trailer-everywhere = Everywhere
 trailer-allow-everywhere = Allow everywhere
-edit-cargo = { $tonnes } t of cargo
-edit-empty = { $tonnes } t empty
-edit-restricted = Some countries only
+edit-restricted = { $game ->
+    [ats] Some states only
+   *[other] Some countries only
+}
 edit-unrestricted = Everywhere
 edit-fuel = { $percent } % fuel
 edit-badge = With the side badge
 edit-no-badge = No side badge
 edit-plate = { $plate } · { $colours }
-edit-odometer = { $km } km on the odometer
 edit-wear = { $part } { $percent } % worn
 
 # Profile tools
@@ -1050,12 +1068,18 @@ gallery-photo-trophies-summary = { $captured } of { $count } photo trophies capt
 gallery-where-kept = Viewpoints are kept in this save, so each save has its own. Photo trophies are kept in the profile, shared by all its saves.
 gallery-column-name = Name
 gallery-column-kind = Kind
-gallery-column-country = Country
+gallery-column-country = { $game ->
+    [ats] State
+   *[other] Country
+}
 gallery-column-progress = Progress
 gallery-filter-viewpoints = Viewpoints
 gallery-filter-photo-trophies = Photo trophies
 gallery-filter-to-do = Not done yet
-gallery-search = Search by name or country
+gallery-search = { $game ->
+    [ats] Search by name or state
+   *[other] Search by name or country
+}
 gallery-table = Viewpoints and photo trophies
 gallery-visit-all = Visit every viewpoint
 gallery-visit-all-tooltip = Mark every viewpoint as visited, as if you'd watched each. The Gallery can play them all then.

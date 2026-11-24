@@ -195,7 +195,7 @@ impl CoachCareerPage {
                             .satisfaction
                             .map(|share| t!(cx, "percent", amount = (share * 100.0).round() as i64))
                             .unwrap_or_default(),
-                        crate::labels::distance(cx, game, service.distance_km),
+                        crate::units::distance(cx, game, service.distance_km),
                         format!("{currency} {}", thousands(service.reward)).into(),
                         SharedString::from(thousands(service.xp)),
                     ]

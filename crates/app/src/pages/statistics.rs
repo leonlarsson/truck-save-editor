@@ -120,7 +120,7 @@ impl StatisticsPage {
             ),
             (
                 t!(cx, "stats-driven"),
-                crate::labels::distance(cx, game, totals.distance_km),
+                crate::units::distance(cx, game, totals.distance_km),
             ),
             (
                 t!(cx, "stats-days"),
@@ -169,7 +169,7 @@ impl StatisticsPage {
                         cargo_token: delivery.cargo.clone(),
                         from: game_data::city_name(cx, &delivery.from_city).into(),
                         to: game_data::city_name(cx, &delivery.to_city).into(),
-                        distance: crate::labels::distance(cx, game, delivery.distance_km),
+                        distance: crate::units::distance(cx, game, delivery.distance_km),
                         income: money(delivery.income),
                         xp: SharedString::from(thousands(delivery.xp)),
                         damage: t!(cx, "percent", amount = damage_percent),

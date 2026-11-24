@@ -108,7 +108,11 @@ impl QuickStart {
         match choice {
             Choice::Money => t!(cx, "quick-start-money"),
             Choice::TruckSkills => t!(cx, "palette-max-truck-skills"),
-            Choice::Adr => t!(cx, "palette-all-adr"),
+            Choice::Adr => t!(
+                cx,
+                "palette-all-adr",
+                game = crate::labels::current_game_key(cx)
+            ),
             Choice::CoachSkills => t!(cx, "palette-max-coach-skills"),
             Choice::HqGarage => {
                 let hq = self.session.read(cx).career().hq_city.clone();

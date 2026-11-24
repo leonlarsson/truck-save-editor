@@ -268,7 +268,11 @@ impl Render for DriversPage {
                         .small()
                         .outline()
                         .label(t!(cx, "drivers-max-all"))
-                        .tip(t!(cx, "drivers-max-all-tooltip"))
+                        .tip(t!(
+                            cx,
+                            "drivers-max-all-tooltip",
+                            game = crate::labels::current_game_key(cx)
+                        ))
                         .disabled(maxed == count)
                         .on_click(cx.listener(|this, _, _, cx| {
                             this.session
@@ -379,7 +383,11 @@ impl DriverTable {
             Some(DriverColumn::Skills) => Column::new("skills", t!(cx, "column-skills")).sortable(),
             Some(DriverColumn::Details) => Column::new("details", ""),
             Some(DriverColumn::Pick) => Column::new("pick", "").resizable(false).movable(false),
-            Some(DriverColumn::Adr) | None => Column::new("adr", t!(cx, "column-adr")).sortable(),
+            Some(DriverColumn::Adr) | None => Column::new(
+                "adr",
+                t!(cx, "column-adr", game = crate::labels::current_game_key(cx)),
+            )
+            .sortable(),
         }
     }
 

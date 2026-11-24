@@ -104,19 +104,14 @@ pub fn slot_name(cx: &App, slot: &Slot) -> SharedString {
     }
 }
 
-/// A distance as the game shows it: in kilometres, or in miles for a game that uses them (ATS).
-/// Saves store kilometres in both games.
-pub fn distance(cx: &App, game: save::Game, km: i64) -> SharedString {
-    if game.uses_miles() {
-        let miles = (km as f64 * KM_TO_MILES).round() as i64;
-        t!(cx, "distance-mi", amount = crate::format::thousands(miles))
-    } else {
-        t!(cx, "distance-km", amount = crate::format::thousands(km))
+/// The current game, as the texts that differ between the games choose by it (`game = …`: `ats`
+/// or `ets2`). While a save is open, the current game is the save's.
+pub fn current_game_key(cx: &App) -> &'static str {
+    match crate::game_data::current_game(cx) {
+        save::Game::Ets2 => "ets2",
+        save::Game::Ats => "ats",
     }
 }
-
-/// Miles in a kilometre.
-const KM_TO_MILES: f64 = 0.621_371;
 
 pub fn location(cx: &App, location: Location) -> SharedString {
     match location {

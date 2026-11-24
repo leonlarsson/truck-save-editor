@@ -414,7 +414,10 @@ palette-group-app = Zapis i aplikacja
 palette-go = { $page }
 palette-max-truck-skills = Maksymalizuj wszystkie zdolności kierowcy ciężarówki
 palette-max-coach-skills = Maksymalizuj wszystkie zdolności kierowcy autokaru
-palette-all-adr = Wszystkie klasy ADR
+palette-all-adr = { $game ->
+    [ats] Wszystkie klasy zagrożenia
+   *[other] Wszystkie klasy ADR
+}
 palette-repair-trucks = Napraw wszystkie ciężarówki
 palette-repair-coaches = Napraw wszystkie autokary
 palette-repair-trailers = Napraw wszystkie naczepy
@@ -520,7 +523,10 @@ skill-just-in-time = Dostawa na czas
 skill-just-in-time-description = Pilne zlecenia z krótkimi terminami
 skill-ecodriving = Ekologiczna jazda
 skill-ecodriving-description = Mniejsze zużycie paliwa
-adr = ADR
+adr = { $game ->
+    [ats] Niebezpieczny ładunek
+   *[other] ADR
+}
 adr-description = Towary niebezpieczne, które może przewozić twój kierowca.
 adr-all = Wszystkie klasy
 adr-none = Brak
@@ -670,7 +676,10 @@ drivers-summary = { $count ->
    *[other] w pełni wyszkoleni: { $maxed }
 }
 drivers-max-all = Maksymalizuj wszystkich kierowców
-drivers-max-all-tooltip = Każda zdolność na najwyższym poziomie i wszystkie klasy ADR, dla każdego zatrudnionego kierowcy.
+drivers-max-all-tooltip = { $game ->
+    [ats] Każda zdolność na najwyższym poziomie i wszystkie klasy zagrożenia, dla każdego zatrudnionego kierowcy.
+   *[other] Każda zdolność na najwyższym poziomie i wszystkie klasy ADR, dla każdego zatrudnionego kierowcy.
+}
 drivers-maxed = { $count ->
     [one] Zmaksymalizowano 1 kierowcę
     [few] Zmaksymalizowano { $count } kierowców
@@ -680,7 +689,10 @@ column-hometown = Miasto rodzinne
 column-location = Teraz w
 column-experience = Doświadczenie
 column-skills = Zdolności
-column-adr = ADR
+column-adr = { $game ->
+    [ats] Niebezpieczny ładunek
+   *[other] ADR
+}
 drivers-table = Kierowcy
 skills-short = { $long } · { $value } · { $fragile } · { $urgent } · { $eco }
 adr-count = { $count } z { $total }
@@ -739,9 +751,13 @@ fleet-trailers = { $count ->
 }
 fleet-tab-trailers = Naczepy · { $count }
 no-garage = Bez garażu
-distance-km = { $amount } km
-distance-mi = { $amount } mil
 percent = { $amount }%
+amount-with-unit = { $amount } { $unit }
+unit-km = km
+unit-mi = mil
+unit-kg = kg
+unit-lb = lb
+unit-t = t
 trucks-table = Pojazdy
 unknown-truck = Nieznany model
 
@@ -791,7 +807,6 @@ removal-after = Usunięte
 change-career = Kariera
 change-you = Ty
 change-cities = Miasta
-change-tonnes = { $tonnes } t
 change-wear = Zużycie: { $part }
 change-on = Jest
 changes-none = Nic nie różni się od zapisu na dysku.
@@ -873,18 +888,21 @@ truck-remove-badge-tooltip = Usuwa emblemat silnika z boków kabiny (emblemat z 
 trailer-load = Ładunek
 trailer-cargo = Ładunek
 trailer-empty-weight = Masa własna
-trailer-countries = Kraje
+trailer-countries = { $game ->
+    [ats] Stany
+   *[other] Kraje
+}
 trailer-everywhere = Wszędzie
 trailer-allow-everywhere = Zezwól wszędzie
-edit-cargo = { $tonnes } t ładunku
-edit-empty = { $tonnes } t pusta
-edit-restricted = Tylko niektóre kraje
+edit-restricted = { $game ->
+    [ats] Tylko niektóre stany
+   *[other] Tylko niektóre kraje
+}
 edit-unrestricted = Wszędzie
 edit-fuel = { $percent } % paliwa
 edit-badge = Z emblematem bocznym
 edit-no-badge = Bez emblematu bocznego
 edit-plate = { $plate } · { $colours }
-edit-odometer = Przebieg: { $km } km
 edit-wear = { $part }: { $percent } % zużycia
 
 # Profile tools
@@ -1104,12 +1122,18 @@ gallery-photo-trophies-summary = Zdobyte trofea fotograficzne: { $captured } z {
 gallery-where-kept = Punkty widokowe są zapisane w tym zapisie gry, więc każdy zapis ma własne. Trofea fotograficzne są zapisane w profilu i wspólne dla wszystkich jego zapisów.
 gallery-column-name = Nazwa
 gallery-column-kind = Rodzaj
-gallery-column-country = Kraj
+gallery-column-country = { $game ->
+    [ats] Stan
+   *[other] Kraj
+}
 gallery-column-progress = Postęp
 gallery-filter-viewpoints = Punkty widokowe
 gallery-filter-photo-trophies = Trofea fotograficzne
 gallery-filter-to-do = Jeszcze nie zrobione
-gallery-search = Szukaj po nazwie lub kraju
+gallery-search = { $game ->
+    [ats] Szukaj po nazwie lub stanie
+   *[other] Szukaj po nazwie lub kraju
+}
 gallery-table = Punkty widokowe i trofea fotograficzne
 gallery-visit-all = Odwiedź każdy punkt widokowy
 gallery-visit-all-tooltip = Oznacz każdy punkt widokowy jako odwiedzony, jakbyś obejrzał każdy z nich. Galeria może wtedy odtworzyć wszystkie.

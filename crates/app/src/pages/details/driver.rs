@@ -225,7 +225,10 @@ impl Render for DriverDetail {
                 t!(cx, "column-skills"),
                 v_flex().gap_2().children(rows),
             ))
-            .child(group(t!(cx, "adr"), v_flex().gap_2().children(adr)))
+            .child(group(
+                t!(cx, "adr", game = crate::labels::current_game_key(cx)),
+                v_flex().gap_2().children(adr),
+            ))
             .child(super::actions_row(
                 Button::new("max-driver")
                     .small()

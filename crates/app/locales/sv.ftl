@@ -396,7 +396,10 @@ palette-group-app = Spara och appen
 palette-go = { $page }
 palette-max-truck-skills = Maxa alla lastbilsfärdigheter
 palette-max-coach-skills = Maxa alla bussfärdigheter
-palette-all-adr = Alla ADR-klasser
+palette-all-adr = { $game ->
+    [ats] Alla faroklasser
+   *[other] Alla ADR-klasser
+}
 palette-repair-trucks = Reparera alla lastbilar
 palette-repair-coaches = Reparera alla bussar
 palette-repair-trailers = Reparera alla släp
@@ -500,7 +503,10 @@ skill-just-in-time = Just-in-time-leveranser
 skill-just-in-time-description = Brådskande uppdrag med snäva tidsgränser
 skill-ecodriving = Sparsam körning
 skill-ecodriving-description = Drar mindre bränsle
-adr = ADR
+adr = { $game ->
+    [ats] Farligt gods
+   *[other] ADR
+}
 adr-description = Farligt gods din förare får köra.
 adr-all = Alla klasser
 adr-none = Inga
@@ -641,7 +647,10 @@ drivers-summary = { $count ->
    *[other] { $maxed } fullt utbildade
 }
 drivers-max-all = Maxa alla förare
-drivers-max-all-tooltip = Varje färdighet på högsta nivån och alla ADR-klasser, för varje anställd förare.
+drivers-max-all-tooltip = { $game ->
+    [ats] Varje färdighet på högsta nivån och alla faroklasser, för varje anställd förare.
+   *[other] Varje färdighet på högsta nivån och alla ADR-klasser, för varje anställd förare.
+}
 drivers-maxed = { $count ->
     [one] 1 förare maxad
    *[other] { $count } förare maxade
@@ -650,7 +659,10 @@ column-hometown = Hemstad
 column-location = Nu i
 column-experience = Erfarenhet
 column-skills = Färdigheter
-column-adr = ADR
+column-adr = { $game ->
+    [ats] Farligt gods
+   *[other] ADR
+}
 drivers-table = Förare
 skills-short = { $long } · { $value } · { $fragile } · { $urgent } · { $eco }
 adr-count = { $count } av { $total }
@@ -703,9 +715,13 @@ fleet-trailers = { $count ->
 }
 fleet-tab-trailers = Släp · { $count }
 no-garage = Utan garage
-distance-km = { $amount } km
-distance-mi = { $amount } mi
 percent = { $amount } %
+amount-with-unit = { $amount } { $unit }
+unit-km = km
+unit-mi = mi
+unit-kg = kg
+unit-lb = lb
+unit-t = t
 trucks-table = Fordon
 unknown-truck = Okänd modell
 
@@ -755,7 +771,6 @@ removal-after = Borttagen
 change-career = Karriär
 change-you = Du
 change-cities = Städer
-change-tonnes = { $tonnes } t
 change-wear = Slitage: { $part }
 change-on = På
 changes-none = Inget skiljer sig från sparfilen på disken.
@@ -834,18 +849,21 @@ truck-remove-badge-tooltip = Tar bort motoremblemet från hyttens sidor (embleme
 trailer-load = Last
 trailer-cargo = Last
 trailer-empty-weight = Tomvikt
-trailer-countries = Länder
+trailer-countries = { $game ->
+    [ats] Delstater
+   *[other] Länder
+}
 trailer-everywhere = Överallt
 trailer-allow-everywhere = Tillåt överallt
-edit-cargo = { $tonnes } t last
-edit-empty = { $tonnes } t tom
-edit-restricted = Bara vissa länder
+edit-restricted = { $game ->
+    [ats] Bara vissa delstater
+   *[other] Bara vissa länder
+}
 edit-unrestricted = Överallt
 edit-fuel = { $percent } % bränsle
 edit-badge = Med sidoemblem
 edit-no-badge = Utan sidoemblem
 edit-plate = { $plate } · { $colours }
-edit-odometer = { $km } km på mätaren
 edit-wear = { $part } { $percent } % slitage
 
 # Profile tools
@@ -1050,12 +1068,18 @@ gallery-photo-trophies-summary = { $captured } av { $count } fototroféer fotogr
 gallery-where-kept = Utsiktsplatser sparas i den här sparfilen, så varje sparfil har sina egna. Fototroféer sparas i profilen och delas av alla dess sparfiler.
 gallery-column-name = Namn
 gallery-column-kind = Typ
-gallery-column-country = Land
+gallery-column-country = { $game ->
+    [ats] Delstat
+   *[other] Land
+}
 gallery-column-progress = Framsteg
 gallery-filter-viewpoints = Utsiktsplatser
 gallery-filter-photo-trophies = Fototroféer
 gallery-filter-to-do = Inte klara än
-gallery-search = Sök på namn eller land
+gallery-search = { $game ->
+    [ats] Sök på namn eller delstat
+   *[other] Sök på namn eller land
+}
 gallery-table = Utsiktsplatser och fototroféer
 gallery-visit-all = Besök varje utsiktsplats
 gallery-visit-all-tooltip = Markera varje utsiktsplats som besökt, som om du sett var och en. Galleriet kan då spela upp alla.

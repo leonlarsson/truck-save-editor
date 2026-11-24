@@ -141,7 +141,7 @@ impl JobsPage {
                             city = game_data::city_name(cx, city)
                         )
                     };
-                    let distance = crate::labels::distance(cx, game, job.distance_km);
+                    let distance = crate::units::distance(cx, game, job.distance_km);
                     Row {
                         from: place(&job.from_company, &job.from_city),
                         to: place(&job.to_company, &job.to_city),
@@ -225,7 +225,7 @@ impl JobsPage {
         let facts = [
             (
                 t!(cx, "column-distance"),
-                crate::labels::distance(cx, game, job.planned_distance_km),
+                crate::units::distance(cx, game, job.planned_distance_km),
             ),
             (t!(cx, "current-job-deadline"), deadline),
             (t!(cx, "column-urgency"), urgency),

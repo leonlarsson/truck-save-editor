@@ -141,7 +141,11 @@ fn parts(
             &["skills", "bus"],
         ),
         PaletteCommand::AllAdr => (
-            t!(cx, "palette-all-adr"),
+            t!(
+                cx,
+                "palette-all-adr",
+                game = crate::labels::current_game_key(cx)
+            ),
             IconName::FlaskConical,
             &["adr", "dangerous"],
         ),

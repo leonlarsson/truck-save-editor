@@ -529,7 +529,7 @@ impl OverviewPage {
             )
         });
 
-        Section::new(t!(cx, "adr"))
+        Section::new(t!(cx, "adr", game = crate::labels::current_game_key(cx)))
             .description(t!(cx, "adr-description"))
             .action(
                 Button::new("all-adr")

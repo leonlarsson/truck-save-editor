@@ -181,7 +181,11 @@ impl GalleryView {
             },
             TextColumn {
                 key: "country",
-                title: t!(cx, "gallery-column-country"),
+                title: t!(
+                    cx,
+                    "gallery-column-country",
+                    game = crate::labels::current_game_key(cx)
+                ),
                 width: 150.,
             },
             TextColumn {
@@ -203,7 +207,11 @@ impl GalleryView {
             t!(cx, "gallery-filter-photo-trophies"),
             t!(cx, "gallery-filter-to-do"),
         ];
-        let placeholder = t!(cx, "gallery-search");
+        let placeholder = t!(
+            cx,
+            "gallery-search",
+            game = crate::labels::current_game_key(cx)
+        );
         let filter = cx.new(|cx| FilterBar::new(placeholder, toggles, window, cx));
         let _subscriptions = vec![
             cx.observe(&session, |this, _, cx| this.reload(cx)),
@@ -503,7 +511,15 @@ impl Render for GalleryItemPanel {
                         kind_label(cx, entry.kind),
                         cx,
                     ))
-                    .child(fact(t!(cx, "gallery-column-country"), country, cx))
+                    .child(fact(
+                        t!(
+                            cx,
+                            "gallery-column-country",
+                            game = crate::labels::current_game_key(cx)
+                        ),
+                        country,
+                        cx,
+                    ))
                     .child(fact(
                         t!(cx, "gallery-column-progress"),
                         progress_label(cx, entry.progress),

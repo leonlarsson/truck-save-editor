@@ -364,8 +364,8 @@ impl Session {
             return Some((
                 subject,
                 t!(cx, "column-odometer"),
-                crate::labels::distance(cx, self.game(), km(&saved)),
-                crate::labels::distance(cx, self.game(), km(text)),
+                crate::units::distance(cx, self.game(), km(&saved)),
+                crate::units::distance(cx, self.game(), km(text)),
             ));
         }
         if VEHICLE_WEAR_FIELDS.contains(&field) {
@@ -1563,7 +1563,7 @@ impl Session {
         }
         add(
             &career,
-            t!(cx, "adr"),
+            t!(cx, "adr", game = crate::labels::current_game_key(cx)),
             adr_summary(cx, before.skills.adr),
             adr_summary(cx, after.skills.adr),
         );
@@ -1704,8 +1704,8 @@ impl Session {
             add(
                 &coaches,
                 t!(cx, "coach-distance"),
-                crate::labels::distance(cx, self.game(), saved.distance_km),
-                crate::labels::distance(cx, self.game(), after.distance_km),
+                crate::units::distance(cx, self.game(), saved.distance_km),
+                crate::units::distance(cx, self.game(), after.distance_km),
             );
             add(
                 &coaches,
@@ -1834,29 +1834,29 @@ impl Session {
             let id = edit.vehicle();
             let subject = vehicle_subject(id);
             let saved = save::trailer_load(&self.loaded.game, id);
-            let tonnes = |kg: f64| crate::format::decimal(kg / 1000.0, 1);
+            let weight = |kg: f64| crate::units::weight(cx, self.game(), kg);
             let (what, before, after) = match edit {
                 save::VehicleEdit::CargoMass { kg, .. } => (
                     t!(cx, "trailer-cargo"),
-                    t!(
-                        cx,
-                        "change-tonnes",
-                        tonnes = tonnes(saved.as_ref().map_or(0.0, |l| l.cargo_kg))
-                    ),
-                    t!(cx, "change-tonnes", tonnes = tonnes(*kg)),
+                    weight(saved.as_ref().map_or(0.0, |l| l.cargo_kg)),
+                    weight(*kg),
                 ),
                 save::VehicleEdit::EmptyMass { kg, .. } => (
                     t!(cx, "trailer-empty-weight"),
-                    t!(
-                        cx,
-                        "change-tonnes",
-                        tonnes = tonnes(saved.as_ref().map_or(0.0, |l| l.empty_kg))
-                    ),
-                    t!(cx, "change-tonnes", tonnes = tonnes(*kg)),
+                    weight(saved.as_ref().map_or(0.0, |l| l.empty_kg)),
+                    weight(*kg),
                 ),
                 save::VehicleEdit::Unrestrict { .. } => (
-                    t!(cx, "trailer-countries"),
-                    t!(cx, "edit-restricted"),
+                    t!(
+                        cx,
+                        "trailer-countries",
+                        game = crate::labels::current_game_key(cx)
+                    ),
+                    t!(
+                        cx,
+                        "edit-restricted",
+                        game = crate::labels::current_game_key(cx)
+                    ),
                     t!(cx, "edit-unrestricted"),
                 ),
                 save::VehicleEdit::Fuel { ratio, .. } => {

@@ -23,6 +23,7 @@ use crate::i18n::t;
 use crate::session::Session;
 use crate::ui::Tip as _;
 use crate::ui::{AmountChanged, AmountField, GameIconView};
+use crate::units::Unit;
 
 /// The wear fields a vehicle keeps on itself (the current format), with their labels' keys.
 const PARTS: [(&str, &str); 6] = [
@@ -76,13 +77,18 @@ impl VehicleDetail {
         cx: &mut Context<Self>,
     ) -> Self {
         let vehicle = find(&session, &id, cx);
+        // Distances and weights in the game's units (miles and pounds in ATS); stored in
+        // kilometres and kilograms.
+        let game = session.read(cx).game();
+        let (distance_unit, weight_unit) = (Unit::distance(game), Unit::weight(game));
         let odometer_km = vehicle.as_ref().map_or(0, |v| v.odometer_km);
         let label = t!(cx, "column-odometer");
+        let distance_symbol = distance_unit.symbol(cx);
         let odometer = cx.new(|cx| {
-            AmountField::new(odometer_km, label, window, cx)
+            AmountField::new(distance_unit.shown(odometer_km as f64), label, window, cx)
                 .id("odometer-input")
                 .min(0)
-                .suffix("km")
+                .suffix(distance_symbol)
                 .compact()
         });
         let plate_text = vehicle
@@ -112,25 +118,26 @@ impl VehicleDetail {
             .as_ref()
             .filter(|v| v.kind == VehicleKind::Trailer)
             .and_then(|_| session.read(cx).trailer_load(&id));
+        let weight_symbol = weight_unit.symbol(cx);
         let cargo = load.as_ref().map(|load| {
             let label = t!(cx, "trailer-cargo");
-            let kg = load.cargo_kg.round() as i64;
+            let symbol = weight_symbol.clone();
             cx.new(|cx| {
-                AmountField::new(kg, label, window, cx)
+                AmountField::new(weight_unit.shown(load.cargo_kg), label, window, cx)
                     .id("cargo-input")
                     .min(0)
-                    .suffix("kg")
+                    .suffix(symbol)
                     .compact()
             })
         });
         let empty_weight = load.as_ref().map(|load| {
             let label = t!(cx, "trailer-empty-weight");
-            let kg = load.empty_kg.round() as i64;
+            let symbol = weight_symbol.clone();
             cx.new(|cx| {
-                AmountField::new(kg, label, window, cx)
+                AmountField::new(weight_unit.shown(load.empty_kg), label, window, cx)
                     .id("empty-weight-input")
                     .min(0)
-                    .suffix("kg")
+                    .suffix(symbol)
                     .compact()
             })
         });
@@ -201,9 +208,10 @@ impl VehicleDetail {
                     }
                 },
             ),
-            cx.subscribe(&odometer, |this, _, AmountChanged(km), cx| {
+            cx.subscribe(&odometer, move |this, _, AmountChanged(shown), cx| {
                 let id = this.id.clone();
-                let km = (*km).max(0).to_string();
+                let km = distance_unit.stored((*shown).max(0)).round() as i64;
+                let km = km.to_string();
                 this.session.update(cx, |session, cx| {
                     session.set_field(&id, "odometer", None, km, cx)
                 });
@@ -276,24 +284,28 @@ impl VehicleDetail {
             }));
         }
         if let Some(field) = &cargo {
-            _subscriptions.push(cx.subscribe(field, |this, _, AmountChanged(kg), cx| {
-                let edit = save::VehicleEdit::CargoMass {
-                    trailer: this.id.clone(),
-                    kg: (*kg).max(0) as f64,
-                };
-                this.session
-                    .update(cx, |session, cx| session.edit_vehicle(edit, cx));
-            }));
+            _subscriptions.push(
+                cx.subscribe(field, move |this, _, AmountChanged(shown), cx| {
+                    let edit = save::VehicleEdit::CargoMass {
+                        trailer: this.id.clone(),
+                        kg: weight_unit.stored((*shown).max(0)),
+                    };
+                    this.session
+                        .update(cx, |session, cx| session.edit_vehicle(edit, cx));
+                }),
+            );
         }
         if let Some(field) = &empty_weight {
-            _subscriptions.push(cx.subscribe(field, |this, _, AmountChanged(kg), cx| {
-                let edit = save::VehicleEdit::EmptyMass {
-                    trailer: this.id.clone(),
-                    kg: (*kg).max(0) as f64,
-                };
-                this.session
-                    .update(cx, |session, cx| session.edit_vehicle(edit, cx));
-            }));
+            _subscriptions.push(
+                cx.subscribe(field, move |this, _, AmountChanged(shown), cx| {
+                    let edit = save::VehicleEdit::EmptyMass {
+                        trailer: this.id.clone(),
+                        kg: weight_unit.stored((*shown).max(0)),
+                    };
+                    this.session
+                        .update(cx, |session, cx| session.edit_vehicle(edit, cx));
+                }),
+            );
         }
         Self {
             session,
@@ -316,10 +328,11 @@ impl VehicleDetail {
         let Some(vehicle) = find(&self.session, &self.id, cx) else {
             return;
         };
-        if self.odometer.read(cx).value() != vehicle.odometer_km {
-            self.odometer.update(cx, |field, cx| {
-                field.set_value(vehicle.odometer_km, window, cx)
-            });
+        let odometer =
+            Unit::distance(self.session.read(cx).game()).shown(vehicle.odometer_km as f64);
+        if self.odometer.read(cx).value() != odometer {
+            self.odometer
+                .update(cx, |field, cx| field.set_value(odometer, window, cx));
         }
         if self.plate.read(cx).value().as_ref() != vehicle.plate {
             self.plate.update(cx, |input, cx| {
@@ -349,15 +362,16 @@ impl VehicleDetail {
             }
         }
         if let Some(load) = self.session.read(cx).trailer_load(&self.id) {
+            let unit = Unit::weight(self.session.read(cx).game());
             for (field, kg) in [
                 (&self.cargo, load.cargo_kg),
                 (&self.empty_weight, load.empty_kg),
             ] {
-                let kg = kg.round() as i64;
+                let shown = unit.shown(kg);
                 if let Some(field) = field
-                    && field.read(cx).value() != kg
+                    && field.read(cx).value() != shown
                 {
-                    field.update(cx, |field, cx| field.set_value(kg, window, cx));
+                    field.update(cx, |field, cx| field.set_value(shown, window, cx));
                 }
             }
         }
@@ -823,7 +837,11 @@ impl Render for VehicleDetail {
                             v_flex()
                                 .gap_1()
                                 .child(fact(
-                                    t!(cx, "trailer-countries"),
+                                    t!(
+                                        cx,
+                                        "trailer-countries",
+                                        game = crate::labels::current_game_key(cx)
+                                    ),
                                     Button::new("unrestrict")
                                         .xsmall()
                                         .ghost()

@@ -24,6 +24,7 @@ mod slot_picker;
 mod tests;
 mod theme;
 mod ui;
+mod units;
 mod updates;
 mod workspace;
 
