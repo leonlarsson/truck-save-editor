@@ -136,6 +136,23 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [ ] Say where things are kept: viewpoints are per save (`game.sii`), photo trophies per profile (its `album` folder). The Gallery says so now (2026-11-23); the rest of the app doesn't yet. Say it where it matters (the Gallery, panels, the save dialog), and look at what else is per profile rather than per save.
 - [ ] Make a job: the trailer list names trailers by the game's codes (`Container, singl 3e 40`); the game's own trailer names would read better, if its data has them.
 
+## Parity and beyond (2026-11-24)
+
+Features worth having that the editor doesn't have yet, from a look at what else exists:
+
+- [ ] Cars: the player's car (`player.cars`, ATS's Road Trip car) in Fleet, with fuel, wear, repairs and plate.
+- [ ] Create a new save: a fresh career in a new local profile, from the start screen (see "Starting fresh").
+- [ ] Plates: layout and badges (the region's plate, badge images, text placement), from the game's own plate definitions.
+- [ ] Accessories: a vehicle's add-on parts (lights, horns, grilles …), with the game's alternatives for each slot.
+- [ ] Coach services: bus stations, the coach fleet's timetable and the coach offers.
+- [ ] Freight market: edit an existing offer (cargo and trailer, destination, urgency, expiry, distance, ferry costs); the cargo market's offers per depot.
+- [ ] GPS routes: copy a saved route (and the truck's position) between saves.
+- [ ] Restore a damaged save's backup into a new profile; snapshots of the open save to go back to.
+- [ ] Find the game's own versioned backup profiles too.
+- [ ] Updates that download and install themselves (verified), not only a notice.
+- [ ] A log of what the editor did, viewable in the app.
+- [ ] French and Spanish (languages are the owner's call).
+
 ## Later
 
 - [ ] American Truck Simulator: test on real ATS saves (the code is written for both from the start). Until then, ATS profiles and saves show a warning (2026-11-22). Still ETS2-only: the game's data (city names, ranks, engines, icons, the DLC check), distances in miles, and Settings (the game's folder, whether it's running, its config.cfg).
