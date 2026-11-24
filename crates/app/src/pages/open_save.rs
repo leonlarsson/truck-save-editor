@@ -423,41 +423,47 @@ impl OpenSavePage {
             let first = of_game.first().copied();
             // The game's own logo, from its install (none when it isn't installed).
             let logo = crate::game_data::game_logo(cx, game)
-                .map(|logo| crate::ui::GameIconView::new(logo).size(3.5));
+                .map(|logo| crate::ui::GameIconView::new(logo).size(2.5));
             Button::new(("game", game as usize))
                 .outline()
+                // Equal halves of the column, whatever each name's length.
                 .flex_1()
-                .h(rems(4.5))
+                .min_w_0()
+                .h(rems(4.))
                 .selected(is_chosen)
                 .disabled(first.is_none())
                 .accessibility_label(SharedString::from(game.name()))
                 .child(
                     h_flex()
                         .w_full()
-                        .justify_between()
-                        .items_center()
                         .gap_3()
+                        .items_center()
+                        .children(logo)
                         .child(
-                            h_flex()
-                                .gap_3()
-                                .items_center()
+                            v_flex()
+                                .items_start()
                                 .min_w_0()
-                                .children(logo)
                                 .child(
-                                    v_flex()
-                                        .items_start()
-                                        .min_w_0()
-                                        .child(div().font_medium().truncate().child(game.name()))
-                                        .child(
-                                            div()
-                                                .text_xs()
-                                                .text_color(cx.theme().muted_foreground)
-                                                .child(detail),
-                                        ),
+                                    div()
+                                        .text_sm()
+                                        .truncate()
+                                        // The chosen one says so in weight, not only its fill.
+                                        .map(|name| {
+                                            if is_chosen {
+                                                name.font_semibold()
+                                            } else {
+                                                name.font_medium()
+                                            }
+                                        })
+                                        .child(game.name()),
+                                )
+                                .child(
+                                    div()
+                                        .text_xs()
+                                        .text_color(cx.theme().muted_foreground)
+                                        .child(detail),
                                 ),
-                        )
-                        // The chosen one says so in shape, not only colour.
-                        .children(is_chosen.then(|| Icon::new(IconName::Check).small())),
+                        ),
                 )
                 .on_click(cx.listener(move |this, _, _, cx| {
                     if let Some(index) = first
@@ -1045,7 +1051,8 @@ impl Render for OpenSavePage {
                     .count();
                 v_flex()
                     .gap_6()
-                    .child(div().px_3().child(self.render_games(profiles, cx)))
+                    // Across the column's full width, like the save rows and the warning below.
+                    .child(self.render_games(profiles, cx))
                     .when(profiles_of_game > 1, |this| {
                         this.child(div().px_3().child(self.render_profiles(profiles, cx)))
                     })
