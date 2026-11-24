@@ -611,16 +611,37 @@ fn read_skills(archive: &mut hashfs::Archive) -> Result<SkillDefinitions> {
 }
 
 /// The game's text in a language: `key[]` and `val[]` pairs in `locale/<language>/local.sii` and
-/// what it includes.
+/// what it includes, then in the folder's other `local.*.sii` files (`local.override.sii` holds
+/// many of ATS's cargo names), which add to it and win where they repeat a key, as the game reads
+/// them.
 fn read_strings(archive: &mut hashfs::Archive, language: &str) -> Result<HashMap<String, String>> {
-    let document = read_document(archive, &format!("/locale/{language}/local.sii"))?;
+    let folder = format!("/locale/{language}");
+    // The base file must be there: without it, this language isn't installed.
+    let mut documents = vec![read_document(archive, &format!("{folder}/local.sii"))?];
+    let mut others: Vec<String> = match archive.list(&folder) {
+        Ok(Some(listing)) => listing
+            .files
+            .into_iter()
+            .filter(|name| name.starts_with("local.") && name.ends_with(".sii"))
+            .filter(|name| name != "local.sii")
+            .collect(),
+        _ => Vec::new(),
+    };
+    others.sort();
+    for name in others {
+        if let Ok(document) = read_document(archive, &format!("{folder}/{name}")) {
+            documents.push(document);
+        }
+    }
     let mut strings = HashMap::new();
-    for unit in document.units_of_kind("localization_db") {
-        for (key, value) in unit.items("key").iter().zip(unit.items("val")) {
-            strings.insert(
-                sii::value::parse_string(key).into_owned(),
-                sii::value::parse_string(value).into_owned(),
-            );
+    for document in &documents {
+        for unit in document.units_of_kind("localization_db") {
+            for (key, value) in unit.items("key").iter().zip(unit.items("val")) {
+                strings.insert(
+                    sii::value::parse_string(key).into_owned(),
+                    sii::value::parse_string(value).into_owned(),
+                );
+            }
         }
     }
     Ok(strings)
