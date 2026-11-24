@@ -432,11 +432,11 @@ impl Workspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let has_coaches = self
-            .opened
+        let session = self.opened.as_ref().map(|opened| opened.session.clone());
+        let has_coaches = session
             .as_ref()
-            .is_some_and(|opened| opened.session.read(cx).has_coach_career());
-        crate::dev_script::act(self, step, has_coaches, window, cx);
+            .is_some_and(|session| session.read(cx).has_coach_career());
+        crate::dev_script::act(self, step, has_coaches, session, window, cx);
     }
 
     /// Shows Coach career: the coach commands land there, so what they changed is in view.

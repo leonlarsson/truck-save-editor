@@ -6,6 +6,7 @@
 //! page gallery            go to a page, by its slug (`TSE_PAGE`'s names)
 //! theme dark              light or dark, for this run only (the settings stay as they are)
 //! run Visit every city    a palette command, by its label as the palette shows it
+//! open truck              open the first truck's panel (or `trailer`, `coach`)
 //! close                   close the open panel or dialog
 //! wait 1500               wait that many milliseconds (World map draws its tiles meanwhile)
 //! shot gallery-dark       ask for a picture (see below), and wait until it's taken
@@ -31,6 +32,7 @@ pub enum Step {
     Page(Page),
     Theme(Appearance),
     Run(String),
+    Open(save::VehicleKind),
     Close,
     Wait(u64),
     Shot(String),
@@ -58,6 +60,12 @@ pub fn parse(text: &str) -> Vec<Step> {
             "run" if !rest.is_empty() => Some(Step::Run(rest.to_string())),
             "close" => Some(Step::Close),
             "wait" => rest.parse().ok().map(Step::Wait),
+            "open" => match rest {
+                "truck" => Some(Step::Open(save::VehicleKind::Truck)),
+                "trailer" => Some(Step::Open(save::VehicleKind::Trailer)),
+                "coach" => Some(Step::Open(save::VehicleKind::Coach)),
+                _ => None,
+            },
             "shot" if !rest.is_empty() => Some(Step::Shot(rest.to_string())),
             _ => None,
         };
@@ -135,6 +143,7 @@ pub fn act(
     workspace: &mut Workspace,
     step: Step,
     has_coaches: bool,
+    session: Option<gpui_kit::Entity<crate::session::Session>>,
     window: &mut Window,
     cx: &mut Context<Workspace>,
 ) {
@@ -148,6 +157,21 @@ pub fn act(
             Some(command) => workspace.run(command, window, cx),
             None => eprintln!("TSE_SCRIPT: no palette command is called {name}"),
         },
+        Step::Open(kind) => {
+            let vehicle = session.as_ref().and_then(|session| {
+                session
+                    .read(cx)
+                    .vehicles()
+                    .into_iter()
+                    .find(|vehicle| vehicle.kind == kind)
+            });
+            match (session, vehicle) {
+                (Some(session), Some(vehicle)) => {
+                    crate::pages::details::open_vehicle(session, &vehicle, window, cx)
+                }
+                _ => eprintln!("TSE_SCRIPT: the save has no {kind:?} to open"),
+            }
+        }
         Step::Close => {
             window.close_dialog(cx);
             window.close_sheet(cx);
@@ -163,7 +187,7 @@ mod tests {
     #[test]
     fn reads_a_script() {
         let steps = parse(
-            "# a note\npage gallery\ntheme dark\nrun Visit every city\nclose\nwait 500\nshot gallery-dark\nfly away\n",
+            "# a note\npage gallery\ntheme dark\nrun Visit every city\nopen trailer\nclose\nwait 500\nshot gallery-dark\nfly away\n",
         );
         assert_eq!(
             steps,
@@ -171,6 +195,7 @@ mod tests {
                 Step::Page(Page::Gallery),
                 Step::Theme(Appearance::Dark),
                 Step::Run("Visit every city".to_string()),
+                Step::Open(save::VehicleKind::Trailer),
                 Step::Close,
                 Step::Wait(500),
                 Step::Shot("gallery-dark".to_string()),
