@@ -788,7 +788,10 @@ map-discover-roads = Upptäck alla vägar
 map-discover-roads-tooltip = Markerar varje väg och korsning på kartan som körd, även i dina kart-DLC, läst från spelets egen karta. Städer du inte varit i förblir obesökta.
 map-discover-roads-needs-game = Kräver att spelet är installerat på den här datorn: dess karta säger var vägarna finns.
 map-discover-roads-confirm-title = Upptäcka alla vägar?
-map-discover-roads-confirm-body = Varje väg och korsning på kartan, även i dina kart-DLC, markeras som körd. Spelet kan räkna vägarna mot sina achievements, som Pathfinder (40 000 km upptäckta vägar), men om det gör det, eller när, vet man inte. Ångra tar tillbaka det tills du sparar, och sparfilen säkerhetskopieras först.
+map-discover-roads-confirm-body = Varje väg och korsning på kartan, även i dina kart-DLC, markeras som körd. Spelet kan räkna vägarna mot sina achievements{ $game ->
+    [ats] {""}
+   *[other] , som Pathfinder (40 000 km upptäckta vägar)
+}, men om det gör det, eller när, vet man inte. Ångra tar tillbaka det tills du sparar, och sparfilen säkerhetskopieras först.
 map-view-driven = Körda
 map-view-not-driven = Inte körda än
 map-view-truck = Din lastbil

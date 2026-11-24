@@ -368,6 +368,24 @@ mod tests {
     }
 
     #[test]
+    fn picks_each_games_words() {
+        let strings = Strings::new(Language::English);
+        assert_eq!(
+            strings.text("adr", &[("game", Arg::from("ats"))]),
+            "Hazardous cargo"
+        );
+        assert_eq!(strings.text("adr", &[("game", Arg::from("ets2"))]), "ADR");
+        let body = |game: &str| {
+            strings.text(
+                "map-discover-roads-confirm-body",
+                &[("game", Arg::from(game))],
+            )
+        };
+        assert!(body("ats").contains("achievements, but whether"));
+        assert!(body("ets2").contains("achievements, such as Pathfinder"));
+    }
+
+    #[test]
     fn a_missing_key_shows_itself() {
         assert_eq!(
             Strings::new(Language::English).text("no-such-key", &[]),

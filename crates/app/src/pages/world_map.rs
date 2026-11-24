@@ -224,7 +224,11 @@ fn confirm_discover_roads(
         let ids = ids.clone();
         alert
             .title(t!(cx, "map-discover-roads-confirm-title"))
-            .description(t!(cx, "map-discover-roads-confirm-body"))
+            .description(t!(
+                cx,
+                "map-discover-roads-confirm-body",
+                game = crate::labels::current_game_key(cx)
+            ))
             .confirm()
             // The kit's own Cancel is English; ours follows the app's language.
             .cancel_text(t!(cx, "cancel"))

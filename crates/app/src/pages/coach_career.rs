@@ -66,7 +66,7 @@ impl CoachCareerPage {
             AmountField::new(stats.distance_km, t!(cx, "coach-distance"), window, cx)
                 .id("coach-distance-input")
                 .min(0)
-                .suffix("km")
+                .suffix(crate::units::Unit::Kilometre.symbol(cx))
                 .compact()
         });
         let columns = vec![
