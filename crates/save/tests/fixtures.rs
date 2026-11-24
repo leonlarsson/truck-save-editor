@@ -475,15 +475,20 @@ fn real_saves_know_the_players_truck_and_position() {
     for (index, dir) in slot_dirs().into_iter().enumerate() {
         let mut slot = save::load(&dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display()));
         let position = save::position(&slot.game);
-        assert!(position.is_some(), "slot {index}: the player's position");
-        // A new career has no truck of its own yet (it drives quick jobs): nothing more to try.
+        // A new career has no truck of its own yet (it drives quick jobs), so no position (the
+        // game keeps zeros) and nothing more to try.
         let has_trucks = slot
             .game
             .first_of_kind("player")
             .is_some_and(|player| !player.items("trucks").is_empty());
         if !has_trucks {
+            assert!(
+                position.is_none(),
+                "slot {index}: no position without a truck"
+            );
             continue;
         }
+        assert!(position.is_some(), "slot {index}: the player's position");
         let own = save::own_truck(&slot.game);
         assert!(own.is_some(), "slot {index}: the player's truck");
         let drivers = |document: &sii::Document| {

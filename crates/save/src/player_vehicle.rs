@@ -271,6 +271,9 @@ pub fn position(document: &Document) -> Option<Position> {
             city,
         });
     }
+    // Without a truck of their own (a new career on quick jobs), the game keeps no position:
+    // `truck_placement` is all zeros.
+    own_truck(document)?;
     let player = document.unit(&player(document)?)?;
     Some(Position {
         placement: player.single("truck_placement")?.to_string(),
@@ -415,6 +418,14 @@ mod tests {
             can_drive(&document, "truck.b"),
             Err(PlayerProblem::AlreadyYours)
         );
+    }
+
+    #[test]
+    fn has_no_position_without_a_truck() {
+        let text = "SiiNunit\r\n{\r\neconomy : e {\r\n player: p\r\n}\r\n\r\nplayer : p {\r\n my_truck: null\r\n assigned_truck: null\r\n truck_placement: (0, 0, 0) (1; 0, 0, 0)\r\n current_job: null\r\n}\r\n\r\n}\r\n";
+        let without_truck = sii::parse_text(text).expect("parses");
+        assert_eq!(position(&without_truck), None);
+        assert!(position(&document()).is_some());
     }
 
     #[test]

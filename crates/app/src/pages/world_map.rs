@@ -118,11 +118,20 @@ impl WorldMapPage {
 
 impl Render for WorldMapPage {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        // Where the player's truck stands.
-        let place = save::position(&self.session.read(cx).preview())
-            .and_then(|position| position.city)
-            .map(|city| game_data::city_name(cx, &city))
-            .unwrap_or_else(|| t!(cx, "player-position-somewhere").to_string());
+        // Where the player's truck stands: in a city, out on the road, or nowhere yet.
+        let preview = self.session.read(cx).preview();
+        let where_truck = match save::position(&preview) {
+            Some(save::Position {
+                city: Some(city), ..
+            }) => t!(
+                cx,
+                "player-position-now",
+                place = game_data::city_name(cx, &city)
+            ),
+            Some(_) => t!(cx, "player-position-away"),
+            None if save::own_truck(&preview).is_none() => t!(cx, "player-position-no-truck"),
+            None => t!(cx, "player-position-unknown"),
+        };
         v_flex()
             .size_full()
             .gap_4()
@@ -141,11 +150,7 @@ impl Render for WorldMapPage {
                         v_flex()
                             .gap_2()
                             .items_start()
-                            .child(div().text_sm().child(t!(
-                                cx,
-                                "player-position-now",
-                                place = place
-                            )))
+                            .child(div().text_sm().child(where_truck))
                             .child(self.position.clone()),
                     )
                     .child(
