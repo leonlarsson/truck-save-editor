@@ -67,6 +67,9 @@ pub struct GameData {
     adr_icons: Vec<Arc<GameIcon>>,
     /// The game's text: key → text, in the loaded language.
     strings: HashMap<String, String>,
+    /// Texts the game's text doesn't have, from its definitions (place names in ATS, which
+    /// doesn't translate them): used when `strings` has no entry.
+    fallback_texts: HashMap<String, String>,
     /// Every city in the installed game and its maps: token → key of its name in the text.
     city_names: std::collections::BTreeMap<String, String>,
     /// Every viewpoint and photo trophy (the game's Gallery).
@@ -81,8 +84,9 @@ pub struct GameData {
     city_country_codes: BTreeMap<String, String>,
     /// Country token → the key of its name in the game's text.
     country_names: BTreeMap<String, String>,
-    /// Cities with a recruitment agency (of those the installed game has).
-    recruitment_cities: BTreeSet<String>,
+    /// Cities with a recruitment agency (of those the installed game has). Known for ETS2 only
+    /// (`recruitment.rs`, read off its map): `None` for ATS.
+    recruitment_cities: Option<BTreeSet<String>>,
     /// Vehicle models: model id → (brand text key, series text key).
     models: HashMap<String, (String, String)>,
     /// Companies' names (`renar` → `Renar Logistik`), as the game writes them (not translated).
@@ -215,13 +219,21 @@ impl GameData {
                 }
             });
         }
-        data.recruitment_cities = recruitment::RECRUITMENT_CITIES
-            .iter()
-            .filter(|token| cities.names.contains_key(**token))
-            .map(|token| token.to_string())
-            .collect();
+        data.recruitment_cities = (game == Game::Ets2).then(|| {
+            recruitment::RECRUITMENT_CITIES
+                .iter()
+                .filter(|token| cities.names.contains_key(**token))
+                .map(|token| token.to_string())
+                .collect()
+        });
         data.country_names = cities.country_names.clone();
         data.dealer_cities = cities.dealers;
+        // Place names the game's text doesn't have (ATS's): the definitions' own.
+        for (key, name) in &cities.plain_names {
+            data.fallback_texts
+                .entry(key.clone())
+                .or_insert_with(|| name.clone());
+        }
         data.city_names = cities.names;
         data.city_country_codes = cities
             .countries
@@ -241,9 +253,16 @@ impl GameData {
     }
 
     /// The game's text for a key, with references to other texts (`@@key@@`) filled in.
+    /// A text by its key: the game's, else one from its definitions.
+    fn entry(&self, key: &str) -> Option<&String> {
+        self.strings
+            .get(key)
+            .or_else(|| self.fallback_texts.get(key))
+    }
+
     pub fn text(&self, key: &str) -> Option<String> {
         let key = key.trim_matches('@');
-        let mut text = self.strings.get(key)?.clone();
+        let mut text = self.entry(key)?.clone();
         // Texts can refer to other texts; resolve a few levels deep.
         for _ in 0..4 {
             let Some(start) = text.find("@@") else { break };
@@ -251,7 +270,7 @@ impl GameData {
                 break;
             };
             let inner = text[start + 2..start + 2 + length].to_string();
-            let replacement = self.strings.get(&inner).cloned().unwrap_or_default();
+            let replacement = self.entry(&inner).cloned().unwrap_or_default();
             text.replace_range(start..start + 4 + length, &replacement);
         }
         Some(text)
@@ -340,9 +359,10 @@ impl GameData {
         &self.dealer_cities
     }
 
-    /// Cities with a recruitment agency, in the installed game and its map DLCs.
-    pub fn recruitment_cities(&self) -> &BTreeSet<String> {
-        &self.recruitment_cities
+    /// Cities with a recruitment agency, in the installed game and its map DLCs; `None` where
+    /// the editor doesn't know them (ATS).
+    pub fn recruitment_cities(&self) -> Option<&BTreeSet<String>> {
+        self.recruitment_cities.as_ref()
     }
 
     /// The rank name for a truck driver level (`Newbie` … ), if the game has one.
@@ -408,6 +428,14 @@ fn rank(ranks: &[(i64, String)], level: i64) -> Option<&str> {
         .rev()
         .find(|(first, _)| level >= *first)
         .map(|(_, key)| key.as_str())
+}
+
+/// The game's logo, from its install (`material/ui/logo/ets2_logo` in `base.scs`: American Truck
+/// Simulator keeps its own logo under the same name), shrunk to keep it small in memory. `None`
+/// when the game or its logo isn't there.
+pub fn game_logo(install_dir: &Path) -> Option<GameIcon> {
+    let mut base = hashfs::Archive::open(install_dir.join("base.scs")).ok()?;
+    GameIcon::load(&mut base, "/material/ui/logo", "ets2_logo").map(|logo| logo.shrunk(512))
 }
 
 /// The DLC an archive belongs to, by its id (`eut2_sstrip`), from its manifest
@@ -607,6 +635,25 @@ fn readable_id(id: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn falls_back_to_the_definitions_place_names() {
+        let mut data = GameData::default();
+        // As in ATS: a group's name points at a state's key, which only its definition names.
+        data.strings
+            .insert("algr_desert".to_string(), "@@desert@@".to_string());
+        data.fallback_texts
+            .insert("desert".to_string(), "Desert State".to_string());
+        data.strings
+            .insert("hello".to_string(), "Hello".to_string());
+        data.fallback_texts
+            .insert("hello".to_string(), "Hi".to_string());
+        assert_eq!(data.text("algr_desert").as_deref(), Some("Desert State"));
+        assert_eq!(data.text("@@desert@@").as_deref(), Some("Desert State"));
+        // The game's own text comes first.
+        assert_eq!(data.text("hello").as_deref(), Some("Hello"));
+        assert_eq!(data.text("nowhere"), None);
+    }
 
     #[test]
     fn names_an_album_item_even_when_its_key_is_off() {

@@ -202,10 +202,11 @@ impl OpenSavePage {
                             })
                         })
                 });
-                page.selected_profile = in_added
+                let selected = in_added
                     .or_else(|| shown.as_ref().and_then(position))
                     .unwrap_or(0);
                 page.found = Some(found);
+                page.select_profile(selected, cx);
                 page.load_previews(cx);
                 cx.notify();
             });
@@ -326,6 +327,24 @@ impl OpenSavePage {
         }));
     }
 
+    /// Shows a profile's saves (by its place in the list of every profile found), and reads its
+    /// game's data if that's another game: its saves' DLC check reads that game's install.
+    fn select_profile(&mut self, index: usize, cx: &mut Context<Self>) {
+        self.selected_profile = index;
+        let game = self
+            .found
+            .as_ref()
+            .and_then(|found| found.profiles.get(index))
+            .map(|(profile, _)| profile.game);
+        // Behind an open save (its search still finishing), the save's game stays.
+        if let Some(game) = game
+            && crate::workspace::shows_start_screen(cx)
+        {
+            crate::game_data::set_game(cx, game);
+        }
+        cx.notify();
+    }
+
     fn render_profiles(
         &self,
         profiles: &[(Profile, Vec<Slot>)],
@@ -346,32 +365,109 @@ impl OpenSavePage {
                 Some(root) => added_folder_name(root).into(),
                 None => labels::location(cx, profile.location),
             };
-            match profile.game {
-                Game::Ets2 => t!(cx, "profile-place", name = &profile.name, place = place),
-                Game::Ats => t!(
-                    cx,
-                    "profile-game-place",
-                    name = &profile.name,
-                    game = "ATS",
-                    place = place
-                ),
-            }
+            t!(cx, "profile-place", name = &profile.name, place = place)
         };
 
+        // The chosen game's profiles only (the game picker above chooses the game); each button
+        // keeps its place in the whole list, which is what `selected_profile` counts in.
+        let game = profiles
+            .get(self.selected_profile)
+            .map(|(profile, _)| profile.game)
+            .unwrap_or(Game::Ets2);
+        let shown: Vec<usize> = (0..profiles.len())
+            .filter(|&index| profiles[index].0.game == game)
+            .collect();
+        let buttons = shown.iter().map(|&index| {
+            Button::new(("profile", index))
+                .label(describe(&profiles[index].0))
+                .selected(index == self.selected_profile)
+        });
         ButtonGroup::new("profiles")
             .outline()
             .small()
-            .children(profiles.iter().enumerate().map(|(index, (profile, _))| {
-                Button::new(("profile", index))
-                    .label(describe(profile))
-                    .selected(index == self.selected_profile)
-            }))
-            .on_click(cx.listener(|this, clicked: &Vec<usize>, _, cx| {
-                if let Some(&index) = clicked.first() {
-                    this.selected_profile = index;
-                    cx.notify();
+            .children(buttons)
+            .on_click(cx.listener(move |this, clicked: &Vec<usize>, _, cx| {
+                if let Some(&index) = clicked.first().and_then(|position| shown.get(*position)) {
+                    this.select_profile(index, cx);
                 }
             }))
+    }
+
+    /// The game picker: a card for each game, with how many profiles and saves were found for
+    /// it; picking one shows its first profile. A game with nothing found is shown, off, saying so.
+    fn render_games(
+        &self,
+        profiles: &[(Profile, Vec<Slot>)],
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        let chosen = profiles
+            .get(self.selected_profile)
+            .map(|(profile, _)| profile.game)
+            .unwrap_or(Game::Ets2);
+        let cards = Game::ALL.into_iter().map(|game| {
+            let of_game: Vec<usize> = (0..profiles.len())
+                .filter(|&index| profiles[index].0.game == game)
+                .collect();
+            let saves: usize = of_game.iter().map(|&index| profiles[index].1.len()).sum();
+            let detail = if of_game.is_empty() {
+                t!(cx, "start-game-none")
+            } else {
+                t!(
+                    cx,
+                    "start-game-detail",
+                    profiles = of_game.len(),
+                    saves = saves
+                )
+            };
+            let is_chosen = game == chosen;
+            let first = of_game.first().copied();
+            // The game's own logo, from its install (none when it isn't installed).
+            let logo = crate::game_data::game_logo(cx, game)
+                .map(|logo| crate::ui::GameIconView::new(logo).size(3.5));
+            Button::new(("game", game as usize))
+                .outline()
+                .flex_1()
+                .h(rems(4.5))
+                .selected(is_chosen)
+                .disabled(first.is_none())
+                .accessibility_label(SharedString::from(game.name()))
+                .child(
+                    h_flex()
+                        .w_full()
+                        .justify_between()
+                        .items_center()
+                        .gap_3()
+                        .child(
+                            h_flex()
+                                .gap_3()
+                                .items_center()
+                                .min_w_0()
+                                .children(logo)
+                                .child(
+                                    v_flex()
+                                        .items_start()
+                                        .min_w_0()
+                                        .child(div().font_medium().truncate().child(game.name()))
+                                        .child(
+                                            div()
+                                                .text_xs()
+                                                .text_color(cx.theme().muted_foreground)
+                                                .child(detail),
+                                        ),
+                                ),
+                        )
+                        // The chosen one says so in shape, not only colour.
+                        .children(is_chosen.then(|| Icon::new(IconName::Check).small())),
+                )
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    if let Some(index) = first
+                        && !is_chosen
+                    {
+                        this.select_profile(index, cx);
+                    }
+                }))
+        });
+        h_flex().gap_3().children(cards)
     }
 
     /// After a crash: says so, with a way to report it (an issue filled in with what happened)
@@ -942,9 +1038,15 @@ impl Render for OpenSavePage {
                 } else {
                     self.render_summary(profile, slots, cx).into_any_element()
                 };
+                // More than one profile of the chosen game: which one.
+                let profiles_of_game = profiles
+                    .iter()
+                    .filter(|(other, _)| other.game == profile.game)
+                    .count();
                 v_flex()
                     .gap_6()
-                    .when(profiles.len() > 1, |this| {
+                    .child(div().px_3().child(self.render_games(profiles, cx)))
+                    .when(profiles_of_game > 1, |this| {
                         this.child(div().px_3().child(self.render_profiles(profiles, cx)))
                     })
                     // Before opening one: what isn't supported for this game yet.

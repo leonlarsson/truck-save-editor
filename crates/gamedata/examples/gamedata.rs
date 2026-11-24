@@ -57,7 +57,7 @@ fn main() {
             println!(
                 "{} cities with a dealer, {} with a recruitment agency",
                 data.dealer_cities().len(),
-                data.recruitment_cities().len()
+                data.recruitment_cities().map_or(0, |cities| cities.len())
             );
         }
         Err(error) => println!("couldn't read it: {error}"),

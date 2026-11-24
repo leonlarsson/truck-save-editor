@@ -47,4 +47,10 @@ impl Game {
     pub fn uses_miles(self) -> bool {
         matches!(self, Game::Ats)
     }
+
+    /// Whether the game has coach services (ETS2's Coaches update). An ATS save carries the coach
+    /// fields too, empty, and its game has none of the coaches' definitions.
+    pub fn has_coaches(self) -> bool {
+        matches!(self, Game::Ets2)
+    }
 }

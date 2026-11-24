@@ -61,6 +61,14 @@ start-slot-missing = { $count ->
 start-slot-number = Speicherplatz { $number }
 profile-place = { $name } · { $place }
 profile-game-place = { $name } · { $game } · { $place }
+start-game-detail = { $profiles ->
+    [one] Ein Profil
+   *[other] { $profiles } Profile
+} · { $saves ->
+    [one] ein Spielstand
+   *[other] { $saves } Spielstände
+}
+start-game-none = Auf diesem PC nicht gefunden
 location-steam-cloud = Steam Cloud
 location-this-pc = Dieser PC
 location-loose = Ein einzelner Spielstand
@@ -192,7 +200,7 @@ save-profile-failed = Der Spielstand wurde geschrieben, der Unternehmensname abe
 ## Warnings
 
 newer-game-warning = Dieser Spielstand stammt aus einer neueren Spielversion, als mit diesem Editor getestet wurde. Alles, was der Editor nicht versteht, bleibt unverändert, aber prüfe deine Änderungen im Spiel und behalte die Sicherung.
-ats-warning = American Truck Simulator wird noch nicht vollständig unterstützt. Spielstände lassen sich sicher öffnen und speichern, mit Sicherung, aber Städtenamen, Motoren, die DLC-Prüfung und Entfernungen (in km statt Meilen) stammen aus Euro Truck Simulator 2 oder fehlen. Prüfe deine Änderungen im Spiel.
+ats-warning = Die Unterstützung für American Truck Simulator ist neu. Seine Spielstände werden sicher geöffnet und gespeichert, mit einer Sicherung, und der Editor liest die eigenen Daten des Spiels, weiß aber noch nicht, welche Städte eine Arbeitsagentur haben, und der Kilometerstand wird in Kilometern bearbeitet. Prüfe deine Änderungen im Spiel.
 
 ## Undo and redo
 
@@ -339,7 +347,7 @@ settings-appearance-system = Wie das System
 settings-appearance-light = Hell
 settings-appearance-dark = Dunkel
 settings-game = Spielordner
-settings-game-description = Wo Euro Truck Simulator 2 installiert ist. Der Editor liest daraus Level-Tabellen, Namen und Symbole und ändert dort nie etwas.
+settings-game-description = Wo { $game } installiert ist. Der Editor liest daraus Level-Tabellen, Namen und Symbole und ändert dort nie etwas.
 settings-game-found = Automatisch gefunden
 settings-game-picked = Von dir gewählt
 settings-game-not-found = Nicht gefunden. Wähle den Ordner, in dem das Spiel installiert ist.
@@ -573,6 +581,7 @@ map-unlock-dealers-tooltip = Schaltet den Lkw-Händler in jeder Stadt frei, die 
 map-unlock-recruitments = Alle Agenturen freischalten
 map-unlock-recruitments-tooltip = Schaltet die Arbeitsagentur in jeder Stadt frei, die eine hat, als wärst du an jeder vorbeigefahren.
 map-needs-game = Zum Freischalten von Händlern und Agenturen muss das Spiel auf diesem PC installiert sein: Seine Daten sagen, welche Städte sie haben.
+map-agencies-unknown = Welche Städte eine Arbeitsagentur haben, ist für { $game } noch nicht bekannt, daher lassen sich Agenturen hier nicht freischalten.
 column-dealer = Lkw-Händler
 column-recruitment = Arbeitsagentur
 map-place-unlocked = Freigeschaltet
@@ -699,6 +708,7 @@ fleet-trailers = { $count ->
 fleet-tab-trailers = Auflieger · { $count }
 no-garage = Keine Garage
 distance-km = { $amount } km
+distance-mi = { $amount } mi
 percent = { $amount }%
 trucks-table = Fahrzeuge
 unknown-truck = Unbekanntes Modell
@@ -749,7 +759,6 @@ removal-after = Entfernt
 change-career = Karriere
 change-you = Du
 change-cities = Städte
-change-km = { $km } km
 change-tonnes = { $tonnes } t
 change-wear = Verschleiß: { $part }
 change-on = An

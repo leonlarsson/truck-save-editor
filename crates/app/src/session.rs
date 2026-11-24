@@ -360,12 +360,12 @@ impl Session {
             return Some((subject, what, old, new));
         }
         if field == "odometer" {
-            let km = |value: &str| thousands(sii::value::parse_i64(value).unwrap_or(0));
+            let km = |value: &str| sii::value::parse_i64(value).unwrap_or(0);
             return Some((
                 subject,
                 t!(cx, "column-odometer"),
-                t!(cx, "change-km", km = km(&saved)),
-                t!(cx, "change-km", km = km(text)),
+                crate::labels::distance(cx, self.game(), km(&saved)),
+                crate::labels::distance(cx, self.game(), km(text)),
             ));
         }
         if VEHICLE_WEAR_FIELDS.contains(&field) {
@@ -1704,8 +1704,8 @@ impl Session {
             add(
                 &coaches,
                 t!(cx, "coach-distance"),
-                t!(cx, "distance-km", amount = thousands(saved.distance_km)),
-                t!(cx, "distance-km", amount = thousands(after.distance_km)),
+                crate::labels::distance(cx, self.game(), saved.distance_km),
+                crate::labels::distance(cx, self.game(), after.distance_km),
             );
             add(
                 &coaches,
@@ -2312,6 +2312,12 @@ impl Session {
     }
 
     /// The profile's folder name, used to keep its backups apart.
+    /// Whether the save has a coach career to edit: a game with coach services, and a save that
+    /// has the coach career's fields.
+    pub fn has_coach_career(&self) -> bool {
+        self.game().has_coaches() && self.career().coach_experience.is_some()
+    }
+
     pub fn profile_folder(&self) -> String {
         self.profile
             .dir

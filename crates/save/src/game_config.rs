@@ -97,7 +97,7 @@ mod disk {
     }
 
     /// Writes the game's `config.cfg`, after backing up the file as it was (under
-    /// `<backups>/config/<time>/config.cfg`). Refuses while the game runs: it writes the file
+    /// `<backups>/config/<game>/<time>/config.cfg`). Refuses while the game runs: it writes the file
     /// when it exits.
     pub fn write_game_config(
         game: Game,

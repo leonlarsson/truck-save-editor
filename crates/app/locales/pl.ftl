@@ -62,6 +62,13 @@ start-slot-missing = { $count ->
 start-slot-number = Slot { $number }
 profile-place = { $name } · { $place }
 profile-game-place = { $name } · { $game } · { $place }
+start-game-detail = { $profiles ->
+    [one] Jeden profil
+    [few] { $profiles } profile
+    [many] { $profiles } profili
+   *[other] { $profiles } profilu
+} · zapisy: { $saves }
+start-game-none = Nie znaleziono na tym komputerze
 location-steam-cloud = Steam Cloud
 location-this-pc = Ten komputer
 location-loose = Pojedynczy zapis
@@ -201,7 +208,7 @@ save-profile-failed = Zapis gry został zapisany, ale nazwa firmy nie: wciąż c
 ## Warnings
 
 newer-game-warning = Ten zapis pochodzi z nowszej wersji gry niż ta, z którą edytor był testowany. Wszystko, czego edytor nie rozumie, zostaje bez zmian, ale sprawdź swoje zmiany w grze i zachowaj kopię zapasową.
-ats-warning = American Truck Simulator nie jest jeszcze w pełni obsługiwany. Zapisy otwierają się i zapisują bezpiecznie, z kopią zapasową, ale nazwy miast, silniki, sprawdzanie DLC i odległości (w km, nie w milach) pochodzą z Euro Truck Simulator 2 lub ich brak. Sprawdź zmiany w grze.
+ats-warning = Obsługa American Truck Simulator jest nowa. Zapisy otwierają się i zapisują bezpiecznie, z kopią zapasową, a edytor czyta dane samej gry, ale nie wie jeszcze, które miasta mają agencję pracy, a przebieg edytuje się w kilometrach. Sprawdź zmiany w grze.
 
 ## Undo and redo
 
@@ -354,7 +361,7 @@ settings-appearance-system = Jak w systemie
 settings-appearance-light = Jasny
 settings-appearance-dark = Ciemny
 settings-game = Folder gry
-settings-game-description = Gdzie jest zainstalowany Euro Truck Simulator 2. Edytor czyta z niego tabele poziomów, nazwy i ikony i nigdy niczego tam nie zmienia.
+settings-game-description = Gdzie jest zainstalowany { $game }. Edytor czyta z niego tabele poziomów, nazwy i ikony i nigdy niczego tam nie zmienia.
 settings-game-found = Znaleziony automatycznie
 settings-game-picked = Wybrany przez ciebie
 settings-game-not-found = Nie znaleziono. Wybierz folder, w którym zainstalowana jest gra.
@@ -595,6 +602,7 @@ map-unlock-dealers-tooltip = Odblokuj dealera ciężarówek w każdym mieście, 
 map-unlock-recruitments = Odblokuj każdą agencję
 map-unlock-recruitments-tooltip = Odblokuj agencję pracy w każdym mieście, które ją ma, jakbyś przejechał obok każdej.
 map-needs-game = Odblokowanie dealerów i agencji wymaga gry zainstalowanej na tym komputerze: jej dane mówią, które miasta je mają.
+map-agencies-unknown = Nie wiadomo jeszcze, które miasta w grze { $game } mają agencję pracy, więc nie można tu odblokować agencji.
 column-dealer = Dealer ciężarówek
 column-recruitment = Agencja pracy
 map-place-unlocked = Odblokowane
@@ -732,6 +740,7 @@ fleet-trailers = { $count ->
 fleet-tab-trailers = Naczepy · { $count }
 no-garage = Bez garażu
 distance-km = { $amount } km
+distance-mi = { $amount } mil
 percent = { $amount }%
 trucks-table = Pojazdy
 unknown-truck = Nieznany model
@@ -782,7 +791,6 @@ removal-after = Usunięte
 change-career = Kariera
 change-you = Ty
 change-cities = Miasta
-change-km = { $km } km
 change-tonnes = { $tonnes } t
 change-wear = Zużycie: { $part }
 change-on = Jest

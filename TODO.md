@@ -139,6 +139,14 @@ Agreed work, in order. Each step should end with something the owner can see or 
 ## Later
 
 - [ ] American Truck Simulator: test on real ATS saves (the code is written for both from the start). Until then, ATS profiles and saves show a warning (2026-11-22). Still ETS2-only: the game's data (city names, ranks, engines, icons, the DLC check), distances in miles, and Settings (the game's folder, whether it's running, its config.cfg).
+  - [x] A first real ATS save (owner, 2026-11-24, a new career; copy in `fixtures/ats/2`) opens and reads; `TSE_GAME=ats` opens it with `TSE_SLOT`.
+  - [x] The game's data is read per game, from that game's install (2026-11-24): an ATS save gets ATS's map, cities, dealers, photo album, texts and DLC check; Settings keeps a folder for each game; Game settings acts on the current game. ATS's place names come from its definitions (its texts don't translate them).
+  - [x] Coach career only for a game with coaches (`Game::has_coaches`): ATS saves carry empty coach fields.
+  - [x] Distances read in miles for ATS (`labels::distance`).
+  - [ ] Recruitment agencies for ATS: read which cities have one off its map (as for ETS2's list); until then the Cities page says they aren't known.
+  - [ ] Odometer and coach distance are edited in kilometres: in miles for ATS (convert what's typed).
+  - [ ] A real check in ATS (owner): money, experience, a city visited, a truck repaired, saved and loaded in the game.
+  - [ ] Quick travel is off ("an older game version"): check what an ATS save needs for it.
 - [x] App icon (`scripts/make-icon.py`, embedded in the .exe) and a release workflow (version tag → draft release).
 - [ ] A final product name (Truck Save Editor for now, in `APP_NAME`; never a game name, those are SCS trademarks), signed Windows builds (see `docs/releasing.md` → Code signing), the first release (the owner's call; the pipeline is ready, `docs/releasing.md`).
 - [ ] Web version, on hold (the owner's call, 2026-11-21): the desktop app comes first. The core crates stay free of UI and disk access so it stays possible (GPUI's web target, or a page around the core compiled to wasm), but no work on it until it's picked up again.

@@ -57,6 +57,14 @@ start-slot-missing = { $count ->
 start-slot-number = Slot { $number }
 profile-place = { $name } · { $place }
 profile-game-place = { $name } · { $game } · { $place }
+start-game-detail = { $profiles ->
+    [one] One profile
+   *[other] { $profiles } profiles
+} · { $saves ->
+    [one] one save
+   *[other] { $saves } saves
+}
+start-game-none = Not found on this PC
 location-steam-cloud = Steam Cloud
 location-this-pc = This PC
 location-loose = A save on its own
@@ -188,7 +196,7 @@ save-profile-failed = The save was written, but the company name couldn't be: it
 ## Warnings
 
 newer-game-warning = This save is from a newer version of the game than this editor has been tested with. Everything the editor doesn't understand is kept as it is, but check your changes in the game, and keep the backup.
-ats-warning = American Truck Simulator isn't fully supported yet. Its saves open and save safely, with a backup, but city names, engines, the DLC check and distances (shown in km, not miles) come from Euro Truck Simulator 2 or are missing. Check your changes in the game.
+ats-warning = American Truck Simulator support is new. Its saves open and save safely, with a backup, and the editor reads the game's own data, but it doesn't know yet which cities have a recruitment agency, and the odometer is edited in kilometres. Check your changes in the game.
 
 ## Undo and redo
 
@@ -335,7 +343,7 @@ settings-appearance-system = Same as the system
 settings-appearance-light = Light
 settings-appearance-dark = Dark
 settings-game = Game folder
-settings-game-description = Where Euro Truck Simulator 2 is installed. The editor reads level tables, names and icons from it, and never changes anything there.
+settings-game-description = Where { $game } is installed. The editor reads level tables, names and icons from it, and never changes anything there.
 settings-game-found = Found automatically
 settings-game-picked = Chosen by you
 settings-game-not-found = Not found. Choose the folder the game is installed in.
@@ -569,6 +577,7 @@ map-unlock-dealers-tooltip = Unlock the truck dealer in every city that has one,
 map-unlock-recruitments = Unlock every agency
 map-unlock-recruitments-tooltip = Unlock the recruitment agency in every city that has one, as if you'd driven past each.
 map-needs-game = Unlocking dealers and agencies needs the game installed on this PC: its data says which cities have them.
+map-agencies-unknown = Which cities have a recruitment agency isn't known for { $game } yet, so agencies can't be unlocked here.
 column-dealer = Truck dealer
 column-recruitment = Recruitment agency
 map-place-unlocked = Unlocked
@@ -695,6 +704,7 @@ fleet-trailers = { $count ->
 fleet-tab-trailers = Trailers · { $count }
 no-garage = No garage
 distance-km = { $amount } km
+distance-mi = { $amount } mi
 percent = { $amount }%
 trucks-table = Vehicles
 unknown-truck = Unknown model
@@ -745,7 +755,6 @@ removal-after = Removed
 change-career = Career
 change-you = You
 change-cities = Cities
-change-km = { $km } km
 change-tonnes = { $tonnes } t
 change-wear = { $part } wear
 change-on = On

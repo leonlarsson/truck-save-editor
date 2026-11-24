@@ -9,6 +9,10 @@ use std::collections::{BTreeMap, BTreeSet};
 pub(crate) struct Cities {
     /// Token → the key of its name in the game's text (`berlin` → `berlin`).
     pub names: BTreeMap<String, String>,
+    /// A name key → the name as the definition writes it (`aberdeen` → `Aberdeen`), for cities
+    /// and countries (or states): the game's text has no entry for these keys in ATS, which
+    /// doesn't translate place names.
+    pub plain_names: BTreeMap<String, String>,
     /// Tokens of the cities with a truck dealer.
     pub dealers: BTreeSet<String>,
     /// City token → its country's token (`verona` → `italy`).
@@ -36,6 +40,9 @@ impl Cities {
                 .map(|key| sii::value::parse_string(key).trim_matches('@').to_string())
                 .filter(|key| !key.is_empty())
                 .unwrap_or_else(|| token.to_string());
+            if let Some(name) = plain_name(unit, "city_name") {
+                self.plain_names.insert(name_key.clone(), name);
+            }
             self.names.insert(token.to_string(), name_key);
             if let Some(country) = unit.single("country") {
                 let country = sii::value::parse_string(country).to_string();
@@ -60,6 +67,9 @@ impl Cities {
                 .map(|key| sii::value::parse_string(key).trim_matches('@').to_string())
                 .filter(|key| !key.is_empty())
                 .unwrap_or_else(|| token.to_string());
+            if let Some(name) = plain_name(unit, "name") {
+                self.plain_names.insert(name_key.clone(), name);
+            }
             self.country_names.insert(token.to_string(), name_key);
             if let Some(code) = unit.single("country_code") {
                 let code = sii::value::parse_string(code).to_string();
@@ -69,4 +79,11 @@ impl Cities {
             }
         }
     }
+}
+
+/// A definition's plain name (`city_name: "Aberdeen"`), if it has one.
+fn plain_name(unit: &sii::Unit, field: &str) -> Option<String> {
+    unit.single(field)
+        .map(|name| sii::value::parse_string(name).to_string())
+        .filter(|name| !name.is_empty())
 }

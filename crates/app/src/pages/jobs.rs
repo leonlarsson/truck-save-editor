@@ -111,6 +111,7 @@ impl JobsPage {
 
     fn reload(&mut self, cx: &mut Context<Self>) {
         let session = self.session.read(cx);
+        let game = session.game();
         let (jobs, now) = session.jobs();
         let my_cities: HashSet<String> = session
             .garages()
@@ -140,7 +141,7 @@ impl JobsPage {
                             city = game_data::city_name(cx, city)
                         )
                     };
-                    let distance = t!(cx, "distance-km", amount = thousands(job.distance_km));
+                    let distance = crate::labels::distance(cx, game, job.distance_km);
                     Row {
                         from: place(&job.from_company, &job.from_city),
                         to: place(&job.to_company, &job.to_city),
@@ -188,6 +189,7 @@ impl JobsPage {
     /// it's clear what Undo would bring back.
     fn render_current_job(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let session = self.session.read(cx);
+        let game = session.game();
         let (saved, is_cancelled) = session.saved_job()?;
         let job = session.current_job().unwrap_or(saved);
         let now = session.jobs().1;
@@ -223,7 +225,7 @@ impl JobsPage {
         let facts = [
             (
                 t!(cx, "column-distance"),
-                format!("{} km", thousands(job.planned_distance_km)).into(),
+                crate::labels::distance(cx, game, job.planned_distance_km),
             ),
             (t!(cx, "current-job-deadline"), deadline),
             (t!(cx, "column-urgency"), urgency),

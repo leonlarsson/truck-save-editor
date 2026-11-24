@@ -78,7 +78,9 @@ impl QuickStart {
     fn unavailable(&self, choice: Choice, cx: &Context<Self>) -> Option<SharedString> {
         let session = self.session.read(cx);
         match choice {
-            Choice::CoachSkills if session.career().coach_skills.is_none() => {
+            Choice::CoachSkills
+                if !session.has_coach_career() || session.career().coach_skills.is_none() =>
+            {
                 Some(t!(cx, "quick-start-no-coaches"))
             }
             Choice::HqGarage => {

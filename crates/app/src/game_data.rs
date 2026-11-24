@@ -1,5 +1,9 @@
 //! The installed game's own data (level tables, rank names, city names, icons), loaded in the background
 //! at startup. Until it arrives, or if the game isn't found, the app uses built-in fallbacks.
+//!
+//! It's one game's at a time: the current game's (`current_game`), the open save's or the one
+//! picked on the start screen (`set_game`). Each game's data, once read, is kept while the other's
+//! is shown, so switching back is instant. Everything here reads the current game's.
 
 use std::collections::{BTreeSet, HashMap};
 use std::sync::{Arc, Mutex};
@@ -8,7 +12,7 @@ use gamedata::{GameData, GameIcon};
 use gpui_kit::{App, AppContext as _, Context, Global, Subscription, Window};
 use save::{Game, LevelTable};
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct Loaded {
     data: Option<Arc<GameData>>,
     /// The DLCs and mods installed (`None` without the game).
@@ -20,11 +24,12 @@ struct Loaded {
 /// Every road and junction on the game's map (for the map view and Discover every road), read
 /// after the rest of the game's data so it never holds that up. `None` until read, or without the
 /// game.
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct MapRoads(Option<RoadsRead>);
 
 /// The map's roads as read: with where they are (for the map view), and their ids alone (for
 /// Discover every road, kept apart so it isn't rebuilt from the roads each time).
+#[derive(Clone)]
 struct RoadsRead {
     roads: Arc<Vec<gamedata::MapRoad>>,
     ids: Arc<Vec<u64>>,
@@ -113,33 +118,173 @@ pub fn map_roads(cx: &App) -> Option<Arc<Vec<gamedata::MapRoad>>> {
 
 impl Global for Loaded {}
 
+/// The game whose data is loaded (see the module's comment).
+struct CurrentGame(Game);
+
+impl Global for CurrentGame {}
+
+/// Each other game's data, once read: its data and its map.
+#[derive(Default)]
+struct Kept(HashMap<Game, (Loaded, Option<MapRoads>)>);
+
+impl Global for Kept {}
+
+/// The game whose data is loaded: Euro Truck Simulator 2 until another is picked.
+pub fn current_game(cx: &App) -> Game {
+    cx.try_global::<CurrentGame>()
+        .map(|current| current.0)
+        .unwrap_or(Game::Ets2)
+}
+
+/// Calls back when the current game changes (see `set_game`).
+pub fn observe_current_game_in<V: 'static>(
+    window: &mut Window,
+    cx: &mut Context<V>,
+    on_change: impl Fn(&mut V, &mut Window, &mut Context<V>) + 'static,
+) -> Subscription {
+    cx.observe_global_in::<CurrentGame>(window, on_change)
+}
+
+/// Shows another game's data: what was read for it before, else read now. The current game's is
+/// kept for when it's picked again.
+pub fn set_game(cx: &mut App, game: Game) {
+    let previous = current_game(cx);
+    if previous == game {
+        return;
+    }
+    if !cx.has_global::<Kept>() {
+        cx.set_global(Kept::default());
+    }
+    // Kept only when fully read: a half-read game is read again when picked.
+    let loaded = cx.try_global::<Loaded>().cloned();
+    let map = cx.try_global::<MapRoads>().cloned();
+    if let Some(loaded) = loaded.filter(|loaded| !loaded.is_loading)
+        && map.is_some()
+    {
+        cx.global_mut::<Kept>().0.insert(previous, (loaded, map));
+    }
+    cx.set_global(CurrentGame(game));
+    forget_read_on_demand(cx);
+    match cx.global_mut::<Kept>().0.remove(&game) {
+        Some((loaded, map)) => {
+            cx.set_global(loaded);
+            match map {
+                Some(map) => cx.set_global(map),
+                None => forget_map(cx),
+            }
+            cx.refresh_windows();
+        }
+        None => {
+            forget_map(cx);
+            load(cx);
+        }
+    }
+}
+
+/// The map isn't read (for the game being switched to): what's shown waits for it.
+fn forget_map(cx: &mut App) {
+    if cx.has_global::<MapRoads>() {
+        cx.remove_global::<MapRoads>();
+    }
+}
+
+/// What's read the first time it's asked for (a model's engines, its paint jobs, the companies'
+/// cargo, drivers' faces) is the current game's: read again for another.
+fn forget_read_on_demand(cx: &mut App) {
+    cx.set_global(Parts::default());
+    cx.set_global(PaintJobs::default());
+    cx.set_global(CompanyCargoState::default());
+    cx.set_global(Pictures::default());
+}
+
+/// Each installed game's logo (the start screen's game picker shows them).
+#[derive(Default)]
+struct Logos(Vec<(Game, Arc<gamedata::GameIcon>)>);
+
+impl Global for Logos {}
+
 /// Starts reading the game's data in the background; windows redraw when it arrives.
 pub fn init(cx: &mut App) {
     cx.set_global(Loaded::default());
     reload(cx);
+    load_logos(cx);
 }
 
-/// Where the game is: the folder picked in the settings, else the one Steam knows.
+/// Reads each installed game's logo from its own files, in the background.
+fn load_logos(cx: &mut App) {
+    cx.set_global(Logos::default());
+    let dirs: Vec<(Game, Option<std::path::PathBuf>)> = Game::ALL
+        .into_iter()
+        .map(|game| (game, install_dir_of(cx, game)))
+        .collect();
+    cx.spawn(async move |cx| {
+        let logos = cx
+            .background_spawn(async move {
+                dirs.into_iter()
+                    .filter_map(|(game, dir)| {
+                        let mut logo = gamedata::game_logo(&dir?)?;
+                        // Both games' logos have the same path, and drawn icons are kept by
+                        // name (`ui::GameIconView`): each gets its own.
+                        logo.name = format!("{}{}", game.name(), logo.name);
+                        Some((game, Arc::new(logo)))
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .await;
+        cx.update(|cx| {
+            cx.set_global(Logos(logos));
+            cx.refresh_windows();
+        });
+    })
+    .detach();
+}
+
+/// A game's logo, from its install, once read.
+pub fn game_logo(cx: &App, game: Game) -> Option<Arc<gamedata::GameIcon>> {
+    cx.try_global::<Logos>()?
+        .0
+        .iter()
+        .find(|(of, _)| *of == game)
+        .map(|(_, logo)| logo.clone())
+}
+
+/// Where the current game is: the folder picked in the settings, else the one Steam knows.
 pub fn install_dir(cx: &App) -> Option<std::path::PathBuf> {
-    crate::settings::get(cx)
-        .game_dir
-        .or_else(|| gamedata::find_install(Game::Ets2))
+    install_dir_of(cx, current_game(cx))
 }
 
-/// Reads the game's data again (after the language or the game's folder changed). What's shown
-/// until it arrives is the data read before.
+/// Where a game is: the folder picked in the settings, else the one Steam knows.
+pub fn install_dir_of(cx: &App, game: Game) -> Option<std::path::PathBuf> {
+    let picked = crate::settings::get(cx).game_dir(game).cloned();
+    // Tests never read the games installed on the machine running them (as they never read its
+    // settings file): only a folder a test picks.
+    if cfg!(test) {
+        return picked;
+    }
+    picked.or_else(|| gamedata::find_install(game))
+}
+
+/// Reads the current game's data again (after the language or a game's folder changed), and
+/// forgets what was read for the others. What's shown until it arrives is the data read before.
 pub fn reload(cx: &mut App) {
+    cx.set_global(Kept::default());
+    forget_read_on_demand(cx);
+    load(cx);
+}
+
+/// Reads the current game's data, then its map, in the background.
+fn load(cx: &mut App) {
     if !cx.has_global::<Loaded>() {
         cx.set_global(Loaded::default());
     }
     cx.global_mut::<Loaded>().is_loading = true;
-    let dir = install_dir(cx);
+    let game = current_game(cx);
+    let dir = install_dir_of(cx, game);
     let roads_dir = dir.clone();
     let language = crate::settings::get(cx).language.game_code();
     cx.spawn(async move |cx| {
         let (data, installed) = cx
             .background_spawn(async move {
-                let game = Game::Ets2;
                 let Some(dir) = dir else {
                     return (None, None);
                 };
@@ -149,6 +294,11 @@ pub fn reload(cx: &mut App) {
                 (data, installed)
             })
             .await;
+        // Another game picked meanwhile: this one's read isn't shown (it's read again if picked).
+        let is_current = cx.update(|cx| current_game(cx) == game);
+        if !is_current {
+            return;
+        }
         cx.update(|cx| {
             cx.set_global(Loaded {
                 data: data.map(Arc::new),
@@ -160,7 +310,7 @@ pub fn reload(cx: &mut App) {
         // Then the map's roads: a second or two of reading, which only Discover every road needs.
         let roads = cx
             .background_spawn(async move {
-                let map = gamedata::map_contents(Game::Ets2, roads_dir.as_deref()?);
+                let map = gamedata::map_contents(game, roads_dir.as_deref()?);
                 let ids: Vec<u64> = map.roads.iter().map(|road| road.id).collect();
                 (!map.roads.is_empty()).then(|| RoadsRead {
                     roads: Arc::new(map.roads),
@@ -170,6 +320,10 @@ pub fn reload(cx: &mut App) {
                 })
             })
             .await;
+        let is_current = cx.update(|cx| current_game(cx) == game);
+        if !is_current {
+            return;
+        }
         cx.update(|cx| {
             cx.set_global(MapRoads(roads));
             cx.refresh_windows();
@@ -258,13 +412,14 @@ pub fn text(cx: &App, key: &str) -> Option<String> {
 }
 
 /// The cities with a truck dealer, or with a recruitment agency, in the installed game. `None`
-/// when the game (or its city definitions) wasn't found: then nobody knows where they are.
+/// when they aren't known: the game (or its city definitions) wasn't found, or the editor doesn't
+/// know them for this game (recruitment agencies for ATS).
 pub fn place_cities(cx: &App, place: save::Place) -> Option<BTreeSet<String>> {
     let data = data(cx)?;
     let cities = match place {
-        save::Place::Dealer => data.dealer_cities(),
+        save::Place::Dealer => Some(data.dealer_cities()),
         save::Place::Recruitment => data.recruitment_cities(),
-    };
+    }?;
     (!cities.is_empty()).then(|| cities.clone())
 }
 

@@ -41,8 +41,9 @@ impl Appearance {
 pub struct Settings {
     pub language: Language,
     pub appearance: Appearance,
-    /// The game's folder, when the player picked it (otherwise it's found through Steam).
-    pub game_dir: Option<PathBuf>,
+    /// Each game's folder, when the player picked it (otherwise it's found through Steam).
+    pub ets2_game_dir: Option<PathBuf>,
+    pub ats_game_dir: Option<PathBuf>,
     /// Folders of profiles the player added on the start screen, looked in as well as the usual
     /// places.
     pub profile_dirs: Vec<PathBuf>,
@@ -55,7 +56,8 @@ impl Default for Settings {
         Self {
             language: Language::default(),
             appearance: Appearance::default(),
-            game_dir: None,
+            ets2_game_dir: None,
+            ats_game_dir: None,
             profile_dirs: Vec::new(),
             // On unless turned off: a game update can need a new version of the editor.
             check_for_updates: true,
@@ -85,7 +87,13 @@ impl Settings {
                         settings.appearance = appearance;
                     }
                 }
-                "game_dir" if !value.is_empty() => settings.game_dir = Some(PathBuf::from(value)),
+                // `game_dir`: ETS2's, as written before ATS had a folder of its own (0.3.0).
+                "ets2_game_dir" | "game_dir" if !value.is_empty() => {
+                    settings.ets2_game_dir = Some(PathBuf::from(value))
+                }
+                "ats_game_dir" if !value.is_empty() => {
+                    settings.ats_game_dir = Some(PathBuf::from(value))
+                }
                 // One line for each folder (a path can hold any separator a list would use).
                 "profile_dir" if !value.is_empty() => {
                     settings.profile_dirs.push(PathBuf::from(value))
@@ -97,19 +105,37 @@ impl Settings {
         settings
     }
 
+    /// A game's folder, when the player picked it.
+    pub fn game_dir(&self, game: save::Game) -> Option<&PathBuf> {
+        match game {
+            save::Game::Ets2 => self.ets2_game_dir.as_ref(),
+            save::Game::Ats => self.ats_game_dir.as_ref(),
+        }
+    }
+
+    /// Picks a game's folder, or forgets it (`None`: found through Steam again).
+    pub fn set_game_dir(&mut self, game: save::Game, dir: Option<PathBuf>) {
+        match game {
+            save::Game::Ets2 => self.ets2_game_dir = dir,
+            save::Game::Ats => self.ats_game_dir = dir,
+        }
+    }
+
     fn to_text(&self) -> String {
-        let game_dir = self
-            .game_dir
-            .as_ref()
-            .map(|dir| dir.to_string_lossy().into_owned())
-            .unwrap_or_default();
+        let path = |dir: &Option<PathBuf>| {
+            dir.as_ref()
+                .map(|dir| dir.to_string_lossy().into_owned())
+                .unwrap_or_default()
+        };
+        let ets2_game_dir = path(&self.ets2_game_dir);
+        let ats_game_dir = path(&self.ats_game_dir);
         let profile_dirs: String = self
             .profile_dirs
             .iter()
             .map(|dir| format!("profile_dir = {}\n", dir.to_string_lossy()))
             .collect();
         format!(
-            "language = {}\nappearance = {}\ngame_dir = {game_dir}\n{profile_dirs}check_for_updates = {}\n",
+            "language = {}\nappearance = {}\nets2_game_dir = {ets2_game_dir}\nats_game_dir = {ats_game_dir}\n{profile_dirs}check_for_updates = {}\n",
             self.language.code(),
             self.appearance.code(),
             self.check_for_updates
@@ -176,7 +202,8 @@ mod tests {
         let settings = Settings {
             language: Language::Swedish,
             appearance: Appearance::Dark,
-            game_dir: Some(PathBuf::from("/games/ets2")),
+            ets2_game_dir: Some(PathBuf::from("/games/ets2")),
+            ats_game_dir: Some(PathBuf::from("/games/ats")),
             profile_dirs: vec![
                 PathBuf::from("D:/saves; and more/profiles"),
                 PathBuf::from("/backup/profiles"),
@@ -189,5 +216,12 @@ mod tests {
         assert_eq!(odd.appearance, Appearance::Light);
         // Checking for updates is on unless the file says otherwise.
         assert!(odd.check_for_updates);
+        // ETS2's folder as written before ATS had one of its own.
+        let before = Settings::parse("game_dir = /games/ets2\n");
+        assert_eq!(
+            before.game_dir(save::Game::Ets2),
+            Some(&PathBuf::from("/games/ets2"))
+        );
+        assert_eq!(before.game_dir(save::Game::Ats), None);
     }
 }

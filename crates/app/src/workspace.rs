@@ -100,6 +100,17 @@ pub fn init(cx: &mut App) {
     });
 }
 
+/// Whether the start screen is what's shown: no save open, or opening. Only then does it choose
+/// the current game (an open save's game is its own).
+pub fn shows_start_screen(cx: &App) -> bool {
+    cx.try_global::<ActiveWorkspace>()
+        .and_then(|active| active.0.upgrade())
+        .is_none_or(|workspace| {
+            let workspace = workspace.read(cx);
+            workspace.opened.is_none() && workspace.opening.is_none()
+        })
+}
+
 /// Opens World map and moves it to a city or a point (Show on map, from a city's, viewpoint's or
 /// photo trophy's panel, on whichever page it was opened).
 pub fn show_on_world_map(spot: crate::pages::world_map::MapSpot, cx: &mut App) {
@@ -264,6 +275,8 @@ impl Workspace {
         }
         let name = labels::slot_name(cx, &slot);
         self.opening = Some(name.clone());
+        // The save's game's data, read while the save is (the save waits for it, see below).
+        game_data::set_game(cx, profile.game);
         cx.notify();
 
         let dir = slot.dir.clone();
@@ -422,7 +435,7 @@ impl Workspace {
         let has_coaches = self
             .opened
             .as_ref()
-            .is_some_and(|opened| opened.session.read(cx).career().coach_experience.is_some());
+            .is_some_and(|opened| opened.session.read(cx).has_coach_career());
         crate::dev_script::act(self, step, has_coaches, window, cx);
     }
 
@@ -437,7 +450,7 @@ impl Workspace {
         let Some(opened) = &self.opened else {
             return;
         };
-        let has_coaches = opened.session.read(cx).career().coach_experience.is_some();
+        let has_coaches = opened.session.read(cx).has_coach_career();
         palette::open(
             cx.entity().downgrade(),
             self.palette.clone(),
@@ -1076,7 +1089,7 @@ impl Workspace {
         let has_coach_career = self
             .opened
             .as_ref()
-            .is_some_and(|opened| opened.session.read(cx).career().coach_experience.is_some());
+            .is_some_and(|opened| opened.session.read(cx).has_coach_career());
         let pages: Vec<Page> = pages
             .iter()
             .copied()
@@ -1782,8 +1795,13 @@ fn dev_start_slot() -> Option<(Profile, Slot)> {
         .file_name()
         .and_then(|folder| save::decode_profile_folder(&folder.to_string_lossy()))
         .unwrap_or_else(|| "Development copy".to_string());
+    // `TSE_GAME=ats` for an American Truck Simulator save (the folder doesn't say which game).
+    let game = match std::env::var("TSE_GAME").as_deref() {
+        Ok("ats") => save::Game::Ats,
+        _ => save::Game::Ets2,
+    };
     let profile = Profile {
-        game: save::Game::Ets2,
+        game,
         name,
         dir: profile_dir,
         location: save::Location::Local,

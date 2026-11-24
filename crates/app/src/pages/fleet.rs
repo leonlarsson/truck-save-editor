@@ -648,7 +648,9 @@ impl TruckTable {
                     (None, false, None) => t!(cx, "no-garage"),
                 }
             }
-            TruckColumn::Odometer => t!(cx, "distance-km", amount = thousands(truck.odometer_km)),
+            TruckColumn::Odometer => {
+                crate::labels::distance(cx, self.session.read(cx).game(), truck.odometer_km)
+            }
             // Rounded down, so only a full tank says 100%. Trailers have none.
             TruckColumn::Fuel => truck
                 .fuel

@@ -424,3 +424,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** the kit draws a tooltip as wide as its text, so a long explanation (why a button is off, what an action does) ran off the screen as one line. The kit's Tooltip can take a maximum width, but its components build their tooltip themselves and, in the pinned version, offer no way to pass a styled one.
 
 **Considered:** setting a width per tooltip (not possible through the components); shortening every tooltip (the explanations are the point); patching the kit (it's pinned and upgraded as a change of its own).
+
+## 2026-11-24: The start screen picks the game first, with its logo
+
+**Decided:** the start screen has a game picker above the profile picker: a card for Euro Truck Simulator 2 and one for American Truck Simulator, each with how many profiles and saves were found for it, and the game's logo read from its own install (`material/ui/logo/ets2_logo` in `base.scs`; ATS keeps its logo under the same name). A game with nothing found is shown, off, saying so. The profile picker below shows only the chosen game's profiles.
+
+**Why:** the owner asked for a picker of its own for the game, then the profile, and for the games' logos. Mixing both games' profiles in one row (ATS ones marked "· ATS") read as one list. The logos come from the player's install, like the game's other icons, so none of SCS's artwork is in the repository (as the README says); a game that isn't installed shows its name without a logo.
+
+**Considered:** keeping the logos in the repository (the owner allowed it; it would also show a logo for a game that isn't installed, but the README promises no SCS artwork is included, and the logos are SCS's trademarks).

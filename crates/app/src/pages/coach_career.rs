@@ -174,7 +174,8 @@ impl CoachCareerPage {
     fn reload(&mut self, cx: &mut Context<Self>) {
         let session = self.session.read(cx);
         let document = session.preview();
-        let currency = session.game().currency_symbol();
+        let game = session.game();
+        let currency = game.currency_symbol();
         let today = save::totals(&document).game_days;
         let services = save::coach_services(&document);
         let total = services.len();
@@ -194,7 +195,7 @@ impl CoachCareerPage {
                             .satisfaction
                             .map(|share| t!(cx, "percent", amount = (share * 100.0).round() as i64))
                             .unwrap_or_default(),
-                        t!(cx, "distance-km", amount = thousands(service.distance_km)),
+                        crate::labels::distance(cx, game, service.distance_km),
                         format!("{currency} {}", thousands(service.reward)).into(),
                         SharedString::from(thousands(service.xp)),
                     ]

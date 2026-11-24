@@ -19,6 +19,7 @@ The editor tells you when a newer version is out: when it starts, it asks GitHub
 
 ### Finding your saves
 
+- Pick the game first (Euro Truck Simulator 2 or American Truck Simulator, each with its logo from your install), then the profile.
 - Finds Steam Cloud and local profiles by itself, with each profile's name, and every save with when it was saved and its money; your own saves first, the game's autosaves folded below.
 - Says which profile's saves it shows and where they're kept, with a button to open the folder, and lists every place it looked and what each held.
 - Saves somewhere else (a backup, another drive) can be added: choose the folder or drop it on the window. A single save on its own opens where it is.

@@ -57,6 +57,14 @@ start-slot-missing = { $count ->
 start-slot-number = Plats { $number }
 profile-place = { $name } · { $place }
 profile-game-place = { $name } · { $game } · { $place }
+start-game-detail = { $profiles ->
+    [one] En profil
+   *[other] { $profiles } profiler
+} · { $saves ->
+    [one] en sparfil
+   *[other] { $saves } sparfiler
+}
+start-game-none = Hittades inte på den här datorn
 location-steam-cloud = Steam Cloud
 location-this-pc = Den här datorn
 location-loose = En ensam sparfil
@@ -188,7 +196,7 @@ save-profile-failed = Sparfilen skrevs, men inte företagsnamnet: det väntar fo
 ## Warnings
 
 newer-game-warning = Den här sparfilen kommer från en nyare version av spelet än redigeraren har testats med. Allt som redigeraren inte förstår lämnas orört, men kontrollera dina ändringar i spelet och behåll säkerhetskopian.
-ats-warning = American Truck Simulator stöds inte fullt ut än. Sparfilerna öppnas och sparas säkert, med en säkerhetskopia, men stadsnamn, motorer, DLC-kontrollen och avstånd (i km, inte miles) kommer från Euro Truck Simulator 2 eller saknas. Kontrollera ändringarna i spelet.
+ats-warning = Stödet för American Truck Simulator är nytt. Dess sparfiler öppnas och sparas säkert, med en säkerhetskopia, och redigeraren läser spelets egna data, men den vet ännu inte vilka städer som har en rekryteringsbyrå, och mätarställningen redigeras i kilometer. Kontrollera dina ändringar i spelet.
 
 ## Undo and redo
 
@@ -335,7 +343,7 @@ settings-appearance-system = Samma som systemet
 settings-appearance-light = Ljust
 settings-appearance-dark = Mörkt
 settings-game = Spelets mapp
-settings-game-description = Där Euro Truck Simulator 2 är installerat. Redigeraren läser nivåtabeller, namn och ikoner därifrån och ändrar aldrig något där.
+settings-game-description = Där { $game } är installerat. Redigeraren läser nivåtabeller, namn och ikoner därifrån och ändrar aldrig något där.
 settings-game-found = Hittades automatiskt
 settings-game-picked = Vald av dig
 settings-game-not-found = Hittades inte. Välj mappen där spelet är installerat.
@@ -569,6 +577,7 @@ map-unlock-dealers-tooltip = Lås upp lastbilshandlaren i varje stad som har en,
 map-unlock-recruitments = Lås upp alla byråer
 map-unlock-recruitments-tooltip = Lås upp rekryteringsbyrån i varje stad som har en, som om du hade kört förbi alla.
 map-needs-game = För att låsa upp handlare och byråer måste spelet vara installerat på den här datorn: dess data berättar vilka städer som har dem.
+map-agencies-unknown = Vilka städer som har en rekryteringsbyrå är ännu inte känt för { $game }, så byråer kan inte låsas upp här.
 column-dealer = Lastbilshandlare
 column-recruitment = Rekryteringsbyrå
 map-place-unlocked = Upplåst
@@ -695,6 +704,7 @@ fleet-trailers = { $count ->
 fleet-tab-trailers = Släp · { $count }
 no-garage = Utan garage
 distance-km = { $amount } km
+distance-mi = { $amount } mi
 percent = { $amount } %
 trucks-table = Fordon
 unknown-truck = Okänd modell
@@ -745,7 +755,6 @@ removal-after = Borttagen
 change-career = Karriär
 change-you = Du
 change-cities = Städer
-change-km = { $km } km
 change-tonnes = { $tonnes } t
 change-wear = Slitage: { $part }
 change-on = På

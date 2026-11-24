@@ -104,6 +104,20 @@ pub fn slot_name(cx: &App, slot: &Slot) -> SharedString {
     }
 }
 
+/// A distance as the game shows it: in kilometres, or in miles for a game that uses them (ATS).
+/// Saves store kilometres in both games.
+pub fn distance(cx: &App, game: save::Game, km: i64) -> SharedString {
+    if game.uses_miles() {
+        let miles = (km as f64 * KM_TO_MILES).round() as i64;
+        t!(cx, "distance-mi", amount = crate::format::thousands(miles))
+    } else {
+        t!(cx, "distance-km", amount = crate::format::thousands(km))
+    }
+}
+
+/// Miles in a kilometre.
+const KM_TO_MILES: f64 = 0.621_371;
+
 pub fn location(cx: &App, location: Location) -> SharedString {
     match location {
         Location::SteamCloud => t!(cx, "location-steam-cloud"),

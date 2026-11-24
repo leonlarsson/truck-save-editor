@@ -258,7 +258,12 @@ fn place_cell(
 
 impl Render for CitiesPage {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let has_game_data = self.dealers.total.is_some() && self.recruitments.total.is_some();
+        // Without the game's data nobody knows where dealers and agencies are; with it, agencies
+        // may still be unknown for this game (ATS).
+        let has_game_data = self.dealers.total.is_some();
+        let has_agencies = self.recruitments.total.is_some();
+        let agencies_unknown = has_game_data && !has_agencies;
+        let game = self.session.read(cx).game();
         let mut summary = vec![t!(
             cx,
             "map-summary",
@@ -345,8 +350,12 @@ impl Render for CitiesPage {
                                     .small()
                                     .outline()
                                     .label(t!(cx, "map-unlock-recruitments"))
-                                    .tip(t!(cx, "map-unlock-recruitments-tooltip"))
-                                    .disabled(!has_game_data || self.recruitments.is_complete())
+                                    .tip(if agencies_unknown {
+                                        t!(cx, "map-agencies-unknown", game = game.name())
+                                    } else {
+                                        t!(cx, "map-unlock-recruitments-tooltip")
+                                    })
+                                    .disabled(!has_agencies || self.recruitments.is_complete())
                                     .on_click(cx.listener(|this, _, _, cx| {
                                         this.unlock(Place::Recruitment, cx)
                                     })),
@@ -355,12 +364,19 @@ impl Render for CitiesPage {
             )
             .child(self.filter.clone())
             // Not hidden, and not just a disabled button: say why, and what makes it work.
-            .children((!has_game_data).then(|| {
-                div()
-                    .text_sm()
-                    .text_color(cx.theme().muted_foreground)
-                    .child(t!(cx, "map-needs-game"))
-            }))
+            .children(
+                match (has_game_data, agencies_unknown) {
+                    (false, _) => Some(t!(cx, "map-needs-game")),
+                    (true, true) => Some(t!(cx, "map-agencies-unknown", game = game.name())),
+                    (true, false) => None,
+                }
+                .map(|note| {
+                    div()
+                        .text_sm()
+                        .text_color(cx.theme().muted_foreground)
+                        .child(note)
+                }),
+            )
             .child(
                 div()
                     .flex_1()

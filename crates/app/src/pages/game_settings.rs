@@ -1,6 +1,7 @@
 //! Game settings: where the game is installed (the editor reads its data from there, and never
 //! changes anything in it), and the game's own settings in its `config.cfg` that the editor can
-//! change. About the installed game, not a save: the same whichever save is open, or none.
+//! change. About the installed game, not a save: the current game's (the open save's, or the one
+//! picked on the start screen), whichever of its saves is open, or none.
 
 use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Sizable as _,
@@ -20,6 +21,8 @@ use crate::ui::{Section, page_body, path_text};
 use crate::workspace::backups_root;
 
 pub struct GameSettingsPage {
+    /// The game the page is about (the current game, followed when it changes).
+    game: save::Game,
     /// Why the last folder picked wasn't taken, if it wasn't.
     folder_problem: Option<SharedString>,
     /// The game's `config.cfg` (where it is, what it says), read when the page opens and after
@@ -30,25 +33,41 @@ pub struct GameSettingsPage {
     /// Whether the game was running when last looked (looking lists processes, so not on every
     /// redraw: when the page opens and when the window comes back to the front).
     is_game_running: bool,
-    _activation: Option<gpui_kit::Subscription>,
+    _subscriptions: Vec<gpui_kit::Subscription>,
 }
 
 impl GameSettingsPage {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let activation = cx.observe_window_activation(window, |this, window, cx| {
-            if window.is_window_active() {
-                this.game_config = read_game_config();
-                this.is_game_running = save::is_game_running(save::Game::Ets2);
-                cx.notify();
-            }
-        });
+        let game = game_data::current_game(cx);
+        let _subscriptions = vec![
+            cx.observe_window_activation(window, |this, window, cx| {
+                if window.is_window_active() {
+                    this.look_again(cx);
+                }
+            }),
+            // Another game picked (on the start screen, or by opening one of its saves).
+            game_data::observe_current_game_in(window, cx, |this, _, cx| {
+                this.game = game_data::current_game(cx);
+                this.folder_problem = None;
+                this.game_config_problem = None;
+                this.look_again(cx);
+            }),
+        ];
         Self {
+            game,
             folder_problem: None,
-            game_config: read_game_config(),
+            game_config: read_game_config(game),
             game_config_problem: None,
-            is_game_running: save::is_game_running(save::Game::Ets2),
-            _activation: Some(activation),
+            is_game_running: save::is_game_running(game),
+            _subscriptions,
         }
+    }
+
+    /// Reads the game's settings and whether it runs again.
+    fn look_again(&mut self, cx: &mut Context<Self>) {
+        self.game_config = read_game_config(self.game);
+        self.is_game_running = save::is_game_running(self.game);
+        cx.notify();
     }
 
     /// Asks for the game's folder, and takes it if the game is there.
@@ -69,7 +88,8 @@ impl GameSettingsPage {
             let _ = this.update(cx, |this, cx| {
                 if dir.join("def.scs").is_file() {
                     this.folder_problem = None;
-                    settings::update(cx, |settings| settings.game_dir = Some(dir));
+                    let game = this.game;
+                    settings::update(cx, |settings| settings.set_game_dir(game, Some(dir)));
                     game_data::reload(cx);
                 } else {
                     this.folder_problem = Some(t!(cx, "settings-game-not-game"));
@@ -82,7 +102,7 @@ impl GameSettingsPage {
 
     /// Writes a change to the game's own settings (backed up first), or says why it can't.
     fn change_game_config(&mut self, change: impl FnOnce(&str) -> String, cx: &mut Context<Self>) {
-        let Some((path, text)) = read_game_config() else {
+        let Some((path, text)) = read_game_config(self.game) else {
             return;
         };
         let changed = change(&text);
@@ -90,14 +110,12 @@ impl GameSettingsPage {
             return;
         };
         self.game_config_problem =
-            match save::write_game_config(save::Game::Ets2, &path, &changed, &backups) {
+            match save::write_game_config(self.game, &path, &changed, &backups) {
                 Ok(()) => None,
                 Err(save::Error::GameRunning) => Some(t!(cx, "game-settings-running")),
                 Err(error) => Some(t!(cx, "game-settings-failed", error = error.to_string())),
             };
-        self.game_config = read_game_config();
-        self.is_game_running = save::is_game_running(save::Game::Ets2);
-        cx.notify();
+        self.look_again(cx);
     }
 
     /// The game's own settings the editor can change: the developer console and convoy size.
@@ -168,9 +186,10 @@ impl GameSettingsPage {
 
 impl Render for GameSettingsPage {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let current = settings::get(cx);
-        let game_dir = game_data::install_dir(cx);
-        let game_status = match (&game_dir, current.game_dir.is_some()) {
+        let game = self.game;
+        let is_picked = settings::get(cx).game_dir(game).is_some();
+        let game_dir = game_data::install_dir_of(cx, game);
+        let game_status = match (&game_dir, is_picked) {
             (Some(_), true) => t!(cx, "settings-game-picked"),
             (Some(_), false) => t!(cx, "settings-game-found"),
             (None, _) => t!(cx, "settings-game-not-found"),
@@ -182,7 +201,7 @@ impl Render for GameSettingsPage {
                 .max_w(rems(46.))
                 .child(
                     Section::new(t!(cx, "settings-game"))
-                        .description(t!(cx, "settings-game-description"))
+                        .description(t!(cx, "settings-game-description", game = game.name()))
                         .child(
                             v_flex()
                                 .gap_2()
@@ -203,15 +222,16 @@ impl Render for GameSettingsPage {
                                                     this.choose_game_folder(cx)
                                                 })),
                                         )
-                                        .children(current.game_dir.is_some().then(|| {
+                                        .children(is_picked.then(|| {
                                             Button::new("find-game")
                                                 .small()
                                                 .ghost()
                                                 .label(t!(cx, "settings-game-automatic"))
                                                 .on_click(cx.listener(|this, _, _, cx| {
                                                     this.folder_problem = None;
+                                                    let game = this.game;
                                                     settings::update(cx, |settings| {
-                                                        settings.game_dir = None
+                                                        settings.set_game_dir(game, None)
                                                     });
                                                     game_data::reload(cx);
                                                     cx.notify();
@@ -225,9 +245,9 @@ impl Render for GameSettingsPage {
     }
 }
 
-/// The game's `config.cfg`, if it has one.
-fn read_game_config() -> Option<(std::path::PathBuf, String)> {
-    let path = save::game_config_path(save::Game::Ets2)?;
+/// A game's `config.cfg`, if it has one.
+fn read_game_config(game: save::Game) -> Option<(std::path::PathBuf, String)> {
+    let path = save::game_config_path(game)?;
     let text = std::fs::read_to_string(&path).ok()?;
     Some((path, text))
 }
