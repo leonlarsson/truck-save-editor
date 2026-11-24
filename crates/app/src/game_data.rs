@@ -37,6 +37,9 @@ struct RoadsRead {
     places: Arc<Vec<gamedata::MapPlace>>,
     /// Where the viewpoints and photo trophies are.
     markers: Arc<Vec<gamedata::MapMarker>>,
+    /// The cities with a recruitment agency, read off the map (for a game without a list of
+    /// them, ATS: see `place_cities`).
+    agency_cities: Arc<BTreeSet<String>>,
 }
 
 impl Global for MapRoads {}
@@ -294,6 +297,11 @@ fn load(cx: &mut App) {
                 (data, installed)
             })
             .await;
+        // Which buildings are recruitment agencies, for finding them on the map below.
+        let agency_models = data
+            .as_ref()
+            .map(|data| data.agency_models.clone())
+            .unwrap_or_default();
         // Another game picked meanwhile: this one's read isn't shown (it's read again if picked).
         let is_current = cx.update(|cx| current_game(cx) == game);
         if !is_current {
@@ -312,11 +320,13 @@ fn load(cx: &mut App) {
             .background_spawn(async move {
                 let map = gamedata::map_contents(game, roads_dir.as_deref()?);
                 let ids: Vec<u64> = map.roads.iter().map(|road| road.id).collect();
+                let agency_cities = gamedata::agency_cities(&map, &agency_models);
                 (!map.roads.is_empty()).then(|| RoadsRead {
                     roads: Arc::new(map.roads),
                     ids: Arc::new(ids),
                     places: Arc::new(map.places),
                     markers: Arc::new(map.markers),
+                    agency_cities: Arc::new(agency_cities),
                 })
             })
             .await;
@@ -417,10 +427,20 @@ pub fn text(cx: &App, key: &str) -> Option<String> {
 pub fn place_cities(cx: &App, place: save::Place) -> Option<BTreeSet<String>> {
     let data = data(cx)?;
     let cities = match place {
-        save::Place::Dealer => Some(data.dealer_cities()),
-        save::Place::Recruitment => data.recruitment_cities(),
-    }?;
-    (!cities.is_empty()).then(|| cities.clone())
+        save::Place::Dealer => data.dealer_cities().clone(),
+        // ETS2's list, else the agencies found on the map once it's read.
+        save::Place::Recruitment => match data.recruitment_cities() {
+            Some(cities) => cities.clone(),
+            None => map_agency_cities(cx)?.as_ref().clone(),
+        },
+    };
+    (!cities.is_empty()).then_some(cities)
+}
+
+/// The cities with a recruitment agency found on the map, once it's read.
+fn map_agency_cities(cx: &App) -> Option<Arc<BTreeSet<String>>> {
+    cx.try_global::<MapRoads>()
+        .and_then(|read| read.0.as_ref().map(|read| read.agency_cities.clone()))
 }
 
 /// Calls `on_loaded` when the game's data arrives, for views that keep text made from it (city

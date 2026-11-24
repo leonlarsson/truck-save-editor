@@ -85,6 +85,8 @@ pub enum PlayerProblem {
     TrailerHitched,
     /// The save doesn't have the player's position (an older format).
     NoPosition,
+    /// The player has no truck of their own yet (a new career, driving quick jobs).
+    NoOwnTruck,
 }
 
 fn on_job(document: &Document) -> bool {
@@ -346,10 +348,13 @@ pub fn can_travel(document: &Document) -> Result<(), PlayerProblem> {
         .and_then(|id| document.unit(&id))
         .ok_or(PlayerProblem::NoPosition)?;
     let has_fields = player.get("schedule_quick_travel").is_some()
-        && player.get("schedule_transfer_to_hq").is_some()
-        && truck_vehicles(document).is_some();
+        && player.get("schedule_transfer_to_hq").is_some();
     if !has_fields {
         return Err(PlayerProblem::NoPosition);
+    }
+    // Quick travel moves the player's own vehicles: none yet, nothing to move.
+    if truck_vehicles(document).is_none() {
+        return Err(PlayerProblem::NoOwnTruck);
     }
     Ok(())
 }

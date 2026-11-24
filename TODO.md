@@ -143,8 +143,9 @@ Agreed work, in order. Each step should end with something the owner can see or 
   - [x] The game's data is read per game, from that game's install (2026-11-24): an ATS save gets ATS's map, cities, dealers, photo album, texts and DLC check; Settings keeps a folder for each game; Game settings acts on the current game. ATS's place names come from its definitions (its texts don't translate them).
   - [x] Coach career only for a game with coaches (`Game::has_coaches`): ATS saves carry empty coach fields.
   - [x] Distances read in miles for ATS (`labels::distance`).
-  - [ ] Recruitment agencies for ATS: read which cities have one off its map (as for ETS2's list); until then the Cities page says they aren't known.
-  - [ ] Odometer and coach distance are edited in kilometres: in miles for ATS (convert what's typed).
+  - [x] Recruitment agencies for ATS, read off its map (2026-11-24): the agencies' prefab models from the game's definitions, each building placed in the city area it stands in (or one within 250 m). ETS2 keeps its list: the same rule gives 135 there, the list 138, the game 136.
+  - [x] The odometer and a trailer's weights are edited in miles and pounds for ATS; hazardous cargo and states in ATS's words.
+  - [ ] ATS (owner): what Career Progress says for recruitment agencies, to compare with the editor's 25.
   - [ ] A real check in ATS (owner): money, experience, a city visited, a truck repaired, saved and loaded in the game.
   - [ ] Quick travel is off ("an older game version"): check what an ATS save needs for it.
 - [x] App icon (`scripts/make-icon.py`, embedded in the .exe) and a release workflow (version tag → draft release).

@@ -11,6 +11,7 @@ mod content;
 mod icon;
 mod install;
 mod photo_album;
+mod prefabs;
 mod recruitment;
 mod roads;
 mod texture;
@@ -28,8 +29,8 @@ pub use icon::{ALPHA, BLUE, GREEN, GameIcon, RED};
 pub use install::find_install;
 pub use photo_album::{AlbumItem, PhotoAlbum};
 pub use roads::{
-    MapContents, MapMarker, MapPlace, MapPlaceKind, MapRoad, decode_token, map_contents, map_roads,
-    road_ids, sector_contents, sector_roads,
+    MapContents, MapMarker, MapPlace, MapPlaceKind, MapPrefab, MapRoad, agency_cities,
+    decode_token, map_contents, map_roads, road_ids, sector_contents, sector_roads,
 };
 pub use texture::{decode_rgba, distance_field_coverage};
 pub use vehicles::{PaintJob, Part, PartKind, model_paint_jobs, model_parts};
@@ -87,6 +88,8 @@ pub struct GameData {
     /// Cities with a recruitment agency (of those the installed game has). Known for ETS2 only
     /// (`recruitment.rs`, read off its map): `None` for ATS.
     recruitment_cities: Option<BTreeSet<String>>,
+    /// The prefab models that are recruitment agencies' buildings (see `prefabs.rs`).
+    pub agency_models: std::collections::HashSet<String>,
     /// Vehicle models: model id → (brand text key, series text key).
     models: HashMap<String, (String, String)>,
     /// Companies' names (`renar` → `Renar Logistik`), as the game writes them (not translated).
@@ -130,6 +133,7 @@ impl GameData {
             data.coach_ranks = coach_ranks;
         }
         data.photo_album = photo_album::read(&mut definitions);
+        data.agency_models = prefabs::agency_models(install_dir);
         let skills = read_skills(&mut definitions).unwrap_or_default();
         data.skill_max = skills.limits;
         // Icons are a nicety: without `base.scs`, or with an icon the editor can't read, the

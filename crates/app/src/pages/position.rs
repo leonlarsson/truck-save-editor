@@ -121,6 +121,7 @@ impl Render for PositionPicker {
         let why = |problem: save::PlayerProblem, cx: &Context<Self>| match problem {
             save::PlayerProblem::OnJob => t!(cx, "player-why-on-job"),
             save::PlayerProblem::TrailerHitched => t!(cx, "player-move-hitched"),
+            save::PlayerProblem::NoOwnTruck => t!(cx, "player-why-no-truck"),
             _ => t!(cx, "player-quick-travel-unavailable"),
         };
         let muted = cx.theme().muted_foreground;

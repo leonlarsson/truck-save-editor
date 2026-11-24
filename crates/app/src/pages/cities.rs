@@ -99,6 +99,8 @@ impl CitiesPage {
         let _subscriptions = vec![
             cx.observe(&session, |this, _, cx| this.reload(cx)),
             game_data::observe(cx, |this, cx| this.reload(cx)),
+            // ATS's recruitment agencies are found on its map, read after the rest.
+            game_data::observe_map_in(window, cx, |this, _, cx| this.reload(cx)),
             cx.subscribe(&filter, |this, _, _: &FilterChanged, cx| this.reload(cx)),
             cx.subscribe_in(&table, window, |this, _, event: &TableEvent, window, cx| {
                 if let TableEvent::DoubleClickedRow(row) = event {
@@ -258,12 +260,11 @@ fn place_cell(
 
 impl Render for CitiesPage {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        // Without the game's data nobody knows where dealers and agencies are; with it, agencies
-        // may still be unknown for this game (ATS).
+        // Without the game's data nobody knows where dealers and agencies are; with it, ATS's
+        // agencies wait for its map (read a moment later).
         let has_game_data = self.dealers.total.is_some();
         let has_agencies = self.recruitments.total.is_some();
         let agencies_unknown = has_game_data && !has_agencies;
-        let game = self.session.read(cx).game();
         let mut summary = vec![t!(
             cx,
             "map-summary",
@@ -351,7 +352,7 @@ impl Render for CitiesPage {
                                     .outline()
                                     .label(t!(cx, "map-unlock-recruitments"))
                                     .tip(if agencies_unknown {
-                                        t!(cx, "map-agencies-unknown", game = game.name())
+                                        t!(cx, "map-agencies-reading")
                                     } else {
                                         t!(cx, "map-unlock-recruitments-tooltip")
                                     })
@@ -367,7 +368,7 @@ impl Render for CitiesPage {
             .children(
                 match (has_game_data, agencies_unknown) {
                     (false, _) => Some(t!(cx, "map-needs-game")),
-                    (true, true) => Some(t!(cx, "map-agencies-unknown", game = game.name())),
+                    (true, true) => Some(t!(cx, "map-agencies-reading")),
                     (true, false) => None,
                 }
                 .map(|note| {

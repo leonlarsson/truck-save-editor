@@ -36,6 +36,8 @@ const CUTSCENE: u32 = 46;
 const MAP_OVERLAY: u32 = 18;
 const FLAGS_AT: usize = 52;
 const OVERLAY_NAME_AT: usize = 57;
+/// A prefab's model (a token) comes right after the head, too.
+const PREFAB_MODEL_AT: usize = 57;
 const VIEWPOINT_TYPE: u32 = 0;
 const LANDMARK_OVERLAY: u32 = 4;
 /// Where a city area or garage names its city: the city's token, this many bytes into the item
@@ -97,13 +99,34 @@ pub enum MapMarker {
     Landmark { id: String, x: f32, z: f32 },
 }
 
+/// A prefab on the map (a junction, a building, a company's yard …): its model, by token
+/// (`prefab.<token>` in the game's definitions), and where it is.
+#[derive(Clone, Debug, PartialEq)]
+pub struct MapPrefab {
+    pub model: u64,
+    pub x: f32,
+    pub z: f32,
+}
+
 /// What the map holds that the editor shows: every road and junction (by id, each once), the
-/// cities' areas and garages, and the viewpoints and photo trophies.
+/// cities' areas and garages, the viewpoints and photo trophies, and every prefab's model (to
+/// find the recruitment agencies' buildings, see `agency_cities`).
 #[derive(Clone, Debug, Default)]
 pub struct MapContents {
     pub roads: Vec<MapRoad>,
     pub places: Vec<MapPlace>,
     pub markers: Vec<MapMarker>,
+    pub prefabs: Vec<MapPrefab>,
+}
+
+impl MapContents {
+    /// Adds another sector's contents.
+    fn extend(&mut self, other: MapContents) {
+        self.roads.extend(other.roads);
+        self.places.extend(other.places);
+        self.markers.extend(other.markers);
+        self.prefabs.extend(other.prefabs);
+    }
 }
 
 /// Every road and junction id on the map of the installed game and its map DLCs, sorted. Empty
@@ -123,9 +146,7 @@ pub fn map_roads(game: Game, install_dir: &Path) -> Vec<MapRoad> {
 /// The map of the installed game and its map DLCs: roads, junctions, city areas and garages.
 pub fn map_contents(game: Game, install_dir: &Path) -> MapContents {
     let folder = map_folder(game);
-    let mut roads: Vec<MapRoad> = Vec::new();
-    let mut places: Vec<MapPlace> = Vec::new();
-    let mut markers: Vec<MapMarker> = Vec::new();
+    let mut map = MapContents::default();
     for path in crate::archives_after(install_dir, "base_map.scs") {
         let Ok(mut archive) = hashfs::Archive::open(&path) else {
             continue;
@@ -135,37 +156,31 @@ pub fn map_contents(game: Game, install_dir: &Path) -> MapContents {
         };
         for file in listing.files.iter().filter(|name| name.ends_with(".base")) {
             if let Ok(Some(bytes)) = archive.read(&format!("{folder}/{file}")) {
-                let (sector_roads, sector_places, sector_markers) = sector_contents(&bytes);
-                roads.extend(sector_roads);
-                places.extend(sector_places);
-                markers.extend(sector_markers);
+                map.extend(sector_contents(&bytes));
             }
         }
     }
-    roads.sort_unstable_by_key(|road| road.id);
-    roads.dedup_by_key(|road| road.id);
-    MapContents {
-        roads,
-        places,
-        markers,
-    }
+    map.roads.sort_unstable_by_key(|road| road.id);
+    map.roads.dedup_by_key(|road| road.id);
+    map
 }
 
 /// The roads and junctions in one sector's `.base` file.
 pub fn sector_roads(bytes: &[u8]) -> Vec<MapRoad> {
-    sector_contents(bytes).0
+    sector_contents(bytes).roads
 }
 
-/// The roads, junctions, city areas and garages, viewpoints and landmarks in one sector's `.base`
-/// file. Viewpoints and landmarks are only as good as the match: the app keeps those the game's
-/// photo album names, so a stray match never shows.
-pub fn sector_contents(bytes: &[u8]) -> (Vec<MapRoad>, Vec<MapPlace>, Vec<MapMarker>) {
+/// The roads, junctions, city areas and garages, viewpoints, landmarks and prefabs in one
+/// sector's `.base` file. Viewpoints and landmarks are only as good as the match: the app keeps
+/// those the game's photo album names, so a stray match never shows.
+pub fn sector_contents(bytes: &[u8]) -> MapContents {
     let item_count = read_u32(bytes, ITEM_COUNT_AT).unwrap_or(0) as usize;
     let mut seen: HashSet<u64> = HashSet::new();
     let mut seen_places: HashSet<u64> = HashSet::new();
     let mut roads = Vec::new();
     let mut places = Vec::new();
     let mut markers = Vec::new();
+    let mut prefabs = Vec::new();
     let mut at = HEADER_LENGTH;
     // The header's count caps the roads found, as a guard against stray matches; places (which
     // only label the map) don't use it up, so no road is missed for them.
@@ -183,6 +198,15 @@ pub fn sector_contents(bytes: &[u8]) -> (Vec<MapRoad>, Vec<MapPlace>, Vec<MapMar
                 (item.low[2] + item.high[2]) / 2.0,
             );
             let flags = read_u32(bytes, at + FLAGS_AT).unwrap_or(u32::MAX);
+            if item.kind == PREFAB
+                && let Some(model) = read_u64(bytes, at + PREFAB_MODEL_AT)
+            {
+                prefabs.push(MapPrefab {
+                    model,
+                    x: middle.0,
+                    z: middle.1,
+                });
+            }
             match item.kind {
                 ROAD | PREFAB => roads.push(MapRoad {
                     id: item.id,
@@ -230,7 +254,61 @@ pub fn sector_contents(bytes: &[u8]) -> (Vec<MapRoad>, Vec<MapPlace>, Vec<MapMar
         }
         at += 1;
     }
-    (roads, places, markers)
+    MapContents {
+        roads,
+        places,
+        markers,
+        prefabs,
+    }
+}
+
+/// The cities with a recruitment agency: the city area each agency's building (a prefab whose
+/// model is one of `agency_models`, by token) stands in, the smallest when areas overlap, else the
+/// nearest area within `AGENCY_REACH` (a building can stand just past its city's area: checked on
+/// ETS2's map, where Graz's is 135 m out). Buildings farther from every city are left out.
+pub fn agency_cities(
+    map: &MapContents,
+    agency_models: &HashSet<String>,
+) -> std::collections::BTreeSet<String> {
+    let areas: Vec<&MapPlace> = map
+        .places
+        .iter()
+        .filter(|place| place.kind == MapPlaceKind::CityArea)
+        .collect();
+    map.prefabs
+        .iter()
+        .filter(|prefab| {
+            decode_token(prefab.model).is_some_and(|model| agency_models.contains(&model))
+        })
+        .filter_map(|prefab| {
+            areas
+                .iter()
+                .filter(|area| {
+                    (prefab.x - area.x).abs() <= area.width / 2.0
+                        && (prefab.z - area.z).abs() <= area.depth / 2.0
+                })
+                .min_by(|a, b| (a.width * a.depth).total_cmp(&(b.width * b.depth)))
+                .or_else(|| {
+                    areas
+                        .iter()
+                        .map(|area| (distance_to_area(prefab, area), area))
+                        .filter(|(distance, _)| *distance <= AGENCY_REACH)
+                        .min_by(|a, b| a.0.total_cmp(&b.0))
+                        .map(|(_, area)| area)
+                })
+                .map(|area| area.city.clone())
+        })
+        .collect()
+}
+
+/// How far an agency's building may stand outside its city's area, in metres.
+const AGENCY_REACH: f32 = 250.0;
+
+/// How far a point is from an area's box, in metres (0 inside it).
+fn distance_to_area(prefab: &MapPrefab, area: &MapPlace) -> f32 {
+    let dx = ((prefab.x - area.x).abs() - area.width / 2.0).max(0.0);
+    let dz = ((prefab.z - area.z).abs() - area.depth / 2.0).max(0.0);
+    (dx * dx + dz * dz).sqrt()
 }
 
 /// The start of an item the editor reads.
