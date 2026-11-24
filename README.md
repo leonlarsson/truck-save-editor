@@ -7,7 +7,7 @@ A save editor for **Euro Truck Simulator 2**: fast, safe and pleasant to use. Ch
   <img alt="The editor's Overview: money, experience shown as levels with the game's rank names, and skills" src="docs/screenshots/overview-light.png">
 </picture>
 
-> **Early version.** Most features have been checked in the game (on a Steam Cloud profile, in the current game version); every save is backed up before it's written, and a backup is one click to restore. American Truck Simulator saves open, with a warning: much of the editor reads ETS2's data so far.
+> **Early version.** Most features have been checked in the game (on a Steam Cloud profile, in the current game version); every save is backed up before it's written, and a backup is one click to restore. American Truck Simulator saves open too, reading ATS's own data (its map, cities, cargo, miles and dollars); its support is new, so the editor says to check your changes in the game.
 
 ## Download
 

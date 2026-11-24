@@ -158,12 +158,15 @@ Agreed work, in order. Each step should end with something the owner can see or 
   - [x] A first real ATS save (owner, 2026-11-24, a new career; copy in `fixtures/ats/2`) opens and reads; `TSE_GAME=ats` opens it with `TSE_SLOT`.
   - [x] The game's data is read per game, from that game's install (2026-11-24): an ATS save gets ATS's map, cities, dealers, photo album, texts and DLC check; Settings keeps a folder for each game; Game settings acts on the current game. ATS's place names come from its definitions (its texts don't translate them).
   - [x] Coach career only for a game with coaches (`Game::has_coaches`): ATS saves carry empty coach fields.
-  - [x] Distances read in miles for ATS (`labels::distance`).
+  - [x] Distances read in miles for ATS (`units::distance`).
   - [x] Recruitment agencies for ATS, read off its map (2026-11-24): the agencies' prefab models from the game's definitions, each building placed in the city area it stands in (or one within 250 m). ETS2 keeps its list: the same rule gives 135 there, the list 138, the game 136.
   - [x] The odometer and a trailer's weights are edited in miles and pounds for ATS; hazardous cargo and states in ATS's words.
   - [ ] ATS (owner): what Career Progress says for recruitment agencies, to compare with the editor's 25.
   - [ ] A real check in ATS (owner): money, experience, a city visited, a truck repaired, saved and loaded in the game.
-  - [ ] Quick travel is off ("an older game version"): check what an ATS save needs for it.
+  - [x] Quick travel was off for the ATS save because it has no truck of its own yet (quick jobs only); it now says so, and World map says there's no truck instead of putting one at the map's origin (2026-11-24).
+  - [x] ATS's cargo names in full (the game's `local.override.sii` was not read), its BC3 company logos, Garages and Buy all without cities of map DLCs that aren't installed, the start screen's folders for the picked game (2026-11-24).
+  - [ ] An ATS save with a truck of its own (owner): to check the truck panel, plates, paint, parts and trailers with ATS's data.
+  - [ ] ATS (owner): whether the game's own map shows the regions east of the installed states (its `base_map.scs` holds their roads, which World map draws without names).
 - [x] App icon (`scripts/make-icon.py`, embedded in the .exe) and a release workflow (version tag → draft release).
 - [ ] A final product name (Truck Save Editor for now, in `APP_NAME`; never a game name, those are SCS trademarks), signed Windows builds (see `docs/releasing.md` → Code signing), the first release (the owner's call; the pipeline is ready, `docs/releasing.md`).
 - [ ] Web version, on hold (the owner's call, 2026-11-21): the desktop app comes first. The core crates stay free of UI and disk access so it stays possible (GPUI's web target, or a page around the core compiled to wasm), but no work on it until it's picked up again.
