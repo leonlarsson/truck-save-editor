@@ -108,6 +108,8 @@ struct Pending {
     copies: Vec<(String, String)>,
     /// Trucks bought from a dealer's stock, in the order asked (see `save::buy_truck`).
     bought_trucks: Vec<BoughtTruck>,
+    /// Trailers bought from the dealer's stock, in the order asked (see `save::buy_trailer`).
+    bought_trailers: Vec<BoughtTrailer>,
     /// Whether to cancel the job in progress when saving.
     cancel_job: bool,
     /// Whether to remove the job in progress's deadline when saving.
@@ -184,6 +186,7 @@ impl Pending {
             garage_moves: Vec::new(),
             copies: Vec::new(),
             bought_trucks: Vec::new(),
+            bought_trailers: Vec::new(),
             cancel_job: false,
             remove_job_deadline: false,
             removed: Vec::new(),
@@ -271,6 +274,18 @@ pub struct BoughtTruck {
     /// The model (`volvo.vnl2018`).
     pub model: String,
     pub accessories: Vec<sii::Unit>,
+    pub garage: String,
+}
+
+/// A trailer (or road train) bought from the dealer's stock: what saving it needs, and its model
+/// and body for the list of changes.
+#[derive(Clone, Debug, PartialEq)]
+pub struct BoughtTrailer {
+    pub model: String,
+    pub body_type: String,
+    /// The dealer file's units, the front trailer first (see `gamedata::DealerTrailer`).
+    pub units: Vec<sii::Unit>,
+    pub definitions: Vec<sii::Unit>,
     pub garage: String,
 }
 
@@ -821,6 +836,7 @@ impl Session {
             + self.moved().len()
             + self.pending.copies.len()
             + self.pending.bought_trucks.len()
+            + self.pending.bought_trailers.len()
             + usize::from(self.pending.cancel_job)
             + usize::from(self.pending.remove_job_deadline)
             + self.pending.removed.len()
@@ -1497,6 +1513,17 @@ impl Session {
         save::buy_targets(&self.preview())
     }
 
+    /// The garages a trailer could be bought into (fewer trailers than truck slots), as the save
+    /// will be after the changes so far.
+    pub fn trailer_targets(&self) -> Vec<String> {
+        save::trailer_targets(&self.preview())
+    }
+
+    /// Buys a dealer's trailer into a garage when saving (Undo takes it back).
+    pub fn buy_trailer(&mut self, trailer: BoughtTrailer, cx: &mut Context<Self>) {
+        self.change(cx, |pending, _| pending.bought_trailers.push(trailer));
+    }
+
     /// Buys a dealer's truck into a garage when saving (Undo takes it back).
     pub fn buy_truck(&mut self, truck: BoughtTruck, cx: &mut Context<Self>) {
         self.change(cx, |pending, _| pending.bought_trucks.push(truck));
@@ -1906,6 +1933,21 @@ impl Session {
                 city.into(),
             );
         }
+        for trailer in &self.pending.bought_trailers {
+            let city = crate::game_data::city_name(
+                cx,
+                trailer
+                    .garage
+                    .strip_prefix("garage.")
+                    .unwrap_or(&trailer.garage),
+            );
+            add(
+                &crate::game_data::trailer_name(cx, &trailer.model, &trailer.body_type).into(),
+                t!(cx, "buy-trailer-change"),
+                t!(cx, "copy-change-before"),
+                city.into(),
+            );
+        }
         // Each truck, trailer, driver or garage taken out: one line under it.
         for removal in &self.pending.removed {
             let subject: SharedString = match removal {
@@ -2262,6 +2304,14 @@ impl Session {
             // One that no longer fits is skipped, as above.
             let _ = save::buy_truck(&mut slot.game, &truck.accessories, &truck.garage);
         }
+        for trailer in &self.pending.bought_trailers {
+            let _ = save::buy_trailer(
+                &mut slot.game,
+                &trailer.units,
+                &trailer.definitions,
+                &trailer.garage,
+            );
+        }
         for edit in &self.pending.vehicle_edits {
             save::apply_vehicle_edit(&mut slot.game, edit);
         }
@@ -2611,6 +2661,50 @@ mod tests {
         });
         session.update(cx, |session, cx| session.undo(cx));
         cx.update(|cx| assert_eq!(session.read(cx).vehicles().len(), 1));
+    }
+
+    #[gpui_kit::test]
+    fn buys_a_trailer_as_one_undoable_change(cx: &mut TestAppContext) {
+        let session = session_of(FLEET, cx);
+        let units = sii::parse_text(
+            "SiiNunit\r\n{\r\ntrailer : .t {\r\n trailer_definition: trailer_def.scs.box.single\r\n}\r\n\r\n}\r\n",
+        )
+        .expect("parses")
+        .units()
+        .to_vec();
+        let definitions = sii::parse_text(
+            "SiiNunit\r\n{\r\ntrailer_def : trailer_def.scs.box.single {\r\n axles: 2\r\n}\r\n\r\n}\r\n",
+        )
+        .expect("parses")
+        .units()
+        .to_vec();
+        cx.update(|cx| assert_eq!(session.read(cx).trailer_targets(), ["garage.lyon"]));
+        session.update(cx, |session, cx| {
+            session.buy_trailer(
+                BoughtTrailer {
+                    model: "scs.box".into(),
+                    body_type: "dryvan".into(),
+                    units,
+                    definitions,
+                    garage: "garage.lyon".into(),
+                },
+                cx,
+            )
+        });
+        let trailers = |session: &Entity<Session>, cx: &mut TestAppContext| {
+            cx.update(|cx| {
+                session
+                    .read(cx)
+                    .vehicles()
+                    .iter()
+                    .filter(|vehicle| vehicle.kind == save::VehicleKind::Trailer)
+                    .count()
+            })
+        };
+        assert_eq!(trailers(&session, cx), 1);
+        cx.update(|cx| assert_eq!(session.read(cx).change_count(), 1));
+        session.update(cx, |session, cx| session.undo(cx));
+        assert_eq!(trailers(&session, cx), 0);
     }
 
     /// Two cities, Berlin visited (4 times) and Lyon not; Berlin's dealer unlocked.

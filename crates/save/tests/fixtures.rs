@@ -261,6 +261,83 @@ fn real_saves_buy_a_truck() {
     }
 }
 
+/// In real saves with a trailer: a trailer (a stand-in for a dealer's, made from the save's own
+/// as a dealer file has it) bought into a garage with room is the company's, shares the save's
+/// type of that name, hangs off the economy, and the save writes and reads back the same.
+#[test]
+fn real_saves_buy_a_trailer() {
+    for (index, dir) in slot_dirs().into_iter().enumerate() {
+        let mut slot = save::load(&dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display()));
+        let Some(garage) = save::trailer_targets(&slot.game).into_iter().next() else {
+            continue;
+        };
+        let Some(trailer) = save::vehicles(&slot.game)
+            .into_iter()
+            .find(|vehicle| vehicle.kind == save::VehicleKind::Trailer)
+        else {
+            continue;
+        };
+        // The front trailer and its accessories, its type named as a dealer file names it.
+        let Some(front) = slot.game.unit(&trailer.id).cloned() else {
+            continue;
+        };
+        let Some(kind) = front
+            .single("trailer_definition")
+            .and_then(|id| slot.game.unit(id))
+            .cloned()
+        else {
+            continue;
+        };
+        let name =
+            sii::value::parse_string(kind.single("source_name").unwrap_or("\"\"")).to_string();
+        let mut dealer_front = front.clone();
+        if let Some(field) = dealer_front
+            .fields
+            .iter_mut()
+            .find(|field| field.name == "trailer_definition")
+        {
+            field.value = sii::Value::single(name.clone());
+        }
+        if let Some(field) = dealer_front
+            .fields
+            .iter_mut()
+            .find(|field| field.name == "slave_trailer")
+        {
+            field.value = sii::Value::single("null");
+        }
+        let mut units = vec![dealer_front];
+        units.extend(
+            front
+                .items("accessories")
+                .iter()
+                .filter_map(|id| slot.game.unit(id).cloned()),
+        );
+        let mut definition = sii::Unit::new("trailer_def", name);
+        definition.fields = kind.fields.clone();
+        let types_before = slot.game.units_of_kind("trailer_def").count();
+        let id = save::buy_trailer(&mut slot.game, &units, &[definition], &garage)
+            .unwrap_or_else(|problem| panic!("slot {index}: {problem:?}"));
+        assert!(
+            save::vehicles(&slot.game)
+                .iter()
+                .any(|vehicle| vehicle.id == id),
+            "slot {index}: the trailer is the company's"
+        );
+        assert_eq!(
+            slot.game.units_of_kind("trailer_def").count(),
+            types_before,
+            "slot {index}: the type is shared"
+        );
+        assert_eq!(save::drop_unreachable(&mut slot.game), 0, "slot {index}");
+        let text = sii::to_text(&slot.game);
+        assert_eq!(
+            sii::to_text(&sii::parse_text(&text).expect("reads back")),
+            text,
+            "slot {index}"
+        );
+    }
+}
+
 #[test]
 fn real_trucks_move_between_garages() {
     for (index, dir) in slot_dirs().into_iter().enumerate() {

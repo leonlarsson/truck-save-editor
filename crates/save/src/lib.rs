@@ -107,7 +107,7 @@ pub use profiles::{
     Slot, SlotKind, Source, decode_profile_folder, find_profiles, is_loose_save, loose_save,
     plain_path, profile_folders_at, profile_slots, search,
 };
-pub use purchases::{BuyProblem, buy_targets, buy_truck};
+pub use purchases::{BuyProblem, buy_targets, buy_trailer, buy_truck, trailer_targets};
 pub use removals::{
     Removal, RemoveProblem, can_remove, discover_roads, discovered_roads, forget_roads, remove,
 };

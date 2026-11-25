@@ -143,7 +143,8 @@ Agreed work, in order. Each step should end with something the owner can see or 
   - [ ] A copied truck and trailer checked in the game (owner).
   - [x] Buy a truck from a dealer's stock: any the game's dealers sell ready-made, for the DLCs the save has (2026-11-25, `docs/decisions.md`).
   - [ ] A bought truck checked in the game (owner).
-  - [ ] Buy a trailer from the trailer dealer's stock.
+  - [x] Buy a trailer (or road train) from the dealer's stock (2026-11-25, `docs/decisions.md`).
+  - [ ] A bought trailer checked in the game (owner), also in a save that had no trailer before.
   - [ ] Build a truck from any parts the configurator offers, starting from a dealer's.
 
 - [ ] Cars: the player's car (`player.cars`, ATS's Road Trip car) in Fleet, with fuel, wear, repairs and plate.

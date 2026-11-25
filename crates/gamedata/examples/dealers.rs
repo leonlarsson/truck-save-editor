@@ -1,4 +1,4 @@
-//! Lists the trucks the game's dealers sell ready-made, with what each costs (its parts' prices
+//! Lists the trucks and trailers the game's dealers sell ready-made, with what each costs (its parts' prices
 //! together): `cargo run -p gamedata --example dealers -- <install folder> [ets2|ats]`. Read-only.
 
 fn main() {
@@ -31,6 +31,23 @@ fn main() {
             truck.accessories.len(),
             truck.price,
             truck.dlc
+        );
+    }
+    let trailers = gamedata::dealer_trailers(dir);
+    println!("{} trailers", trailers.len());
+    for trailer in &trailers {
+        let chassis = match &data {
+            Some(data) => data.resolve(&trailer.chassis),
+            None => trailer.chassis.clone(),
+        };
+        let count = trailer
+            .units
+            .iter()
+            .filter(|unit| unit.kind == "trailer")
+            .count();
+        println!(
+            "{} {} · {chassis} · {count} trailer(s) · {} · {:?}",
+            trailer.model, trailer.body_type, trailer.price, trailer.dlc
         );
     }
 }

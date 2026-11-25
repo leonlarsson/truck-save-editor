@@ -26,7 +26,7 @@ use save::{Game, LevelTable};
 
 pub use companies::{CompanyCargo, company_cargo};
 pub use content::{Installed, installed};
-pub use dealer::{DealerTruck, dealer_trucks};
+pub use dealer::{DealerTrailer, DealerTruck, dealer_trailers, dealer_trucks};
 pub use icon::{ALPHA, BLUE, GREEN, GameIcon, RED};
 pub use install::find_install;
 pub use photo_album::{AlbumItem, PhotoAlbum};

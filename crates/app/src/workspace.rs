@@ -540,7 +540,20 @@ impl Workspace {
                 crate::pages::saved_colours::open(session.clone(), window, cx);
             }
             PaletteCommand::BuyTruck => {
-                crate::pages::buy_truck::open(session.clone(), window, cx);
+                crate::pages::buy::open(
+                    session.clone(),
+                    crate::pages::buy::Buying::Truck,
+                    window,
+                    cx,
+                );
+            }
+            PaletteCommand::BuyTrailer => {
+                crate::pages::buy::open(
+                    session.clone(),
+                    crate::pages::buy::Buying::Trailer,
+                    window,
+                    cx,
+                );
             }
             PaletteCommand::PerfectCoachSatisfaction => {
                 session.update(cx, |session, cx| session.perfect_coach_satisfaction(cx));

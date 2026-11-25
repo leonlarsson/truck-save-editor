@@ -198,6 +198,7 @@ fn forget_read_on_demand(cx: &mut App) {
     cx.set_global(PaintJobs::default());
     cx.set_global(CompanyCargoState::default());
     cx.set_global(DealerTrucks::default());
+    cx.set_global(DealerTrailers::default());
     cx.set_global(Pictures::default());
 }
 
@@ -707,6 +708,45 @@ pub fn dealer_trucks(cx: &mut App) -> Option<Arc<Vec<gamedata::DealerTruck>>> {
     })
     .detach();
     None
+}
+
+/// The trailers the dealers sell, once read (`None` inside while reading).
+#[derive(Default)]
+struct DealerTrailers(Option<Option<Arc<Vec<gamedata::DealerTrailer>>>>);
+
+impl Global for DealerTrailers {}
+
+/// The trailers the game's dealers sell ready-made (`gamedata::dealer_trailers`), read on first
+/// ask like `dealer_trucks`.
+pub fn dealer_trailers(cx: &mut App) -> Option<Arc<Vec<gamedata::DealerTrailer>>> {
+    if !cx.has_global::<DealerTrailers>() {
+        cx.set_global(DealerTrailers::default());
+    }
+    if let Some(state) = &cx.global::<DealerTrailers>().0 {
+        return state.clone();
+    }
+    let install_dir = data(cx)?.install_dir.clone();
+    cx.global_mut::<DealerTrailers>().0 = Some(None);
+    cx.spawn(async move |cx| {
+        let trailers = cx
+            .background_spawn(async move { gamedata::dealer_trailers(&install_dir) })
+            .await;
+        cx.update(|cx| {
+            cx.global_mut::<DealerTrailers>().0 = Some(Some(Arc::new(trailers)));
+            cx.refresh_windows();
+        });
+    })
+    .detach();
+    None
+}
+
+/// A trailer's name as lists show it: SCS's own by their body (`Refrigerated`), as `model_name`
+/// does; branded ones (Krone …) by their model.
+pub fn trailer_name(cx: &App, model_id: &str, body_type: &str) -> String {
+    if model_id.starts_with("scs.") && !body_type.is_empty() {
+        return text(cx, body_type).unwrap_or_else(|| save::model_display_name(body_type));
+    }
+    model_name_by_id(cx, model_id)
 }
 
 /// A model's name by its id (`volvo.vnl2018` → `Volvo VNL 2018`), else made from the id.

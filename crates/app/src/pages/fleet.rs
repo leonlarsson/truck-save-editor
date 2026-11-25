@@ -355,6 +355,19 @@ impl Render for FleetPage {
             count = worn_count,
             amount = thousands(worn_count as i64)
         );
+        let buying = match self.kind {
+            VehicleKind::Truck => Some((
+                crate::pages::buy::Buying::Truck,
+                t!(cx, "buy-truck"),
+                t!(cx, "buy-truck-description"),
+            )),
+            VehicleKind::Trailer => Some((
+                crate::pages::buy::Buying::Trailer,
+                t!(cx, "buy-trailer"),
+                t!(cx, "buy-trailer-description"),
+            )),
+            VehicleKind::Coach => None,
+        };
         // With none, how many need repairs says nothing.
         let summary = if truck_count == 0 {
             vehicles
@@ -422,16 +435,22 @@ impl Render for FleetPage {
                 .child(
                     h_flex()
                         .gap_2()
-                        .child(
-                            Button::new("buy-truck")
+                        // Buy a truck, or a trailer, by the list shown; coaches aren't sold here.
+                        .children(buying.map(|(buying, label, tip)| {
+                            Button::new("buy-vehicle")
                                 .small()
                                 .ghost()
-                                .label(t!(cx, "buy-truck"))
-                                .tip(t!(cx, "buy-truck-description"))
-                                .on_click(cx.listener(|this, _, window, cx| {
-                                    crate::pages::buy_truck::open(this.session.clone(), window, cx)
-                                })),
-                        )
+                                .label(label)
+                                .tip(tip)
+                                .on_click(cx.listener(move |this, _, window, cx| {
+                                    crate::pages::buy::open(
+                                        this.session.clone(),
+                                        buying,
+                                        window,
+                                        cx,
+                                    )
+                                }))
+                        }))
                         .child(
                             Button::new("saved-colours")
                                 .small()
