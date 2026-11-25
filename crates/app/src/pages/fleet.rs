@@ -368,6 +368,28 @@ impl Render for FleetPage {
             )),
             VehicleKind::Coach => None,
         };
+        // No trucks (or trailers) yet: say so, with the way to add one right there.
+        let empty = buying.clone().map(|(buying, label, _)| {
+            let (title, body) = match buying {
+                crate::pages::buy::Buying::Truck => {
+                    (t!(cx, "fleet-none"), t!(cx, "fleet-none-body"))
+                }
+                crate::pages::buy::Buying::Trailer => (
+                    t!(cx, "fleet-none-trailers"),
+                    t!(cx, "fleet-none-trailers-body"),
+                ),
+            };
+            let session = self.session.clone();
+            crate::ui::EmptyState::new(title).description(body).action(
+                Button::new("empty-add-vehicle")
+                    .small()
+                    .outline()
+                    .label(label)
+                    .on_click(move |_, window, cx| {
+                        crate::pages::buy::open(session.clone(), buying, window, cx)
+                    }),
+            )
+        });
         // With none, how many need repairs says nothing.
         let summary = if truck_count == 0 {
             vehicles
@@ -375,14 +397,14 @@ impl Render for FleetPage {
             t!(cx, "fleet-summary", vehicles = vehicles, worn = worn)
         };
 
-        // Trucks, coaches and trailers each get their own list; the switch shows the kinds the
-        // save has (trucks always).
+        // Trucks, coaches and trailers each get their own list; the switch shows trucks and
+        // trailers always (either can be added here), coaches when the save has some.
         let all = self.session.read(cx).vehicles();
         let count_of = |kind: VehicleKind| all.iter().filter(|v| v.kind == kind).count();
         let kinds: Vec<VehicleKind> =
             [VehicleKind::Truck, VehicleKind::Coach, VehicleKind::Trailer]
                 .into_iter()
-                .filter(|kind| *kind == VehicleKind::Truck || count_of(*kind) > 0)
+                .filter(|kind| *kind != VehicleKind::Coach || count_of(*kind) > 0)
                 .collect();
         let switch = (kinds.len() > 1).then(|| {
             let buttons = kinds.iter().map(|kind| {
@@ -530,10 +552,7 @@ impl Render for FleetPage {
                                 .accessibility_label(t!(cx, "trucks-table"))
                                 .into_any_element(),
                         ),
-                        Some(
-                            crate::ui::EmptyState::new(t!(cx, "fleet-none"))
-                                .description(t!(cx, "fleet-none-body")),
-                        ),
+                        empty,
                         cx,
                     )),
             )

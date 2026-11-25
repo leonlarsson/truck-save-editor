@@ -140,11 +140,12 @@ Agreed work, in order. Each step should end with something the owner can see or 
 
 - [ ] Add trucks and trailers from the app, in both games: any the installed game's dealers sell (as they configure it) into a garage slot, and copy one you already own.
   - [x] Copy a truck or trailer into a garage with room (2026-11-25, `docs/decisions.md`).
-  - [ ] A copied truck and trailer checked in the game (owner).
+  - [x] A copied truck and trailer checked in the game (owner, ATS, 2026-11-25: in the garage, paint and parts kept, own plates).
   - [x] Add a truck from a dealer's stock: any the game's dealers sell ready-made, for the DLCs the save has (2026-11-25, `docs/decisions.md`).
-  - [ ] An added truck checked in the game (owner).
+  - [x] An added truck checked in the game (owner, ATS, 2026-11-25). ETS2 still to check.
   - [x] Add a trailer (or road train) from the dealer's stock (2026-11-25, `docs/decisions.md`).
-  - [ ] An added trailer checked in the game (owner), also in a save that had no trailer before.
+  - [x] An added road train checked in the game (owner, ATS, 2026-11-25: the whole train, its own plate).
+  - [ ] An added trailer in a save that had no trailer before, and in ETS2 (owner).
   - [ ] Build a truck from any parts the configurator offers, starting from a dealer's.
 
 - [ ] Cars: the player's car (`player.cars`, ATS's Road Trip car) in Fleet, with fuel, wear, repairs and plate.
