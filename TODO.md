@@ -149,7 +149,7 @@ Agreed work, in order. Each step should end with something the owner can see or 
   - [x] Adding and copying in ETS2 (owner, 2026-11-25: a truck, a B-double and a copy in Milan, with Italian plates made the game's way).
   - [x] An agency unlocked by the editor opens in the game, and hiring online works (owner, ATS, 2026-11-25).
   - [x] Coaches: add one from the coach dealer, or copy one (2026-11-25, `docs/decisions.md`).
-  - [ ] An added and a copied coach checked in the game (owner).
+  - [x] An added and a copied coach checked in the game (owner, ETS2, 2026-11-25: both listed by the coach dealer; the added one's showroom price matches the editor's, €405,685).
 - [ ] Trucks the game lists as N/A (brand and engine unknown; one drives as an old Scania R 420, maybe from TruckersMP): find what their data points at, and say so in Fleet (owner: leave for now, 2026-11-25).
   - [ ] Build a truck from any parts the configurator offers, starting from a dealer's.
 
