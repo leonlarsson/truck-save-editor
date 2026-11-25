@@ -164,7 +164,7 @@ Agreed work, in order. Each step should end with something the owner can see or 
   - [x] The odometer and a trailer's weights are edited in miles and pounds for ATS; hazardous cargo and states in ATS's words.
   - [ ] ATS (owner): what Career Progress says for recruitment agencies, to compare with the editor's 25.
   - [x] Recruitment agencies unlocked in the save stay shut in the game (black screen, no hiring online), in both games: the editor no longer unlocks them, only locks them, which with a drive past repairs one (2026-11-25, `docs/decisions.md`).
-  - [ ] A real check in ATS (owner): money, experience, a city visited, a truck repaired, saved and loaded in the game.
+  - [x] A real check in ATS (owner, 2026-11-25): money, experience, a dealer unlocked and a garage upgraded by the editor, saved and loaded in the game, all as expected (agencies aside, see below).
   - [x] Quick travel was off for the ATS save because it has no truck of its own yet (quick jobs only); it now says so, and World map says there's no truck instead of putting one at the map's origin (2026-11-24).
   - [x] ATS's cargo names in full (the game's `local.override.sii` was not read), its BC3 company logos, Garages and Buy all without cities of map DLCs that aren't installed, the start screen's folders for the picked game (2026-11-24).
   - [ ] An ATS save with a truck of its own (owner): to check the truck panel, plates, paint, parts and trailers with ATS's data.
