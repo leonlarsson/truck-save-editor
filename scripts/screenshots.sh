@@ -2,7 +2,7 @@
 # Takes the README's screenshots (light and dark) and a release's pictures (dark) of a made-up demo
 # profile, so they show nothing of the player's own. Runs the dev build under WSLg.
 #
-#   scripts/screenshots.sh <slot folder> [release version]
+#   scripts/screenshots.sh <slot folder> [release version] [ATS slot folder]
 #
 # <slot folder> is a copy of a save under fixtures/ (never a live save): one with a coach career
 # and a map's worth of driving shows the most. scripts/demo-profile.py turns it into a profile
@@ -10,13 +10,17 @@
 # pictures go to docs/screenshots/<page>-<theme>.png; with a version, that release's go to
 # docs/release-notes/<version>/. Look at every picture before committing it.
 #
-# One launch: the app drives itself through steps (scripts/drive.sh, crates/app/src/dev_script.rs):
+# With an ATS slot copy too, the release gets ATS pictures (Overview, Jobs, World map), from a
+# demo ATS profile made the same way.
+#
+# One launch per game: the app drives itself through steps (scripts/drive.sh, crates/app/src/dev_script.rs):
 # pages, themes, palette commands, and a picture where asked.
 set -euo pipefail
 
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 source_slot="${1:?usage: scripts/screenshots.sh <slot folder> [release version]}"
 version="${2:-}"
+ats_slot="${3:-}"
 
 # The editor's own settings say English while the pictures are taken, and go back afterwards.
 settings="$HOME/.config/Truck Save Editor/settings.txt"
@@ -86,3 +90,26 @@ pages="overview statistics coach-career fleet world-map gallery"
 # The app drives itself through the steps; drive.sh saves each picture under docs/.
 "$repo/scripts/drive.sh" "$slot" "$work/script.txt" "$repo/docs" \
     TSE_PAGE=overview TSE_THEME=light TSE_FIND_CITY=hamburg
+
+# ATS: a few release pictures of a demo ATS profile.
+if [ -n "$ats_slot" ] && [ -n "$version" ]; then
+    mkdir -p "$work/ats"
+    "$repo/target/debug/examples/decode" "$ats_slot/game.sii" "$work/ats/game.txt" >/dev/null
+    "$repo/target/debug/examples/decode" "$ats_slot/info.sii" "$work/ats/info.txt" >/dev/null
+    ats="$(python3 -I "$repo/scripts/demo-profile.py" "$work/ats/game.txt" "$work/ats/info.txt" \
+        "$work/ats/profiles" ats)"
+    notes="release-notes/$version"
+    {
+        echo "page overview"
+        echo "shot $notes/ats-overview"
+        # Jobs draws the companies' logos as they load.
+        echo "page jobs"
+        echo "wait 1500"
+        echo "shot $notes/ats-jobs"
+        echo "page world-map"
+        echo "wait 2500"
+        echo "shot $notes/ats-world-map"
+    } >"$work/ats-script.txt"
+    "$repo/scripts/drive.sh" "$ats" "$work/ats-script.txt" "$repo/docs" \
+        TSE_GAME=ats TSE_PAGE=overview TSE_THEME=dark TSE_FIND_CITY=sacramento
+fi
