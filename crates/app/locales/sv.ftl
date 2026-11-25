@@ -835,6 +835,7 @@ map-discover-roads-confirm-body = Varje väg och korsning på kartan, även i di
 map-view-driven = Körda
 map-view-not-driven = Inte körda än
 map-view-truck = Din lastbil
+map-view-as-dots = Vägar som prickar
 map-view-garages = Dina garage
 map-view-names = Stadsnamn
 map-view-hide = Klicka för att dölja

@@ -49,6 +49,9 @@ pub struct Settings {
     pub profile_dirs: Vec<PathBuf>,
     /// Whether to ask GitHub for the latest version when the editor starts (`updates.rs`).
     pub check_for_updates: bool,
+    /// Whether maps draw each road as a dot where it is, as they did before they drew roads as
+    /// lines (the legend's Roads as dots).
+    pub map_roads_as_dots: bool,
 }
 
 impl Default for Settings {
@@ -61,6 +64,7 @@ impl Default for Settings {
             profile_dirs: Vec::new(),
             // On unless turned off: a game update can need a new version of the editor.
             check_for_updates: true,
+            map_roads_as_dots: false,
         }
     }
 }
@@ -99,6 +103,7 @@ impl Settings {
                     settings.profile_dirs.push(PathBuf::from(value))
                 }
                 "check_for_updates" => settings.check_for_updates = value != "false",
+                "map_roads_as_dots" => settings.map_roads_as_dots = value == "true",
                 _ => {}
             }
         }
@@ -135,10 +140,11 @@ impl Settings {
             .map(|dir| format!("profile_dir = {}\n", dir.to_string_lossy()))
             .collect();
         format!(
-            "language = {}\nappearance = {}\nets2_game_dir = {ets2_game_dir}\nats_game_dir = {ats_game_dir}\n{profile_dirs}check_for_updates = {}\n",
+            "language = {}\nappearance = {}\nets2_game_dir = {ets2_game_dir}\nats_game_dir = {ats_game_dir}\n{profile_dirs}check_for_updates = {}\nmap_roads_as_dots = {}\n",
             self.language.code(),
             self.appearance.code(),
-            self.check_for_updates
+            self.check_for_updates,
+            self.map_roads_as_dots
         )
     }
 }
@@ -209,6 +215,7 @@ mod tests {
                 PathBuf::from("/backup/profiles"),
             ],
             check_for_updates: false,
+            map_roads_as_dots: true,
         };
         assert_eq!(Settings::parse(&settings.to_text()), settings);
         let odd = Settings::parse("language = klingon\nwhatever\nappearance=light\n");

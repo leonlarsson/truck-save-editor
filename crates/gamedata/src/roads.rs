@@ -73,6 +73,70 @@ pub struct MapRoad {
     pub z: f32,
 }
 
+/// A node of the map: a point roads and junctions meet at. After a sector's items come its
+/// nodes, 56 bytes each: an id (`u64`), a position (three `i32`s, in 256ths of a metre), a
+/// rotation (a quaternion, four `f32`s: w, x, y, z), the item behind it and the item ahead of it
+/// (`u64` ids, 0 for none) and flags. A road runs from the node it's ahead of to the node it's
+/// behind; a junction is behind or ahead of each of its ends. (Worked out on sector format 907,
+/// 2026-11-25: in one sector every node found was inside its item's box, and the nodes'
+/// directions ran along their roads.)
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MapNode {
+    pub x: f32,
+    pub z: f32,
+    /// The way it points (east, south), one metre long.
+    pub direction: [f32; 2],
+    pub backward_item: u64,
+    pub forward_item: u64,
+}
+
+/// A stretch of road as it runs on the map: of the road or junction `id`, from one point to
+/// another (in the game's metres, east and south), leaving and arriving in these directions (one
+/// metre long each; zero for a straight line).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MapLine {
+    pub id: u64,
+    pub from: [f32; 2],
+    pub from_direction: [f32; 2],
+    pub to: [f32; 2],
+    pub to_direction: [f32; 2],
+}
+
+impl MapLine {
+    /// The point a share of the way along (0 at `from`, 1 at `to`): on the curve that leaves
+    /// and arrives in the line's directions (a Hermite curve, as the game lays its roads), or on
+    /// the straight line when it has none.
+    pub fn point(&self, share: f32) -> [f32; 2] {
+        let length = self.length();
+        let t = share.clamp(0.0, 1.0);
+        let (t2, t3) = (t * t, t * t * t);
+        // The four Hermite weights: start point, start direction, end point, end direction.
+        let weights = [
+            2.0 * t3 - 3.0 * t2 + 1.0,
+            t3 - 2.0 * t2 + t,
+            -2.0 * t3 + 3.0 * t2,
+            t3 - t2,
+        ];
+        let is_straight = self.from_direction == [0.0, 0.0] && self.to_direction == [0.0, 0.0];
+        let axis = |axis: usize| {
+            if is_straight {
+                self.from[axis] + (self.to[axis] - self.from[axis]) * t
+            } else {
+                weights[0] * self.from[axis]
+                    + weights[1] * self.from_direction[axis] * length
+                    + weights[2] * self.to[axis]
+                    + weights[3] * self.to_direction[axis] * length
+            }
+        };
+        [axis(0), axis(1)]
+    }
+
+    /// How far apart its ends are, in metres.
+    pub fn length(&self) -> f32 {
+        (self.to[0] - self.from[0]).hypot(self.to[1] - self.from[1])
+    }
+}
+
 /// A city's area or a garage on the map: which city (its token, `berlin`), where (the middle of
 /// its box, in the game's metres) and how big.
 #[derive(Clone, Debug, PartialEq)]
@@ -119,6 +183,11 @@ pub struct MapContents {
     pub places: Vec<MapPlace>,
     pub markers: Vec<MapMarker>,
     pub prefabs: Vec<MapPrefab>,
+    /// The nodes found, for `lines` (a road's nodes can be in a neighbouring sector's file).
+    pub nodes: Vec<MapNode>,
+    /// How the roads and junctions run, made from the nodes once every sector is read (see
+    /// `lines_of`). A road or junction without one still has its place in `roads`.
+    pub lines: Vec<MapLine>,
 }
 
 impl MapContents {
@@ -128,6 +197,7 @@ impl MapContents {
         self.places.extend(other.places);
         self.markers.extend(other.markers);
         self.prefabs.extend(other.prefabs);
+        self.nodes.extend(other.nodes);
     }
 }
 
@@ -164,7 +234,88 @@ pub fn map_contents(game: Game, install_dir: &Path) -> MapContents {
     }
     map.roads.sort_unstable_by_key(|road| road.id);
     map.roads.dedup_by_key(|road| road.id);
+    map.lines = lines_of(&map);
+    // Only needed to make the lines.
+    map.nodes = Vec::new();
     map
+}
+
+/// One end of a junction: where it is, and the direction that leads into the junction there.
+type JunctionEnd = ([f32; 2], [f32; 2]);
+
+/// How every road and junction runs, from the nodes: a road from the node it's ahead of to the
+/// node it's behind, curved the way the nodes point. A junction's own lanes are in its prefab's
+/// file, which isn't read: one with two ends is drawn as the curve between them, one with more
+/// as a line from each end to their middle (a crossroads becomes a cross).
+pub fn lines_of(map: &MapContents) -> Vec<MapLine> {
+    use std::collections::HashMap;
+    let junctions: HashSet<u64> = map.prefabs.iter().map(|prefab| prefab.id).collect();
+    // Each item's nodes: for a road, where it starts (the node it's ahead of) and ends.
+    let mut starts: HashMap<u64, &MapNode> = HashMap::new();
+    let mut ends: HashMap<u64, &MapNode> = HashMap::new();
+    // A junction's ends, each with the direction that leads into the junction.
+    let mut junction_ends: HashMap<u64, Vec<JunctionEnd>> = HashMap::new();
+    for node in &map.nodes {
+        let reversed = [-node.direction[0], -node.direction[1]];
+        for (item, is_ahead) in [(node.forward_item, true), (node.backward_item, false)] {
+            if item == 0 {
+                continue;
+            }
+            if junctions.contains(&item) {
+                // Ahead of the node: its direction leads in. Behind it: the other way does.
+                let inward = if is_ahead { node.direction } else { reversed };
+                junction_ends
+                    .entry(item)
+                    .or_default()
+                    .push(([node.x, node.z], inward));
+            } else if is_ahead {
+                starts.insert(item, node);
+            } else {
+                ends.insert(item, node);
+            }
+        }
+    }
+
+    let mut lines = Vec::new();
+    for road in &map.roads {
+        if let Some(ends_of) = junction_ends.get(&road.id) {
+            match ends_of.as_slice() {
+                [(from, inward), (to, other_inward)] => lines.push(MapLine {
+                    id: road.id,
+                    from: *from,
+                    from_direction: *inward,
+                    to: *to,
+                    // Arriving at the far end means leaving the junction there.
+                    to_direction: [-other_inward[0], -other_inward[1]],
+                }),
+                ends_of => {
+                    let count = ends_of.len() as f32;
+                    let middle = [
+                        ends_of.iter().map(|(at, _)| at[0]).sum::<f32>() / count,
+                        ends_of.iter().map(|(at, _)| at[1]).sum::<f32>() / count,
+                    ];
+                    lines.extend(ends_of.iter().map(|(at, _)| MapLine {
+                        id: road.id,
+                        from: *at,
+                        from_direction: [0.0, 0.0],
+                        to: middle,
+                        to_direction: [0.0, 0.0],
+                    }));
+                }
+            }
+        } else if let (Some(start), Some(end)) = (starts.get(&road.id), ends.get(&road.id)) {
+            lines.push(MapLine {
+                id: road.id,
+                from: [start.x, start.z],
+                from_direction: start.direction,
+                to: [end.x, end.z],
+                to_direction: end.direction,
+            });
+        }
+    }
+    // Nodes wrongly matched would make a line across the map: no real one is this long.
+    lines.retain(|line| line.length() < LARGEST_ITEM);
+    lines
 }
 
 /// The roads and junctions in one sector's `.base` file.
@@ -262,7 +413,78 @@ pub fn sector_contents(bytes: &[u8]) -> MapContents {
         places,
         markers,
         prefabs,
+        nodes: sector_nodes(bytes, HEADER_LENGTH),
+        lines: Vec::new(),
     }
+}
+
+/// A node's length in a `.base` file, and where its parts are.
+const NODE_LENGTH: usize = 56;
+const NODE_POSITION_AT: usize = 8;
+const NODE_ROTATION_AT: usize = 20;
+const NODE_BACKWARD_AT: usize = 36;
+const NODE_FORWARD_AT: usize = 44;
+/// A node's position is in 256ths of a metre.
+const NODE_UNITS_PER_METRE: f32 = 256.0;
+
+/// The nodes in a sector's file, from `from` on. The whole file is looked through: starting
+/// after the last item recognised missed one road in six (on the 1.62 map: 97 % of roads and
+/// junctions get a line this way, 83 % that way). Like the items, they're
+/// recognised where they start: an id, a position on the map, a rotation that is one (a
+/// quaternion of length 1) and an item behind or ahead. A stray match does no harm: a node only
+/// counts once an item of the map names it (`lines_of`).
+///
+/// Every place is tried, also right after a match: a node that only turns about the up axis has
+/// zeros in its rotation, so the bytes four before it can pass for a rotation too. Skipping a
+/// node's length after such a match would step over the real node (and then every node after
+/// it, all four bytes off); its items would be nonsense, so it's harmless when the real one is
+/// found as well.
+fn sector_nodes(bytes: &[u8], from: usize) -> Vec<MapNode> {
+    (from..bytes.len().saturating_sub(NODE_LENGTH - 1))
+        .filter_map(|at| node_at(bytes, at))
+        .collect()
+}
+
+fn node_at(bytes: &[u8], at: usize) -> Option<MapNode> {
+    // The rotation first: it rules out nearly every place that isn't a node, cheaply.
+    let part = |index: usize| read_f32(bytes, at + NODE_ROTATION_AT + index * 4);
+    let (w, x, y, z) = (part(0)?, part(1)?, part(2)?, part(3)?);
+    let length = w * w + x * x + y * y + z * z;
+    if !(0.98..1.02).contains(&length) {
+        return None;
+    }
+    if read_u64(bytes, at)? == 0 {
+        return None;
+    }
+    let backward_item = read_u64(bytes, at + NODE_BACKWARD_AT)?;
+    let forward_item = read_u64(bytes, at + NODE_FORWARD_AT)?;
+    if backward_item == 0 && forward_item == 0 {
+        return None;
+    }
+    let position = |index: usize| {
+        read_u32(bytes, at + NODE_POSITION_AT + index * 4)
+            .map(|value| value as i32 as f32 / NODE_UNITS_PER_METRE)
+    };
+    let (east, south) = (position(0)?, position(2)?);
+    if east.abs() > FARTHEST || south.abs() > FARTHEST {
+        return None;
+    }
+    // The way the node points: the game's "forward" (north, -z) turned by the rotation.
+    let direction = [-2.0 * (x * z + w * y), -(1.0 - 2.0 * (x * x + y * y))];
+    let size = direction[0].hypot(direction[1]);
+    // Pointing straight up or down: no direction on the map.
+    let direction = if size > 0.001 {
+        [direction[0] / size, direction[1] / size]
+    } else {
+        [0.0, 0.0]
+    };
+    Some(MapNode {
+        x: east,
+        z: south,
+        direction,
+        backward_item,
+        forward_item,
+    })
 }
 
 /// Leaves out the roads of map DLCs that aren't installed: the base map holds the roads of states
@@ -293,6 +515,9 @@ pub fn keep_installed_roads(map: &mut MapContents, installed_cities: &HashSet<St
             .min_by(|a, b| a.0.total_cmp(&b.0))
             .is_some_and(|(_, is_installed)| is_installed)
     });
+    // The lines of the roads left out go too.
+    let kept: HashSet<u64> = map.roads.iter().map(|road| road.id).collect();
+    map.lines.retain(|line| kept.contains(&line.id));
 }
 
 /// The cities with a recruitment agency: the city area each agency's building (a prefab whose
@@ -456,6 +681,74 @@ mod tests {
             .map(|road| (road.id, road.x, road.z))
             .collect();
         assert_eq!(found, [(101, -90.0, 70.0), (103, 22.5, 17.5)]);
+    }
+
+    /// One made-up node: where it is (east, south), the quarter turns it's turned to the left
+    /// from north, and the items behind and ahead of it.
+    fn node(
+        id: u64,
+        east: f32,
+        south: f32,
+        quarter_turns: f32,
+        behind: u64,
+        ahead: u64,
+    ) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend(id.to_le_bytes());
+        for metres in [east, 0.0, south] {
+            bytes.extend(((metres * NODE_UNITS_PER_METRE) as i32).to_le_bytes());
+        }
+        // A turn about the up axis: (w, x, y, z) = (cos half, 0, sin half, 0).
+        let half = quarter_turns * std::f32::consts::FRAC_PI_4;
+        for part in [half.cos(), 0.0, half.sin(), 0.0] {
+            bytes.extend(part.to_le_bytes());
+        }
+        bytes.extend(behind.to_le_bytes());
+        bytes.extend(ahead.to_le_bytes());
+        bytes.extend(0u32.to_le_bytes());
+        bytes
+    }
+
+    #[test]
+    fn a_road_runs_between_its_nodes_and_a_junction_between_its_ends() {
+        let mut bytes = sector(&[
+            item(ROAD, 101, [0.0, 0.0, -100.0], [1.0, 1.0, 0.0]),
+            item(PREFAB, 103, [-5.0, 0.0, -140.0], [5.0, 1.0, -100.0]),
+        ]);
+        // The road runs north from (0, 0) to (0, -100), into the junction, which ends at
+        // (0, -140).
+        bytes.extend(node(1, 0.0, 0.0, 0.0, 0, 101));
+        bytes.extend(node(2, 0.0, -100.0, 0.0, 101, 103));
+        bytes.extend(node(3, 0.0, -140.0, 0.0, 103, 0));
+        let mut map = sector_contents(&bytes);
+        map.lines = lines_of(&map);
+
+        let road = map
+            .lines
+            .iter()
+            .find(|line| line.id == 101)
+            .expect("the road's line");
+        assert_eq!((road.from, road.to), ([0.0, 0.0], [0.0, -100.0]));
+        // Pointing north at both ends: straight up the map, so halfway is halfway.
+        let middle = road.point(0.5);
+        assert!(middle[0].abs() < 0.01 && (middle[1] + 50.0).abs() < 0.01);
+
+        let junction = map
+            .lines
+            .iter()
+            .find(|line| line.id == 103)
+            .expect("the junction's line");
+        assert_eq!((junction.from, junction.to), ([0.0, -100.0], [0.0, -140.0]));
+        assert!(junction.from_direction[1] < -0.99 && junction.to_direction[1] < -0.99);
+    }
+
+    #[test]
+    fn a_node_turned_left_points_west() {
+        let bytes = node(1, 0.0, 0.0, 1.0, 0, 7);
+        let found = node_at(&bytes, 0).expect("a node");
+        assert!(found.direction[0] < -0.99 && found.direction[1].abs() < 0.01);
+        // Bytes that aren't a rotation aren't a node.
+        assert_eq!(node_at(&[0u8; NODE_LENGTH], 0), None);
     }
 
     #[test]

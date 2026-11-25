@@ -32,6 +32,8 @@ struct MapRoads(Option<RoadsRead>);
 #[derive(Clone)]
 struct RoadsRead {
     roads: Arc<Vec<gamedata::MapRoad>>,
+    /// How the roads run (their lines on the map), for the map view to draw.
+    lines: Arc<Vec<gamedata::MapLine>>,
     ids: Arc<Vec<u64>>,
     /// The cities' areas and the garages, for names and garages on the map view.
     places: Arc<Vec<gamedata::MapPlace>>,
@@ -111,6 +113,12 @@ pub fn resolve(cx: &App, raw: &str) -> String {
         Some(data) => data.resolve(raw),
         None => raw.trim_matches('@').to_string(),
     }
+}
+
+/// How the map's roads and junctions run, once read: the lines the map view draws.
+pub fn map_lines(cx: &App) -> Option<Arc<Vec<gamedata::MapLine>>> {
+    cx.try_global::<MapRoads>()
+        .and_then(|read| read.0.as_ref().map(|read| read.lines.clone()))
 }
 
 /// The map's roads and junctions with where they are, once read.
@@ -331,6 +339,7 @@ fn load(cx: &mut App) {
                 let agency_cities = gamedata::agency_cities(&map, &agency_models);
                 (!map.roads.is_empty()).then(|| RoadsRead {
                     roads: Arc::new(map.roads),
+                    lines: Arc::new(map.lines),
                     ids: Arc::new(ids),
                     places: Arc::new(map.places),
                     markers: Arc::new(map.markers),

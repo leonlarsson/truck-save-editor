@@ -876,6 +876,7 @@ map-discover-roads-confirm-body = Każda droga i skrzyżowanie na mapie, także 
 map-view-driven = Przejechane
 map-view-not-driven = Jeszcze nie przejechane
 map-view-truck = Twoja ciężarówka
+map-view-as-dots = Drogi jako kropki
 map-view-garages = Twoje garaże
 map-view-names = Nazwy miast
 map-view-hide = Kliknij, aby ukryć

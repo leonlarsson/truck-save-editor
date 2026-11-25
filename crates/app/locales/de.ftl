@@ -839,6 +839,7 @@ map-discover-roads-confirm-body = Jede Straße und Kreuzung der Karte, auch in d
 map-view-driven = Befahren
 map-view-not-driven = Noch nicht befahren
 map-view-truck = Dein Lkw
+map-view-as-dots = Straßen als Punkte
 map-view-garages = Deine Garagen
 map-view-names = Städtenamen
 map-view-hide = Zum Ausblenden klicken

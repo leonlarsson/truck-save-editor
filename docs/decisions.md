@@ -534,3 +534,12 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** a release with one big change should say so where the release list shows it; the title is still made by the workflow, so it can't slip.
 
 **Considered:** editing the title by hand when publishing (the step that slipped before).
+
+## 2026-11-25: The map draws roads as lines, from the map's nodes
+
+**Decided:** `gamedata` reads the nodes of the game's map (`.base` sector files: a position, a rotation, the item behind and the item ahead) and makes a line for each road, from the node it's ahead of to the node it's behind, curved the way the nodes point (a Hermite curve, as the game lays roads). The map view draws those lines in its tiles; a road or junction without one keeps its dot. Roads as dots in the map's legend (kept in the settings) draws every road as a dot again, as before. A junction's own lanes are in its prefab's file, which isn't read: one with two ends is the curve between them, one with more a line from each end to their middle.
+
+**Why:** the owner put the game's map beside ours: dots at each road's middle don't read as roads. On the 1.62 map 97 % of roads and junctions get a line; reading the map takes 2.8 s instead of 2.0 s (in the background, as before).
+
+**Considered:** reading every item's full layout to find its nodes (dozens of item kinds, each changing between map formats: the reason items are recognised where they start instead); the prefabs' own files for junctions' real lanes (the next step if junctions look too rough); joining dots by nearness (wrong at every interchange).
+

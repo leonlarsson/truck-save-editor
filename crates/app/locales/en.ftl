@@ -835,6 +835,7 @@ map-discover-roads-confirm-body = Every road and junction on the map, yours and 
 map-view-driven = Driven
 map-view-not-driven = Not driven yet
 map-view-truck = Your truck
+map-view-as-dots = Roads as dots
 map-view-garages = Your garages
 map-view-names = City names
 map-view-hide = Click to hide

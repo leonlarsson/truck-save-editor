@@ -1,6 +1,7 @@
-//! The map's roads: a dot for every road and junction on the game's map (read from its files, see
-//! `gamedata::map_roads`), the ones driven in this save in the accent colour, and where the
-//! player's truck is. The mouse wheel zooms around the pointer, dragging moves the map, and
+//! The map's roads: every road and junction on the game's map as the line it runs along (read
+//! from its files, see `gamedata::lines_of`; a dot for the few without one, or for all of them
+//! with the legend's Roads as dots), the ones driven in this save in the accent colour, and where
+//! the player's truck is. The mouse wheel zooms around the pointer, dragging moves the map, and
 //! buttons do both from the keyboard. A click on a city's name, a garage or the truck opens its
 //! panel (the list of cities, Garages and Fleet open the same panels from the keyboard). The
 //! viewpoints and photo trophies are marked too, each opening its panel (the Gallery lists them).
@@ -51,6 +52,12 @@ const DOT: f32 = 2.0;
 const LARGEST_DOT: f32 = 6.0;
 /// How many metres a dot stands for once zoomed in (about a road piece).
 const DOT_METRES: f32 = 40.0;
+/// How wide a road is drawn: this many metres once zoomed in, between these widths in pixels.
+const ROAD_METRES: f32 = 14.0;
+const THINNEST_ROAD: f32 = 1.0;
+const WIDEST_ROAD: f32 = 6.0;
+/// Farther out than this many metres a pixel, driven roads are drawn a pixel wider.
+const DRIVEN_WIDER_FROM: f32 = 40.0;
 /// The truck's marker's radius on screen, in pixels.
 const MARKER: f32 = 6.0;
 /// The closest zoom: metres a screen pixel shows.
@@ -102,10 +109,15 @@ struct Index {
     /// Metres per pixel at level 0, where one tile holds the whole map.
     base: f32,
     cells: HashMap<(i32, i32), Vec<u32>>,
+    /// How the roads run, sorted into the same cells (a line into every cell it may cross).
+    lines: Arc<Vec<gamedata::MapLine>>,
+    line_cells: HashMap<(i32, i32), Vec<u32>>,
+    /// The roads and junctions that have a line: the others are drawn as a dot where they are.
+    lined: HashSet<u64>,
 }
 
 impl Index {
-    fn new(roads: Arc<Vec<gamedata::MapRoad>>) -> Option<Self> {
+    fn new(roads: Arc<Vec<gamedata::MapRoad>>, lines: Arc<Vec<gamedata::MapLine>>) -> Option<Self> {
         let world = world_of(&roads)?;
         let base = (world.east - world.west).max(world.south - world.north) / TILE;
         let mut cells: HashMap<(i32, i32), Vec<u32>> = HashMap::new();
@@ -115,11 +127,35 @@ impl Index {
                 .or_default()
                 .push(index as u32);
         }
+        let mut line_cells: HashMap<(i32, i32), Vec<u32>> = HashMap::new();
+        let mut lined = HashSet::new();
+        for (index, line) in lines.iter().enumerate() {
+            lined.insert(line.id);
+            // A curve bulges past the straight line between its ends: a quarter of its length
+            // covers any the game makes.
+            let bulge = line.length() * 0.25;
+            let first = cell_of(
+                line.from[0].min(line.to[0]) - bulge,
+                line.from[1].min(line.to[1]) - bulge,
+            );
+            let last = cell_of(
+                line.from[0].max(line.to[0]) + bulge,
+                line.from[1].max(line.to[1]) + bulge,
+            );
+            for x in first.0..=last.0 {
+                for z in first.1..=last.1 {
+                    line_cells.entry((x, z)).or_default().push(index as u32);
+                }
+            }
+        }
         Some(Self {
             roads,
             world,
             base,
             cells,
+            lines,
+            line_cells,
+            lined,
         })
     }
 
@@ -157,6 +193,26 @@ impl Index {
             }
         }
         found
+    }
+
+    /// Every line in the cells this extent touches, each once.
+    fn lines_in(&self, west: f32, north: f32, east: f32, south: f32) -> Vec<&gamedata::MapLine> {
+        let (first, last) = (cell_of(west, north), cell_of(east, south));
+        let mut indices: Vec<u32> = Vec::new();
+        for x in first.0..=last.0 {
+            for z in first.1..=last.1 {
+                if let Some(found) = self.line_cells.get(&(x, z)) {
+                    indices.extend(found);
+                }
+            }
+        }
+        // A line that crosses cells is in each of them.
+        indices.sort_unstable();
+        indices.dedup();
+        indices
+            .into_iter()
+            .map(|index| &self.lines[index as usize])
+            .collect()
     }
 }
 
@@ -376,6 +432,8 @@ struct Look {
     scale: f32,
     /// Which roads are drawn: driven, not driven.
     roads: (bool, bool),
+    /// Roads as dots, not lines (the player's choice, kept in the settings).
+    as_dots: bool,
 }
 
 /// The colours tiles are drawn in, as blue, green, red, alpha (GPUI's image order).
@@ -532,12 +590,13 @@ impl MapView {
         let Some(roads) = game_data::map_roads(cx) else {
             return;
         };
+        let lines = game_data::map_lines(cx).unwrap_or_default();
         let Some(index) = self.index.clone() else {
             if !self.is_indexing {
                 self.is_indexing = true;
                 self._work.push(cx.spawn(async move |this, cx| {
                     let index = cx
-                        .background_spawn(async move { Index::new(roads).map(Arc::new) })
+                        .background_spawn(async move { Index::new(roads, lines).map(Arc::new) })
                         .await;
                     let _ = this.update(cx, |this, cx| {
                         this.index = index;
@@ -561,6 +620,7 @@ impl MapView {
             is_dark: cx.theme().is_dark(),
             scale: window.scale_factor(),
             roads: (self.layers.driven, self.layers.not_driven),
+            as_dots: crate::settings::get(cx).map_roads_as_dots,
         };
         if self.look.as_ref() != Some(&look) {
             self.look = Some(look);
@@ -632,13 +692,19 @@ impl MapView {
         };
         let look = self.look.clone();
         let scale = window.scale_factor();
+        let as_dots = crate::settings::get(cx).map_roads_as_dots;
         self._work.retain(|task| !task.is_ready());
         self._work.push(cx.spawn(async move |this, cx| {
             let drawn = cx
                 .background_spawn(async move {
                     missing
                         .into_iter()
-                        .map(|key| (key, draw_tile(&index, &driven, key, palette, scale)))
+                        .map(|key| {
+                            (
+                                key,
+                                draw_tile(&index, &driven, key, palette, scale, as_dots),
+                            )
+                        })
                         .collect::<Vec<_>>()
                 })
                 .await;
@@ -1034,6 +1100,7 @@ fn draw_tile(
     key: TileKey,
     palette: Palette,
     scale: f32,
+    as_dots: bool,
 ) -> Option<RenderImage> {
     let side = (TILE * scale).round() as i64;
     let (west, north, east, south) = index.tile_extent(key);
@@ -1043,9 +1110,25 @@ fn draw_tile(
     // Dots just outside the tile reach into it.
     let margin = dot as f32 * metres;
     let roads = index.roads_in(west - margin, north - margin, east + margin, south + margin);
-    if roads.is_empty() {
+    // As dots: no lines, and every road a dot.
+    let lines = if as_dots {
+        Vec::new()
+    } else {
+        index.lines_in(west - margin, north - margin, east + margin, south + margin)
+    };
+    if roads.is_empty() && lines.is_empty() {
         return None;
     }
+    // A road's line is as wide as a road once zoomed in, and never thinner than a hairline.
+    let metres_per_pixel = index.metres_per_pixel(key.level);
+    let width =
+        ((ROAD_METRES / metres_per_pixel).clamp(THINNEST_ROAD, WIDEST_ROAD) * scale).round() as i64;
+    // Driven roads a little wider from far away, where a hairline of them would be lost.
+    let driven_extra = if metres_per_pixel > DRIVEN_WIDER_FROM {
+        scale.round() as i64
+    } else {
+        0
+    };
     let mut pixels = vec![0u8; (side * side * 4) as usize];
     let mut put = |x: i64, y: i64, color: [u8; 4]| {
         if x >= 0 && y >= 0 && x < side && y < side {
@@ -1063,8 +1146,33 @@ fn draw_tile(
         let Some(color) = color else {
             continue;
         };
+        // The roads as they run: points along each line, close enough to leave no gaps.
+        let width = (width + if is_driven { driven_extra } else { 0 }).max(1);
+        for line in lines
+            .iter()
+            .filter(|line| driven.contains(&line.id) == is_driven)
+        {
+            let length = line.length() / metres;
+            let steps = ((length / (width as f32 * 0.5).max(0.5)).ceil() as i64).clamp(1, 20_000);
+            for step in 0..=steps {
+                let at = line.point(step as f32 / steps as f32);
+                let x = ((at[0] - west) / metres) as i64 - width / 2;
+                let y = ((at[1] - north) / metres) as i64 - width / 2;
+                if x + width < 0 || y + width < 0 || x >= side || y >= side {
+                    continue;
+                }
+                any = true;
+                for dy in 0..width {
+                    for dx in 0..width {
+                        put(x + dx, y + dy, color);
+                    }
+                }
+            }
+        }
+        // The roads and junctions without a line: a dot where each is.
         for road in roads
             .iter()
+            .filter(|road| as_dots || !index.lined.contains(&road.id))
             .filter(|road| driven.contains(&road.id) == is_driven)
         {
             let x = ((road.x - west) / metres) as i64 - dot / 2;
@@ -1224,6 +1332,20 @@ impl Render for MapView {
                 photo_trophies_label,
                 cx,
             ))
+            .child(
+                // How roads are drawn, for every map, kept between sessions.
+                gpui_kit::component::checkbox::Checkbox::new("roads-as-dots")
+                    .label(t!(cx, "map-view-as-dots"))
+                    .checked(crate::settings::get(cx).map_roads_as_dots)
+                    .on_change(|checked: &bool, _, cx| {
+                        let as_dots = *checked;
+                        crate::settings::update(cx, |settings| {
+                            settings.map_roads_as_dots = as_dots
+                        });
+                        // Every map on screen draws its tiles again.
+                        cx.refresh_windows();
+                    }),
+            )
             .child(div().flex_1())
             .child(t!(cx, "map-view-hint"))
             .child(
@@ -1645,7 +1767,7 @@ mod tests {
 
     #[test]
     fn one_tile_holds_the_whole_map_at_level_zero() {
-        let index = Index::new(roads()).expect("an index");
+        let index = Index::new(roads(), Arc::new(Vec::new())).expect("an index");
         // 25,600 m wide over 256 pixels: 100 m a pixel.
         assert_eq!(index.metres_per_pixel(0), 100.0);
         assert_eq!(index.tile_metres(1), 12_800.0);
@@ -1662,7 +1784,7 @@ mod tests {
 
     #[test]
     fn draws_a_tile_with_its_roads_and_skips_an_empty_one() {
-        let index = Index::new(roads()).expect("an index");
+        let index = Index::new(roads(), Arc::new(Vec::new())).expect("an index");
         let palette = Palette {
             road: Some([1, 1, 1, 255]),
             driven: Some([2, 2, 2, 255]),
@@ -1673,7 +1795,7 @@ mod tests {
             x: 0,
             y: 0,
         };
-        let picture = draw_tile(&index, &driven, whole, palette, 2.0).expect("a picture");
+        let picture = draw_tile(&index, &driven, whole, palette, 2.0, false).expect("a picture");
         let drawn = picture.size(0);
         // At a scale of 2, twice a tile's side.
         assert_eq!((drawn.width.0, drawn.height.0), (512, 512));
@@ -1683,12 +1805,48 @@ mod tests {
             x: 3,
             y: 3,
         };
-        assert!(draw_tile(&index, &driven, empty, palette, 1.0).is_none());
+        assert!(draw_tile(&index, &driven, empty, palette, 1.0, false).is_none());
+    }
+
+    #[test]
+    fn a_road_s_line_is_drawn_along_its_length_and_its_dot_is_not() {
+        // The first road runs east from the map's corner to the middle of its north edge.
+        let lines = Arc::new(vec![gamedata::MapLine {
+            id: 1,
+            from: [0.0, 0.0],
+            from_direction: [0.0, 0.0],
+            to: [12_800.0, 0.0],
+            to_direction: [0.0, 0.0],
+        }]);
+        let index = Index::new(roads(), lines).expect("an index");
+        let palette = Palette {
+            road: Some([1, 1, 1, 255]),
+            driven: Some([2, 2, 2, 255]),
+        };
+        let whole = TileKey {
+            level: 0,
+            x: 0,
+            y: 0,
+        };
+        let picture =
+            draw_tile(&index, &HashSet::new(), whole, palette, 1.0, false).expect("a picture");
+        let pixels = picture.as_bytes(0).expect("the picture's pixels");
+        let is_drawn = |x: usize, y: usize| pixels[(y * 256 + x) * 4 + 3] == 255;
+        // 100 m a pixel: the line covers the top row's first 128 pixels, and no more.
+        assert!(is_drawn(0, 0) && is_drawn(64, 0) && is_drawn(127, 0));
+        assert!(!is_drawn(200, 0) && !is_drawn(64, 3));
+
+        // As dots: the road is a dot at its place again, and its line isn't drawn.
+        let picture =
+            draw_tile(&index, &HashSet::new(), whole, palette, 1.0, true).expect("a picture");
+        let pixels = picture.as_bytes(0).expect("the picture's pixels");
+        let is_drawn = |x: usize, y: usize| pixels[(y * 256 + x) * 4 + 3] == 255;
+        assert!(is_drawn(0, 0) && !is_drawn(64, 0));
     }
 
     #[test]
     fn places_tiles_where_the_view_puts_them() {
-        let index = Index::new(roads()).expect("an index");
+        let index = Index::new(roads(), Arc::new(Vec::new())).expect("an index");
         let area = Bounds::new(point(px(0.0), px(0.0)), size(px(256.0), px(256.0)));
         let whole = TileKey {
             level: 0,

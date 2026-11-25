@@ -26,6 +26,50 @@ fn main() {
         garages,
         started.elapsed()
     );
+    let with_line: std::collections::HashSet<u64> = map.lines.iter().map(|line| line.id).collect();
+    println!(
+        "{} lines; {} of the roads and junctions have one",
+        map.lines.len(),
+        with_line.len()
+    );
+    let junctions: std::collections::HashSet<u64> =
+        map.prefabs.iter().map(|prefab| prefab.id).collect();
+    let (mut roads_without, mut junctions_without) = (0, 0);
+    for road in map
+        .roads
+        .iter()
+        .filter(|road| !with_line.contains(&road.id))
+    {
+        if junctions.contains(&road.id) {
+            junctions_without += 1;
+        } else {
+            roads_without += 1;
+        }
+    }
+    println!(
+        "without a line: {roads_without} roads, {junctions_without} of {} junctions",
+        junctions.len()
+    );
+    // With a city's token after the folder: the lines within 3 km of it, as points along each
+    // (`east south` a line, a blank line between lines), to plot and compare with the game's map.
+    if let Some(city) = std::env::args().nth(2) {
+        let Some(area) = map.places.iter().find(|place| place.city == city) else {
+            eprintln!("no city {city} on the map");
+            return;
+        };
+        for line in &map.lines {
+            let near =
+                |at: [f32; 2]| (at[0] - area.x).abs() < 3000.0 && (at[1] - area.z).abs() < 3000.0;
+            if near(line.from) || near(line.to) {
+                for step in 0..=16 {
+                    let at = line.point(step as f32 / 16.0);
+                    println!("{} {}", at[0] - area.x, at[1] - area.z);
+                }
+                println!();
+            }
+        }
+        return;
+    }
     // The game's cities without an area on the map.
     if let Ok(data) =
         gamedata::GameData::load(save::Game::Ets2, std::path::Path::new(&dir), "en_us")
