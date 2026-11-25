@@ -526,3 +526,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** ATS's `base_map.scs` holds the roads of states whose DLC isn't installed (Utah, Colorado, Wyoming, New Mexico …); the game's own map shows those states empty (checked with the owner, 2026-11-25), while World map drew their roads, and Discover every road would have marked them.
 
 **Considered:** the map items' DLC markers (not worked out, and the nearest city answers the same question from data already read); a distance limit from installed cities (cuts roads off at arbitrary lines).
+
+## 2026-11-25: A release's title can carry a headline
+
+**Decided:** a `Headline:` line in the opening comment of `docs/release-notes/<version>.md` is added to the release's title by the release workflow ("Truck Save Editor 0.4.0: American Truck Simulator support"). Without one, the title is the name and version as before.
+
+**Why:** a release with one big change should say so where the release list shows it; the title is still made by the workflow, so it can't slip.
+
+**Considered:** editing the title by hand when publishing (the step that slipped before).

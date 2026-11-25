@@ -122,10 +122,17 @@ jobs:
           prerelease=""
           case "$VERSION" in *-*) prerelease="--prerelease" ;; esac
           # Titled like every release: "Truck Save Editor 0.3.0" (the name from crates/app/build.rs,
-          # the one place it's written).
+          # the one place it's written), then the notes' headline when their opening comment has a
+          # "Headline:" line: "Truck Save Editor 0.4.0: American Truck Simulator support".
           product="$(sed -n 's/^const PRODUCT_NAME: &str = "\(.*\)";/\1/p' crates/app/build.rs)"
+          title="$product $VERSION"
+          written="docs/release-notes/$VERSION.md"
+          if [ -f "$written" ]; then
+            headline="$(perl -0ne 'print $1 if /\A\s*<!--(?:(?!-->).)*?\bHeadline:[ \t]*(.+?)[ \t]*$/ms' "$written")"
+            if [ -n "$headline" ]; then title="$title: $headline"; fi
+          fi
           gh release create "$GITHUB_REF_NAME" dist/*.exe dist/SHA256SUMS.txt \
-            --draft $prerelease --verify-tag --title "$product $VERSION" --notes-file notes.md
+            --draft $prerelease --verify-tag --title "$title" --notes-file notes.md
       - name: Keep the rehearsal
         if: github.ref_type != 'tag'
         uses: actions/upload-artifact@v4
