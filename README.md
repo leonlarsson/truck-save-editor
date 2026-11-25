@@ -29,7 +29,7 @@ The editor tells you when a newer version is out: when it starts, it asks GitHub
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/start-dark.png">
-  <img alt="The start screen: the profile's saves, the player's own first" src="docs/screenshots/start-light.png">
+  <img alt="The start screen: the game first (Euro Truck Simulator 2 or American Truck Simulator), then the profile's saves, the player's own first" src="docs/screenshots/start-light.png">
 </picture>
 
 ### Your career
