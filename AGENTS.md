@@ -4,7 +4,7 @@ Guide for AI agents (and humans) working in this repo.
 
 ## What this is
 
-**Truck Save Editor** (a working name) is a save editor for **Euro Truck Simulator 2**: a desktop app written in Rust with [GPUI](https://www.gpui.rs/) (Zed's UI framework) through [GPUI Kit](https://gpui-kit.com) (`gpui-kit`: GPUI plus a styled component library). Windows is the platform that matters, because that's where the game and its saves are. American Truck Simulator runs on the same engine and uses the same file formats, so the code is written for both from the start (a `Game` value carries what differs: folders, Steam app id, currency, units, names), while ETS2 ships first.
+**Truck Save Editor** is a save editor for **Euro Truck Simulator 2** and **American Truck Simulator**: a desktop app written in Rust with [GPUI](https://www.gpui.rs/) (Zed's UI framework) through [GPUI Kit](https://gpui-kit.com) (`gpui-kit`: GPUI plus a styled component library). Windows is the platform that matters, because that's where the game and its saves are. The two games run on the same engine and use the same file formats, so the code serves both (a `Game` value carries what differs: folders, Steam app id, currency, units, names).
 
 The bar: **the best save editor anyone has used.** Polish, safety and ease of use come before the number of features.
 
