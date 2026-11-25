@@ -218,6 +218,7 @@ pub fn buy_trailer(
     units: &[Unit],
     definitions: &[Unit],
     garage: &str,
+    plates: &[String],
 ) -> Result<String, BuyProblem> {
     let front = units
         .first()
@@ -303,6 +304,8 @@ pub fn buy_trailer(
         );
         new_units.push(trailer);
     }
+    // Plates made the game's way, one for each trailer of the train, when the app has them.
+    crate::plates::set_plates(&mut new_units, plates);
     for unit in new_units {
         document.push(unit);
     }
@@ -349,6 +352,7 @@ pub fn buy_truck(
     document: &mut Document,
     accessories: &[Unit],
     garage: &str,
+    plates: &[String],
 ) -> Result<String, BuyProblem> {
     if accessories.is_empty() {
         return Err(BuyProblem::Empty);
@@ -388,7 +392,11 @@ pub fn buy_truck(
         .map(|(unit, id)| renamed(unit, id, &renames))
         .collect();
 
-    document.push(start_as_new(&template, "vehicle", &truck_id, &ids, now));
+    let mut truck = start_as_new(&template, "vehicle", &truck_id, &ids, now);
+    // A plate made the game's way for the garage's country, when the app has one (a save's own
+    // plates can be empty: the dealers' used trucks have none).
+    crate::plates::set_plates(std::slice::from_mut(&mut truck), plates);
+    document.push(truck);
     for unit in new_accessories {
         document.push(unit);
     }
@@ -430,7 +438,7 @@ mod tests {
     fn buys_a_new_truck_into_a_free_slot() {
         let mut document = sii::parse_text(SAVE).expect("parses");
         assert_eq!(buy_targets(&document), ["garage.lyon"]);
-        let id = buy_truck(&mut document, &dealer_parts(), "garage.lyon").expect("bought");
+        let id = buy_truck(&mut document, &dealer_parts(), "garage.lyon", &[]).expect("bought");
         let truck = document.unit(&id).expect("the truck");
         assert_eq!(truck.single("engine_wear"), Some("0"));
         assert_eq!(truck.single("fuel_relative"), Some("1"));
@@ -477,11 +485,11 @@ mod tests {
         );
         // Lyon is full now.
         assert_eq!(
-            buy_truck(&mut document, &dealer_parts(), "garage.lyon"),
+            buy_truck(&mut document, &dealer_parts(), "garage.lyon", &[]),
             Err(BuyProblem::GarageFull)
         );
         assert_eq!(
-            buy_truck(&mut document, &dealer_parts(), "garage.rome"),
+            buy_truck(&mut document, &dealer_parts(), "garage.rome", &[]),
             Err(BuyProblem::NotAGarage)
         );
         assert!(document.reachable_from("e").contains(&parts[0]));
@@ -505,7 +513,7 @@ mod tests {
         assert_eq!(trailer_targets(&document), ["garage.lyon"]);
         let (units, definitions) = dealer_train();
         let front =
-            buy_trailer(&mut document, &units, &definitions, "garage.lyon").expect("bought");
+            buy_trailer(&mut document, &units, &definitions, "garage.lyon", &[]).expect("bought");
         let trailer = document.unit(&front).expect("front");
         // The front trailer carries the type: a new one, made from the game's definition.
         let type_id = trailer
@@ -544,7 +552,7 @@ mod tests {
         );
         // One truck slot: no room for a second trailer.
         assert_eq!(
-            buy_trailer(&mut document, &units, &definitions, "garage.lyon"),
+            buy_trailer(&mut document, &units, &definitions, "garage.lyon", &[]),
             Err(BuyProblem::GarageFull)
         );
         let reachable = document.reachable_from("e");
@@ -559,14 +567,15 @@ mod tests {
         ))
         .expect("parses");
         let (units, definitions) = dealer_train();
-        let first = buy_trailer(&mut document, &units, &definitions, "garage.lyon").expect("first");
+        let first =
+            buy_trailer(&mut document, &units, &definitions, "garage.lyon", &[]).expect("first");
         // Worn and loaded, as if driven: the next one takes its fields from it, started as new.
         if let Some(mut unit) = document.unit_mut(&first) {
             unit.set("cargo_mass", Value::single("20000"));
             unit.set("chassis_wear", Value::single("&3f000000"));
         }
         let second =
-            buy_trailer(&mut document, &units, &definitions, "garage.lyon").expect("second");
+            buy_trailer(&mut document, &units, &definitions, "garage.lyon", &[]).expect("second");
         let [one, two] = [&first, &second].map(|id| document.unit(id).expect("trailer"));
         assert_eq!(
             one.single("trailer_definition"),
@@ -577,5 +586,36 @@ mod tests {
         let player = document.unit("p").expect("player");
         assert_eq!(player.items("trailers").len(), 2);
         assert_eq!(player.items("trailer_defs").len(), 1);
+    }
+
+    #[test]
+    fn each_trailer_of_a_train_gets_its_plate() {
+        let mut document = sii::parse_text(SAVE).expect("parses");
+        let (units, definitions) = dealer_train();
+        let plates: Vec<String> = ["A1|france", "B2|france", "C3|france"]
+            .iter()
+            .map(|plate| plate.to_string())
+            .collect();
+        let front = buy_trailer(&mut document, &units, &definitions, "garage.lyon", &plates)
+            .expect("bought");
+        let plate = |id: &str| {
+            document
+                .unit(id)
+                .and_then(|unit| unit.single("license_plate"))
+                .map(str::to_string)
+        };
+        let dolly = document
+            .unit(&front)
+            .and_then(|unit| unit.single("slave_trailer"))
+            .map(str::to_string)
+            .expect("dolly");
+        let second = document
+            .unit(&dolly)
+            .and_then(|unit| unit.single("slave_trailer"))
+            .map(str::to_string)
+            .expect("second");
+        assert_eq!(plate(&front).as_deref(), Some("\"A1|france\""));
+        assert_eq!(plate(&dolly).as_deref(), Some("\"B2|france\""));
+        assert_eq!(plate(&second).as_deref(), Some("\"C3|france\""));
     }
 }

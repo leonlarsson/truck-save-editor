@@ -216,10 +216,12 @@ impl BuyForm {
                     .iter()
                     .find(|truck| truck.path == path)
                     .ok_or_else(choose)?;
+                let plates = game_data::new_plates(cx, &garage, "truck", 1);
                 Ok(Purchase::Truck(BoughtTruck {
                     model: truck.model.clone(),
                     accessories: truck.accessories.clone(),
                     garage,
+                    plates,
                 }))
             }
             Buying::Trailer => {
@@ -228,12 +230,20 @@ impl BuyForm {
                     .iter()
                     .find(|trailer| trailer.path == path)
                     .ok_or_else(choose)?;
+                // A plate for each trailer of the train (a dolly has one too).
+                let count = trailer
+                    .units
+                    .iter()
+                    .filter(|unit| unit.kind == "trailer")
+                    .count();
+                let plates = game_data::new_plates(cx, &garage, "trailer", count);
                 Ok(Purchase::Trailer(BoughtTrailer {
                     model: trailer.model.clone(),
                     body_type: trailer.body_type.clone(),
                     units: trailer.units.clone(),
                     definitions: trailer.definitions.clone(),
                     garage,
+                    plates,
                 }))
             }
         }

@@ -488,3 +488,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** a trailer added to a save that never had one showed in the garage, but the game said "To access the Trailer Manager you need to buy your first trailer"; `screen.trailerman` was still on the list. Comparing the owner's saves before and after the game sold a truck and a trailer showed which screens it takes off for them, and the agency repaired by a drive past differed from the broken one only by `screen.recruit` coming off: the black screen and the refused online hiring were that one locked screen, not something the game keeps out of the save, as the earlier entry concluded.
 
 **Considered:** taking the screens off only for vehicles the editor adds in this session (the game's saves the editor wrote earlier would stay broken until edited again with that change).
+
+## 2026-11-25: Plates made the game's way
+
+**Decided:** a truck or trailer the editor adds or copies gets a plate the way the game makes one: from the `license_plate_data` of its garage's country or state (`/def/country/<country>/license_plates.sii`: per kind of vehicle, `templates[]` whose digits pick characters from `def0[]`…`def9[]`, everything else, tags included, kept), read with the game's data (`gamedata::make_plate`, `GameData::new_plate`). The app makes the plates when the player presses Add or Copy (seeded by the clock) and keeps them with the change, so the preview and the save agree; a road train gets one per trailer, dollies included, as the game gives them. Without the game's data, the earlier plate of the same format with new characters stays as the fallback (`save/src/plates.rs`). Replaces "Added trucks and trailers get plates of their own", above, where the game's data is there.
+
+**Why:** in a save with nothing to take a plate from (a new career: the dealers' used trucks carry empty plates, and dealer files none), the added truck and trailer came out with blank plates in the game. The game's own formats give the right plate for the region in every case, with ETS2's layout tags and badges.
+
+**Considered:** the region of the company's headquarters (the garage's is where the vehicle lives, and what a dealer there would register it in).

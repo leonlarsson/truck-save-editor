@@ -749,6 +749,25 @@ pub fn trailer_name(cx: &App, model_id: &str, body_type: &str) -> String {
     model_name_by_id(cx, model_id)
 }
 
+/// `count` new plates for vehicles of `kind` (`truck`, `trailer`) kept in a garage
+/// (`garage.san_francisc`), made the game's way for its country (`gamedata::make_plate`): a
+/// truck or trailer the editor adds gets one, and each trailer of a road train. Different each
+/// time (seeded by the clock); the change keeps them, so the preview and the save agree. Empty
+/// without the game's data, or for a country without plate formats.
+pub fn new_plates(cx: &App, garage: &str, kind: &str, count: usize) -> Vec<String> {
+    let Some(data) = data(cx) else {
+        return Vec::new();
+    };
+    let city = garage.strip_prefix("garage.").unwrap_or(garage);
+    let seed = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|time| time.as_nanos() as u64)
+        .unwrap_or(0);
+    (0..count as u64)
+        .filter_map(|index| data.new_plate(city, kind, seed.wrapping_add(index * 7_919)))
+        .collect()
+}
+
 /// A model's name by its id (`volvo.vnl2018` → `Volvo VNL 2018`), else made from the id.
 pub fn model_name_by_id(cx: &App, model_id: &str) -> String {
     data(cx)

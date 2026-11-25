@@ -21,6 +21,29 @@ pub(crate) fn renew_plate(unit: &mut sii::Unit) {
     }
 }
 
+/// Gives the trucks and trailers among `units` (in order) the plates in `plates` (as a save
+/// writes them, unquoted: `7TT3983|california`), one each, while there are plates. Units that
+/// aren't trucks or trailers are skipped; extra plates are left over.
+pub(crate) fn set_plates(units: &mut [sii::Unit], plates: &[String]) {
+    let vehicles = units
+        .iter_mut()
+        .filter(|unit| unit.kind == "vehicle" || unit.kind == "trailer");
+    for (unit, plate) in vehicles.zip(plates) {
+        let value = sii::Value::single(sii::value::format_string(plate));
+        match unit
+            .fields
+            .iter_mut()
+            .find(|field| field.name == "license_plate")
+        {
+            Some(field) => field.value = value,
+            None => unit.fields.push(sii::Field {
+                name: "license_plate".to_string(),
+                value,
+            }),
+        }
+    }
+}
+
 /// A plate as the save writes it (`"FP02542|california"`, quoted), with its letters and digits
 /// swapped for others picked by `seed`. Text inside `<…>` tags and the region are kept.
 pub(crate) fn fresh_plate(value: &str, seed: u64) -> String {

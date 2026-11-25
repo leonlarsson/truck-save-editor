@@ -919,6 +919,13 @@ impl VehicleDetail {
         }
         let session = self.session.clone();
         let id = self.id.clone();
+        let is_trailer = self
+            .session
+            .read(cx)
+            .vehicles()
+            .iter()
+            .any(|vehicle| vehicle.id == self.id && vehicle.kind == VehicleKind::Trailer);
+        let plate_kind = if is_trailer { "trailer" } else { "truck" };
         button
             .tip(t!(cx, "copy-tooltip"))
             // Upward: the button sits at the panel's foot, where a menu opening down would cover it.
@@ -929,7 +936,12 @@ impl VehicleDetail {
                     // Each item needs its own copies to move into its click handler.
                     let (session, id, garage) = (session.clone(), id.clone(), garage.clone());
                     menu.item(PopupMenuItem::new(city).on_click(move |_, _, cx| {
-                        session.update(cx, |session, cx| session.copy_vehicle(&id, &garage, cx));
+                        // Plates for the copy's trucks or trailers (a road train has several; the
+                        // extra ones are left over), made for that garage's country.
+                        let plates = game_data::new_plates(cx, &garage, plate_kind, 8);
+                        session.update(cx, |session, cx| {
+                            session.copy_vehicle(&id, &garage, plates, cx)
+                        });
                     }))
                 })
             })

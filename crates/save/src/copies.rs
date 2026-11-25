@@ -181,6 +181,7 @@ pub fn copy_vehicle(
     document: &mut Document,
     id: &str,
     garage: &str,
+    plates: &[String],
 ) -> Result<String, VehicleCopyProblem> {
     let kind = kind_of(document, id).ok_or(VehicleCopyProblem::NotOwned)?;
     let garage_unit = document
@@ -222,6 +223,10 @@ pub fn copy_vehicle(
             Some(copy)
         })
         .collect();
+    // Plates made the game's way for the garage's country, when the app has them (over the ones
+    // `renew_plate` made from the original's).
+    let mut copies = copies;
+    crate::plates::set_plates(&mut copies, plates);
     let copy_id = ids.get(id).cloned().ok_or(VehicleCopyProblem::NotOwned)?;
     for unit in copies {
         document.push(unit);
@@ -281,7 +286,8 @@ mod tests {
             copy_targets(&document, "_nameless.1.10"),
             Ok(vec!["garage.lyon".to_string()])
         );
-        let copy = copy_vehicle(&mut document, "_nameless.1.10", "garage.lyon").expect("copies");
+        let copy =
+            copy_vehicle(&mut document, "_nameless.1.10", "garage.lyon", &[]).expect("copies");
         let vehicle = document.unit(&copy).expect("the copy");
         let plate = vehicle.single("license_plate").expect("a plate");
         assert!(plate.ends_with("|sweden\"") && plate != "\"AB 123|sweden\"");
@@ -317,11 +323,11 @@ mod tests {
         );
         // The garage is full now, and a garage the company doesn't own was never offered.
         assert_eq!(
-            copy_vehicle(&mut document, "_nameless.1.10", "garage.lyon"),
+            copy_vehicle(&mut document, "_nameless.1.10", "garage.lyon", &[]),
             Err(VehicleCopyProblem::GarageFull)
         );
         assert_eq!(
-            copy_vehicle(&mut document, "_nameless.1.10", "garage.rome"),
+            copy_vehicle(&mut document, "_nameless.1.10", "garage.rome", &[]),
             Err(VehicleCopyProblem::NotAGarage)
         );
         // Everything the copy needs is in the one tree from the economy.
@@ -332,7 +338,8 @@ mod tests {
     #[test]
     fn copies_a_trailer_sharing_its_type() {
         let mut document = document();
-        let copy = copy_vehicle(&mut document, "_nameless.1.40", "garage.lyon").expect("copies");
+        let copy =
+            copy_vehicle(&mut document, "_nameless.1.40", "garage.lyon", &[]).expect("copies");
         let trailer = document.unit(&copy).expect("the copy");
         assert_eq!(trailer.single("trailer_definition"), Some("_nameless.1.48"));
         let player = document.unit("p").expect("player");
@@ -350,7 +357,7 @@ mod tests {
         );
         // Two truck slots, two trailers: no room for a third.
         assert_eq!(
-            copy_vehicle(&mut document, "_nameless.1.40", "garage.lyon"),
+            copy_vehicle(&mut document, "_nameless.1.40", "garage.lyon", &[]),
             Err(VehicleCopyProblem::GarageFull)
         );
     }
@@ -359,7 +366,7 @@ mod tests {
     fn copies_only_what_it_owns() {
         let mut document = document();
         assert_eq!(
-            copy_vehicle(&mut document, "_nameless.1.20", "garage.lyon"),
+            copy_vehicle(&mut document, "_nameless.1.20", "garage.lyon", &[]),
             Err(VehicleCopyProblem::NotOwned)
         );
     }

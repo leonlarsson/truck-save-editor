@@ -188,7 +188,7 @@ fn real_trucks_and_trailers_copy_into_a_garage() {
             else {
                 continue;
             };
-            let copy = save::copy_vehicle(&mut slot.game, &vehicle.id, &garage)
+            let copy = save::copy_vehicle(&mut slot.game, &vehicle.id, &garage, &[])
                 .unwrap_or_else(|problem| panic!("slot {index}: {problem:?}"));
             assert!(
                 save::vehicles(&slot.game).iter().any(|v| v.id == copy),
@@ -240,7 +240,7 @@ fn real_saves_buy_a_truck() {
         else {
             continue;
         };
-        let id = save::buy_truck(&mut slot.game, &parts, &garage)
+        let id = save::buy_truck(&mut slot.game, &parts, &garage, &[])
             .unwrap_or_else(|problem| panic!("slot {index}: {problem:?}"));
         let truck = save::vehicles(&slot.game)
             .into_iter()
@@ -315,7 +315,7 @@ fn real_saves_buy_a_trailer() {
         let mut definition = sii::Unit::new("trailer_def", name);
         definition.fields = kind.fields.clone();
         let types_before = slot.game.units_of_kind("trailer_def").count();
-        let id = save::buy_trailer(&mut slot.game, &units, &[definition], &garage)
+        let id = save::buy_trailer(&mut slot.game, &units, &[definition], &garage, &[])
             .unwrap_or_else(|problem| panic!("slot {index}: {problem:?}"));
         assert!(
             save::vehicles(&slot.game)

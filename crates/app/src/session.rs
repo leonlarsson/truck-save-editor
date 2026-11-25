@@ -265,8 +265,9 @@ pub struct QuickStartPlan {
 /// A truck or trailer added to the company.
 #[derive(Clone, Debug, PartialEq)]
 enum Addition {
-    /// A copy of a truck or trailer (id), into a garage (id).
-    Copy(String, String),
+    /// A copy of a truck or trailer (id), into a garage (id), with plates for its trucks and
+    /// trailers made the game's way for that garage's country (none without the game's data).
+    Copy(String, String, Vec<String>),
     Truck(BoughtTruck),
     Trailer(BoughtTrailer),
 }
@@ -275,7 +276,7 @@ impl Addition {
     /// The garage it goes in.
     fn garage(&self) -> &str {
         match self {
-            Addition::Copy(_, garage) => garage,
+            Addition::Copy(_, garage, _) => garage,
             Addition::Truck(truck) => &truck.garage,
             Addition::Trailer(trailer) => &trailer.garage,
         }
@@ -290,6 +291,9 @@ pub struct BoughtTruck {
     pub model: String,
     pub accessories: Vec<sii::Unit>,
     pub garage: String,
+    /// Its plate, made the game's way for the garage's country (`game_data::new_plates`); none
+    /// without the game's data.
+    pub plates: Vec<String>,
 }
 
 /// A trailer (or road train) bought from the dealer's stock: what saving it needs, and its model
@@ -302,6 +306,8 @@ pub struct BoughtTrailer {
     pub units: Vec<sii::Unit>,
     pub definitions: Vec<sii::Unit>,
     pub garage: String,
+    /// A plate for each trailer of the train, as `BoughtTruck::plates`.
+    pub plates: Vec<String>,
 }
 
 /// One change, for the list shown before saving.
@@ -1533,11 +1539,17 @@ impl Session {
     }
 
     /// Copies a truck or trailer into a garage when saving (Undo takes it back).
-    pub fn copy_vehicle(&mut self, id: &str, garage: &str, cx: &mut Context<Self>) {
+    pub fn copy_vehicle(
+        &mut self,
+        id: &str,
+        garage: &str,
+        plates: Vec<String>,
+        cx: &mut Context<Self>,
+    ) {
         self.change(cx, |pending, _| {
             pending
                 .added
-                .push(Addition::Copy(id.to_string(), garage.to_string()));
+                .push(Addition::Copy(id.to_string(), garage.to_string(), plates));
         });
     }
 
@@ -1927,7 +1939,7 @@ impl Session {
             let city =
                 crate::game_data::city_name(cx, garage.strip_prefix("garage.").unwrap_or(garage));
             let (subject, what): (SharedString, SharedString) = match addition {
-                Addition::Copy(id, _) => (vehicle_subject(id), t!(cx, "copy-change")),
+                Addition::Copy(id, _, _) => (vehicle_subject(id), t!(cx, "copy-change")),
                 Addition::Truck(truck) => (
                     crate::game_data::model_name_by_id(cx, &truck.model).into(),
                     t!(cx, "buy-change"),
@@ -2289,11 +2301,16 @@ impl Session {
             // One that no longer fits (an earlier change took the room) is skipped; the panels
             // only offer garages with room in the preview, which this builds.
             match addition {
-                Addition::Copy(id, garage) => {
-                    let _ = save::copy_vehicle(&mut slot.game, id, garage);
+                Addition::Copy(id, garage, plates) => {
+                    let _ = save::copy_vehicle(&mut slot.game, id, garage, plates);
                 }
                 Addition::Truck(truck) => {
-                    let _ = save::buy_truck(&mut slot.game, &truck.accessories, &truck.garage);
+                    let _ = save::buy_truck(
+                        &mut slot.game,
+                        &truck.accessories,
+                        &truck.garage,
+                        &truck.plates,
+                    );
                 }
                 Addition::Trailer(trailer) => {
                     let _ = save::buy_trailer(
@@ -2301,6 +2318,7 @@ impl Session {
                         &trailer.units,
                         &trailer.definitions,
                         &trailer.garage,
+                        &trailer.plates,
                     );
                 }
             }
@@ -2616,7 +2634,7 @@ mod tests {
             )
         });
         session.update(cx, |session, cx| {
-            session.copy_vehicle("_nameless.10", "garage.lyon", cx)
+            session.copy_vehicle("_nameless.10", "garage.lyon", Vec::new(), cx)
         });
         assert_eq!(trucks(&session, cx), 2);
         cx.update(|cx| {
@@ -2645,6 +2663,7 @@ mod tests {
                     model: "x".into(),
                     accessories: parts,
                     garage: "garage.lyon".into(),
+                    plates: Vec::new(),
                 },
                 cx,
             )
@@ -2683,6 +2702,7 @@ mod tests {
                     units,
                     definitions,
                     garage: "garage.lyon".into(),
+                    plates: Vec::new(),
                 },
                 cx,
             )
@@ -2710,7 +2730,7 @@ mod tests {
                 .expect("the bought trailer")
         });
         session.update(cx, |session, cx| {
-            session.copy_vehicle(&bought, "garage.lyon", cx)
+            session.copy_vehicle(&bought, "garage.lyon", Vec::new(), cx)
         });
         assert_eq!(trailers(&session, cx), 2);
         cx.update(|cx| {

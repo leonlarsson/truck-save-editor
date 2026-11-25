@@ -12,6 +12,7 @@ mod dealer;
 mod icon;
 mod install;
 mod photo_album;
+mod plates;
 mod prefabs;
 mod recruitment;
 mod roads;
@@ -30,6 +31,7 @@ pub use dealer::{DealerTrailer, DealerTruck, dealer_trailers, dealer_trucks};
 pub use icon::{ALPHA, BLUE, GREEN, GameIcon, RED};
 pub use install::find_install;
 pub use photo_album::{AlbumItem, PhotoAlbum};
+pub use plates::{PlateFormat, make_plate};
 pub use roads::{
     MapContents, MapMarker, MapPlace, MapPlaceKind, MapPrefab, MapRoad, agency_cities,
     decode_token, map_contents, map_roads, road_ids, sector_contents, sector_roads,
@@ -85,6 +87,10 @@ pub struct GameData {
     dealer_cities: BTreeSet<String>,
     /// City token → its country's short code (`verona` → `I`).
     city_country_codes: BTreeMap<String, String>,
+    /// City token → its country's (or state's) token (`verona` → `italy`).
+    city_countries: BTreeMap<String, String>,
+    /// Each country's plate formats (`plates.rs`), by its token.
+    plate_formats: HashMap<String, Vec<PlateFormat>>,
     /// Country token → the key of its name in the game's text.
     country_names: BTreeMap<String, String>,
     /// Cities with a recruitment agency (of those the installed game has). Known for ETS2 only
@@ -241,6 +247,8 @@ impl GameData {
                 .or_insert_with(|| name.clone());
         }
         data.city_names = cities.names;
+        data.plate_formats = plates::read(install_dir);
+        data.city_countries = cities.countries.clone();
         data.city_country_codes = cities
             .countries
             .iter()
@@ -306,6 +314,19 @@ impl GameData {
     }
 
     /// The short code of a city's country, as the game shows it after the city's name (`I`).
+    /// A city's country (or state) token (`san_francisc` → `california`).
+    pub fn city_country(&self, token: &str) -> Option<&str> {
+        self.city_countries.get(token).map(String::as_str)
+    }
+
+    /// A new plate for a vehicle of `kind` (`truck`, `trailer`) kept in `city`, as the game makes
+    /// them in its country (`plates.rs`), as a save writes it (`7TT3983|california`). `None` when
+    /// the country has no plate formats.
+    pub fn new_plate(&self, city: &str, kind: &str, seed: u64) -> Option<String> {
+        let country = self.city_country(city)?;
+        make_plate(self.plate_formats.get(country)?, country, kind, seed)
+    }
+
     pub fn city_country_code(&self, token: &str) -> Option<&str> {
         self.city_country_codes.get(token).map(String::as_str)
     }
