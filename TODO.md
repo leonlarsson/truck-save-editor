@@ -181,7 +181,7 @@ Agreed work, in order. Each step should end with something the owner can see or 
   - [x] Quick travel was off for the ATS save because it has no truck of its own yet (quick jobs only); it now says so, and World map says there's no truck instead of putting one at the map's origin (2026-11-24).
   - [x] ATS's cargo names in full (the game's `local.override.sii` was not read), its BC3 company logos, Garages and Buy all without cities of map DLCs that aren't installed, the start screen's folders for the picked game (2026-11-24).
   - [ ] An ATS save with a truck of its own (owner): to check the truck panel, plates, paint, parts and trailers with ATS's data.
-  - [ ] ATS (owner): whether the game's own map shows the regions east of the installed states (its `base_map.scs` holds their roads, which World map draws without names).
+  - [x] The game's map shows states of map DLCs that aren't installed empty; World map now leaves their roads out too (2026-11-25).
 - [x] App icon (`scripts/make-icon.py`, embedded in the .exe) and a release workflow (version tag → draft release).
 - [ ] A final product name (Truck Save Editor for now, in `APP_NAME`; never a game name, those are SCS trademarks), signed Windows builds (see `docs/releasing.md` → Code signing), the first release (the owner's call; the pipeline is ready, `docs/releasing.md`).
 - [ ] Web version, on hold (the owner's call, 2026-11-21): the desktop app comes first. The core crates stay free of UI and disk access so it stays possible (GPUI's web target, or a page around the core compiled to wasm), but no work on it until it's picked up again.
