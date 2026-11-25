@@ -52,6 +52,15 @@ impl Choice {
     ];
 }
 
+/// `choices` without coach skills when the game has no coaches.
+fn of_game(choices: &[Choice], has_coaches: bool) -> Vec<Choice> {
+    choices
+        .iter()
+        .copied()
+        .filter(|choice| has_coaches || *choice != Choice::CoachSkills)
+        .collect()
+}
+
 /// The money a rich start begins with.
 const RICH_START_MONEY: i64 = 10_000_000;
 
@@ -65,11 +74,19 @@ impl QuickStart {
     fn new(session: Entity<Session>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let label = t!(cx, "money");
         let money = cx.new(|cx| AmountField::new(RICH_START_MONEY, label, window, cx));
+        let has_coaches = session.read(cx).game().has_coaches();
         Self {
             session,
             money,
-            chosen: Choice::RICH_START.into_iter().collect(),
+            chosen: of_game(&Choice::RICH_START, has_coaches)
+                .into_iter()
+                .collect(),
         }
+    }
+
+    /// The choices this save's game has: no coach skills in a game without coaches (ATS).
+    fn choices(&self, of: &[Choice], cx: &Context<Self>) -> Vec<Choice> {
+        of_game(of, self.session.read(cx).game().has_coaches())
     }
 
     /// Why a choice can't be made for this save, if it can't.
@@ -150,8 +167,9 @@ impl QuickStart {
 
 impl Render for QuickStart {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let all: Vec<Choice> = Choice::ALL.to_vec();
-        let is_rich = self.chosen == Choice::RICH_START.into_iter().collect();
+        let all = self.choices(&Choice::ALL, cx);
+        let rich = self.choices(&Choice::RICH_START, cx);
+        let is_rich = self.chosen == rich.iter().copied().collect();
         let is_everything = self.chosen == all.iter().copied().collect();
         let presets = ButtonGroup::new("quick-start-presets")
             .outline()
@@ -168,13 +186,13 @@ impl Render for QuickStart {
             )
             .on_click(cx.listener(
                 move |this, clicked: &Vec<usize>, _, cx| match clicked.first() {
-                    Some(0) => this.choose(&Choice::RICH_START, cx),
-                    Some(1) => this.choose(&Choice::ALL, cx),
+                    Some(0) => this.choose(&rich, cx),
+                    Some(1) => this.choose(&all, cx),
                     _ => {}
                 },
             ));
 
-        let rows = Choice::ALL.into_iter().map(|choice| {
+        let rows = self.choices(&Choice::ALL, cx).into_iter().map(|choice| {
             let reason = self.unavailable(choice, cx);
             let is_chosen = self.chosen.contains(&choice) && reason.is_none();
             let checkbox = Checkbox::new(("quick-start", choice as usize))
