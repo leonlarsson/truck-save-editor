@@ -17,6 +17,15 @@ The editor tells you when a newer version is out: when it starts, it asks GitHub
 
 ## What it does
 
+### Live: your drive as it happens (experimental)
+
+- **The game on the map while you play**: where you are, the way you're heading, the road you've driven this session behind you, and a flag on your job's destination.
+- **Your drive in numbers**: speed against the limit, gear, fuel and range, rest, the game's clock, and your vehicle's wear.
+- **Your job** along the foot of the map, with how far is left and when it's due; **this session** in totals (driven, earned, XP, fines and tolls) with what just happened.
+- It works through a small plugin for the game's own SDK, which the editor adds to the game's folder when you ask and removes again at any time. It only reads, and nothing leaves your PC. Both games, in each one's units.
+
+<img alt="Live while driving in American Truck Simulator: the map follows the player, with speed over the limit, fuel, wear and the session's fines in cards over it" src="docs/screenshots/live.gif">
+
 ### Finding your saves
 
 - Pick the game first (Euro Truck Simulator 2 or American Truck Simulator, each with its logo from your install), then the profile.
