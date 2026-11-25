@@ -166,6 +166,54 @@ fn real_jobs_read_and_cancel_cleanly() {
 }
 
 /// A truck moves to another garage with its driver, and the company keeps every truck and driver.
+/// In real saves: a truck and a trailer copy into a garage with room, linked into the one tree
+/// from the economy (nothing is cut off), and the save writes and reads back the same.
+#[test]
+fn real_trucks_and_trailers_copy_into_a_garage() {
+    for (index, dir) in slot_dirs().into_iter().enumerate() {
+        let mut slot = save::load(&dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display()));
+        let units_before = slot.game.len();
+        let mut copied = 0;
+        for kind in [save::VehicleKind::Truck, save::VehicleKind::Trailer] {
+            let Some(vehicle) = save::vehicles(&slot.game)
+                .into_iter()
+                .find(|vehicle| vehicle.kind == kind)
+            else {
+                continue;
+            };
+            let Some(garage) = save::copy_targets(&slot.game, &vehicle.id)
+                .unwrap_or_else(|problem| panic!("slot {index}: {problem:?}"))
+                .into_iter()
+                .next()
+            else {
+                continue;
+            };
+            let copy = save::copy_vehicle(&mut slot.game, &vehicle.id, &garage)
+                .unwrap_or_else(|problem| panic!("slot {index}: {problem:?}"));
+            assert!(
+                save::vehicles(&slot.game).iter().any(|v| v.id == copy),
+                "slot {index}: the copy is in the fleet"
+            );
+            copied += 1;
+        }
+        if copied == 0 {
+            continue;
+        }
+        assert!(slot.game.len() > units_before, "slot {index}");
+        assert_eq!(
+            save::drop_unreachable(&mut slot.game),
+            0,
+            "slot {index}: the copies hang off the economy"
+        );
+        let text = sii::to_text(&slot.game);
+        assert_eq!(
+            sii::to_text(&sii::parse_text(&text).expect("reads back")),
+            text,
+            "slot {index}"
+        );
+    }
+}
+
 #[test]
 fn real_trucks_move_between_garages() {
     for (index, dir) in slot_dirs().into_iter().enumerate() {

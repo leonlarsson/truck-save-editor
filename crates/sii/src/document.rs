@@ -93,6 +93,23 @@ impl Document {
         reached
     }
 
+    /// `count` anonymous ids (`_nameless.…`) that no unit has, for units an edit adds. They come
+    /// after the highest anonymous id in the document, 8 apart as the game's are (they're its
+    /// memory addresses, which it hands out again each time it saves).
+    pub fn unused_nameless_ids(&self, count: usize) -> Vec<String> {
+        let highest = self
+            .units
+            .iter()
+            .filter_map(|unit| nameless_value(&unit.id))
+            .max()
+            .unwrap_or(0);
+        // Rounded up to the next multiple of 8, then on from there.
+        let first = (highest | 7).saturating_add(1);
+        (0..count as u64)
+            .map(|index| nameless_id(first.saturating_add(index * 8)))
+            .collect()
+    }
+
     /// Removes units by id, keeping the others in their order.
     pub fn remove_units(&mut self, ids: &HashSet<String>) {
         if ids.is_empty() {
@@ -107,6 +124,33 @@ impl Document {
             .map(|(position, unit)| (unit.id.clone(), position))
             .collect();
     }
+}
+
+/// An anonymous id's number: `_nameless.246.5b82.fe8` → 0x0246_5b82_0fe8 (each dot-separated
+/// part is 16 bits, leading zero parts left out). `None` for any other id.
+pub fn nameless_value(id: &str) -> Option<u64> {
+    let parts = id.strip_prefix("_nameless.")?;
+    let mut value: u64 = 0;
+    let mut count = 0;
+    for part in parts.split('.') {
+        let group = u64::from_str_radix(part, 16)
+            .ok()
+            .filter(|group| *group <= 0xFFFF)?;
+        value = value.checked_shl(16)? | group;
+        count += 1;
+    }
+    (1..=4).contains(&count).then_some(value)
+}
+
+/// An anonymous id for a number, written as the game writes it (see `nameless_value`).
+pub fn nameless_id(value: u64) -> String {
+    let groups = [48, 32, 16, 0].map(|shift| (value >> shift) & 0xFFFF);
+    let first = groups.iter().position(|&group| group != 0).unwrap_or(3);
+    let mut id = String::from("_nameless");
+    for group in &groups[first..] {
+        id.push_str(&format!(".{group:x}"));
+    }
+    id
 }
 
 /// One unit: `kind : id { fields }`.
@@ -216,6 +260,25 @@ impl Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reads_and_writes_anonymous_ids() {
+        assert_eq!(
+            nameless_value("_nameless.246.5b82.fe8"),
+            Some(0x0246_5b82_0fe8)
+        );
+        assert_eq!(nameless_id(0x0246_5b82_0fe8), "_nameless.246.5b82.fe8");
+        assert_eq!(nameless_id(0x1_0002), "_nameless.1.2");
+        assert_eq!(nameless_value("garage.lyon"), None);
+        assert_eq!(nameless_value("_nameless.12345"), None);
+        let mut document = Document::new();
+        document.push(Unit::new("bank", "_nameless.1.2"));
+        document.push(Unit::new("garage", "garage.lyon"));
+        assert_eq!(
+            document.unused_nameless_ids(2),
+            ["_nameless.1.8", "_nameless.1.10"]
+        );
+    }
 
     fn tree() -> Document {
         let mut document = Document::new();

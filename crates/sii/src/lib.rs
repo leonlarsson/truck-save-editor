@@ -22,7 +22,7 @@ mod text;
 pub mod token;
 pub mod value;
 
-pub use document::{Document, Field, Unit, UnitMut, Value};
+pub use document::{Document, Field, Unit, UnitMut, Value, nameless_id, nameless_value};
 pub use error::{Error, Result};
 
 /// The three forms a SII file comes in.

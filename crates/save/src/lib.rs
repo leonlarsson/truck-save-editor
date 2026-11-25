@@ -6,6 +6,7 @@
 
 mod career;
 mod coach;
+mod copies;
 mod current_job;
 mod drivers;
 mod error;
@@ -41,6 +42,7 @@ pub use coach::{
     CoachService, CoachStats, coach_services, coach_stats, discover_bus_stops,
     perfect_satisfaction, set_coach_distance, set_coach_passengers,
 };
+pub use copies::{VehicleCopyProblem, copy_targets, copy_vehicle};
 pub use current_job::{CurrentJob, JobKind, cancel_job, current_job, remove_job_deadline};
 pub use drivers::{Driver, drivers, max_driver};
 pub use error::{Error, Result};

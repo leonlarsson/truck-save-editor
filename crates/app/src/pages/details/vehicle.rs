@@ -6,6 +6,7 @@ use gpui_kit::component::{
     button::{Button, ButtonVariants as _},
     h_flex,
     input::{Input, InputEvent, InputState},
+    menu::{DropdownMenu as _, PopupMenuItem},
     select::{SearchableVec, Select, SelectEvent, SelectItem, SelectState},
     slider::{Slider, SliderEvent, SliderState},
     v_flex,
@@ -873,20 +874,65 @@ impl Render for VehicleDetail {
             )
             .child(group(t!(cx, "column-wear"), wear))
             .child(super::actions_row(
-                Button::new("repair-vehicle")
-                    .small()
-                    .outline()
-                    .label(t!(cx, "repair-all-parts"))
-                    .disabled(vehicle.wear.worst() == 0.0)
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        let id = id.clone();
-                        this.session
-                            .update(cx, |session, cx| session.repair(&id, cx));
-                    })),
+                h_flex()
+                    .gap_2()
+                    .child(
+                        Button::new("repair-vehicle")
+                            .small()
+                            .outline()
+                            .label(t!(cx, "repair-all-parts"))
+                            .disabled(vehicle.wear.worst() == 0.0)
+                            .on_click(cx.listener(move |this, _, _, cx| {
+                                let id = id.clone();
+                                this.session
+                                    .update(cx, |session, cx| session.repair(&id, cx));
+                            })),
+                    )
+                    // Trucks and trailers can be copied; coaches aren't the company's to copy.
+                    .children((vehicle.kind != VehicleKind::Coach).then(|| self.copy_button(cx))),
                 &self.session,
                 removal,
                 cx,
             ))
+            .into_any_element()
+    }
+}
+
+impl VehicleDetail {
+    /// Copy to a garage: a menu of the company's garages with room for one more, by city.
+    /// Without room anywhere, it's off and says how to make some.
+    fn copy_button(&self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
+        let targets = self
+            .session
+            .read(cx)
+            .copy_targets(&self.id)
+            .unwrap_or_default();
+        let button = Button::new("copy-vehicle")
+            .small()
+            .outline()
+            .label(t!(cx, "copy-to-garage"));
+        if targets.is_empty() {
+            return button
+                .tip(t!(cx, "copy-no-room"))
+                .disabled(true)
+                .into_any_element();
+        }
+        let session = self.session.clone();
+        let id = self.id.clone();
+        button
+            .tip(t!(cx, "copy-tooltip"))
+            // Upward: the button sits at the panel's foot, where a menu opening down would cover it.
+            .dropdown_menu_with_anchor(gpui_kit::Anchor::BottomLeft, move |menu, _, cx| {
+                targets.iter().fold(menu, |menu, garage| {
+                    let city =
+                        game_data::city_name(cx, garage.strip_prefix("garage.").unwrap_or(garage));
+                    // Each item needs its own copies to move into its click handler.
+                    let (session, id, garage) = (session.clone(), id.clone(), garage.clone());
+                    menu.item(PopupMenuItem::new(city).on_click(move |_, _, cx| {
+                        session.update(cx, |session, cx| session.copy_vehicle(&id, &garage, cx));
+                    }))
+                })
+            })
             .into_any_element()
     }
 }

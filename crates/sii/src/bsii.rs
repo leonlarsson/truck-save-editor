@@ -334,16 +334,7 @@ impl Reader<'_> {
         let parts = self.u8()?;
         match parts {
             0 => Ok("null".to_string()),
-            0xFF => {
-                let value = self.u64()?;
-                let groups = [48, 32, 16, 0].map(|shift| (value >> shift) & 0xFFFF);
-                let first = groups.iter().position(|&g| g != 0).unwrap_or(3);
-                let mut out = String::from("_nameless");
-                for group in &groups[first..] {
-                    let _ = write!(out, ".{group:x}");
-                }
-                Ok(out)
-            }
+            0xFF => Ok(crate::document::nameless_id(self.u64()?)),
             _ => {
                 let mut out = String::new();
                 for index in 0..parts {

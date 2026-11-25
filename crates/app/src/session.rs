@@ -102,6 +102,10 @@ struct Pending {
     /// Trucks and drivers to move to another garage (id, garage id), in the order asked; each
     /// takes its whole slot along (see `save::move_to_garage`).
     garage_moves: Vec<(String, String)>,
+    /// Trucks and trailers to copy into a garage (id, garage id), in the order asked (see
+    /// `save::copy_vehicle`). A copy's id is the same in the preview and when saving, since both
+    /// make the copies from the same save in the same order.
+    copies: Vec<(String, String)>,
     /// Whether to cancel the job in progress when saving.
     cancel_job: bool,
     /// Whether to remove the job in progress's deadline when saving.
@@ -176,6 +180,7 @@ impl Pending {
             lock_dealers: BTreeSet::new(),
             lock_recruitments: BTreeSet::new(),
             garage_moves: Vec::new(),
+            copies: Vec::new(),
             cancel_job: false,
             remove_job_deadline: false,
             removed: Vec::new(),
@@ -801,6 +806,7 @@ impl Session {
             + usize::from(self.places_changed(Place::Dealer))
             + usize::from(self.places_changed(Place::Recruitment))
             + self.moved().len()
+            + self.pending.copies.len()
             + usize::from(self.pending.cancel_job)
             + usize::from(self.pending.remove_job_deadline)
             + self.pending.removed.len()
@@ -1465,6 +1471,19 @@ impl Session {
         moved
     }
 
+    /// The garages a truck or trailer could be copied into, as the save will be after the changes
+    /// so far, or why it can't be copied.
+    pub fn copy_targets(&self, id: &str) -> Result<Vec<String>, save::VehicleCopyProblem> {
+        save::copy_targets(&self.preview(), id)
+    }
+
+    /// Copies a truck or trailer into a garage when saving (Undo takes it back).
+    pub fn copy_vehicle(&mut self, id: &str, garage: &str, cx: &mut Context<Self>) {
+        self.change(cx, |pending, _| {
+            pending.copies.push((id.to_string(), garage.to_string()));
+        });
+    }
+
     /// Moves a truck or driver, with the rest of its slot, to another garage.
     pub fn move_to_garage(&mut self, id: &str, garage: &str, cx: &mut Context<Self>) {
         self.change(cx, |pending, _| {
@@ -1835,6 +1854,17 @@ impl Session {
                 city(&to).into(),
             );
         }
+        // Each copy: a line under the truck or trailer it's a copy of, saying where it goes.
+        for (id, garage) in &self.pending.copies {
+            let city =
+                crate::game_data::city_name(cx, garage.strip_prefix("garage.").unwrap_or(garage));
+            add(
+                &vehicle_subject(id),
+                t!(cx, "copy-change"),
+                t!(cx, "copy-change-before"),
+                city.into(),
+            );
+        }
         // Each truck, trailer, driver or garage taken out: one line under it.
         for removal in &self.pending.removed {
             let subject: SharedString = match removal {
@@ -2179,6 +2209,13 @@ impl Session {
             // only offers moves that fit the preview, which this builds.
             let _ = save::move_to_garage(&mut slot.game, id, garage);
         }
+        // After the moves (a copy goes where there's room once they're done), before the vehicle
+        // edits (an edit made to a copy finds it).
+        for (id, garage) in &self.pending.copies {
+            // One that no longer fits (an earlier change took the room) is skipped; the panel
+            // only offers garages with room in the preview, which this builds.
+            let _ = save::copy_vehicle(&mut slot.game, id, garage);
+        }
         for edit in &self.pending.vehicle_edits {
             save::apply_vehicle_edit(&mut slot.game, edit);
         }
@@ -2469,6 +2506,35 @@ mod tests {
         let session = session(cx);
         set_money(&session, 1000, cx);
         cx.update(|cx| assert!(!session.read(cx).can_undo()));
+    }
+
+    /// One truck, in Lyon's garage, which has a free slot.
+    const FLEET: &str = "SiiNunit\r\n{\r\neconomy : _nameless.1 {\r\n bank: _nameless.2\r\n player: _nameless.3\r\n garages: 1\r\n garages[0]: garage.lyon\r\n experience_points: 5000\r\n adr: 0\r\n long_dist: 0\r\n heavy: 0\r\n fragile: 0\r\n urgent: 0\r\n mechanical: 0\r\n}\r\n\r\nbank : _nameless.2 {\r\n money_account: 1000\r\n loans: 0\r\n}\r\n\r\nplayer : _nameless.3 {\r\n hq_city: lyon\r\n trucks: 1\r\n trucks[0]: _nameless.10\r\n truck_profit_logs: 1\r\n truck_profit_logs[0]: _nameless.18\r\n trailers: 0\r\n}\r\n\r\nvehicle : _nameless.10 {\r\n license_plate: \"AB 123|france\"\r\n odometer: 5000\r\n accessories: 1\r\n accessories[0]: _nameless.20\r\n}\r\n\r\nvehicle_accessory : _nameless.20 {\r\n data_path: \"/def/vehicle/truck/x/engine/a.sii\"\r\n}\r\n\r\nprofit_log : _nameless.18 {\r\n stats_data: 0\r\n acc_distance_free: 0\r\n acc_distance_on_job: 0\r\n history_age: 4294967295\r\n}\r\n\r\ngarage : garage.lyon {\r\n vehicles: 2\r\n vehicles[0]: _nameless.10\r\n vehicles[1]: null\r\n drivers: 2\r\n drivers[0]: null\r\n drivers[1]: null\r\n trailers: 0\r\n status: 2\r\n}\r\n\r\n}\r\n";
+
+    #[gpui_kit::test]
+    fn copies_a_truck_as_one_undoable_change(cx: &mut TestAppContext) {
+        let session = session_of(FLEET, cx);
+        let trucks = |session: &Entity<Session>, cx: &mut TestAppContext| {
+            cx.update(|cx| session.read(cx).vehicles().len())
+        };
+        cx.update(|cx| {
+            assert_eq!(
+                session.read(cx).copy_targets("_nameless.10"),
+                Ok(vec!["garage.lyon".to_string()])
+            )
+        });
+        session.update(cx, |session, cx| {
+            session.copy_vehicle("_nameless.10", "garage.lyon", cx)
+        });
+        assert_eq!(trucks(&session, cx), 2);
+        cx.update(|cx| {
+            let session = session.read(cx);
+            assert_eq!(session.change_count(), 1);
+            // Lyon is full now: nowhere to copy another.
+            assert_eq!(session.copy_targets("_nameless.10"), Ok(Vec::new()));
+        });
+        session.update(cx, |session, cx| session.undo(cx));
+        assert_eq!(trucks(&session, cx), 1);
     }
 
     /// Two cities, Berlin visited (4 times) and Lyon not; Berlin's dealer unlocked.
