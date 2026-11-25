@@ -103,6 +103,8 @@ pub enum MapMarker {
 /// (`prefab.<token>` in the game's definitions), and where it is.
 #[derive(Clone, Debug, PartialEq)]
 pub struct MapPrefab {
+    /// Its map item id (as the save's `discovered_items` name it).
+    pub id: u64,
     pub model: u64,
     pub x: f32,
     pub z: f32,
@@ -202,6 +204,7 @@ pub fn sector_contents(bytes: &[u8]) -> MapContents {
                 && let Some(model) = read_u64(bytes, at + PREFAB_MODEL_AT)
             {
                 prefabs.push(MapPrefab {
+                    id: item.id,
                     model,
                     x: middle.0,
                     z: middle.1,

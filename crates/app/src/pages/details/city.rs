@@ -5,7 +5,8 @@
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::{
-    ActiveTheme as _, Icon, Sizable as _, WindowExt as _, button::Button, h_flex, v_flex,
+    ActiveTheme as _, Disableable as _, Icon, Sizable as _, WindowExt as _, button::Button, h_flex,
+    v_flex,
 };
 use gpui_kit::{
     AnyElement, App, AppContext as _, Context, ElementId, Entity, IntoElement, ParentElement as _,
@@ -148,6 +149,8 @@ impl Render for CityDetail {
                 PlaceState::Locked => false,
                 PlaceState::Missing | PlaceState::Unknown => return value_with_action(value, None),
             };
+            // An agency can't be unlocked, only locked (`Session::can_unlock`): its button says why.
+            let can_unlock = is_unlocked || Session::can_unlock(place);
             let action = Button::new(id)
                 .xsmall()
                 .outline()
@@ -156,11 +159,13 @@ impl Render for CityDetail {
                 } else {
                     t!(cx, "city-unlock")
                 })
-                .tip(if is_unlocked {
-                    t!(cx, "city-lock-tooltip")
-                } else {
-                    t!(cx, "city-unlock-tooltip")
+                .tip(match (is_unlocked, place) {
+                    (true, Place::Recruitment) => t!(cx, "agency-lock-tooltip"),
+                    (true, Place::Dealer) => t!(cx, "city-lock-tooltip"),
+                    (false, _) if !can_unlock => t!(cx, "agency-unlock-off"),
+                    (false, _) => t!(cx, "city-unlock-tooltip"),
                 })
+                .disabled(!can_unlock)
                 .on_click(cx.listener(move |this, _, _, cx| {
                     this.session.update(cx, |session, cx| {
                         if is_unlocked {

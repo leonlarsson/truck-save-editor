@@ -514,12 +514,8 @@ impl Workspace {
             PaletteCommand::MaxAllDrivers => {
                 session.update(cx, |session, cx| session.max_all_drivers(cx));
             }
-            PaletteCommand::UnlockDealers | PaletteCommand::UnlockRecruitments => {
-                let place = if command == PaletteCommand::UnlockDealers {
-                    save::Place::Dealer
-                } else {
-                    save::Place::Recruitment
-                };
+            PaletteCommand::UnlockDealers => {
+                let place = save::Place::Dealer;
                 // Without the game nobody knows where they are; the Map page says so.
                 match session.read(cx).place_cities(place, cx) {
                     Some(cities) => {

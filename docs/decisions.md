@@ -432,3 +432,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** the owner asked for a picker of its own for the game, then the profile, and for the games' logos. Mixing both games' profiles in one row (ATS ones marked "· ATS") read as one list. The logos come from the player's install, like the game's other icons, so none of SCS's artwork is in the repository (as the README says); a game that isn't installed shows its name without a logo.
 
 **Considered:** keeping the logos in the repository (the owner allowed it; it would also show a logo for a game that isn't installed, but the README promises no SCS artwork is included, and the logos are SCS's trademarks).
+
+## 2026-11-25: Recruitment agencies can't be unlocked, only locked
+
+**Decided:** the editor no longer unlocks recruitment agencies, in either game: Unlock every agency and the city panel's agency Unlock are disabled with the reason (the game has to find an agency itself: drive past it), and the palette command and Quick start's choice are gone. Locking an agency stays, as the repair: lock it, then drive past it in the game. `Session::can_unlock` is the one rule. Dealers unlock as before.
+
+**Why:** tested in ATS with the owner (2026-11-25): an agency unlocked in the save (`economy.unlocked_recruitments`) before the game discovered it shows on the game's map, but hiring online asks to discover an agency first, and entering it gives a black screen that Esc doesn't leave. The same save with only the editor's other changes (garage upgrade, experience, money, dealer) works; locking the agency and driving past it fixes it. Players report the same two symptoms in ETS2 with saves whose agencies were unlocked. Every field the game saves on discovery (the agency, one driver moved from `driver_pool` to `drivers_offer`, `screen_access_list`, `discovered_items`) was compared between an unlocked and a discovered agency and matched, so what the game does on discovery isn't in anything the editor can write.
+
+**Considered:** writing the driver offer as the game does (it makes one itself when it loads the save, and that doesn't help); keeping the unlock with a warning (it damages the save until the player repairs it by hand).
