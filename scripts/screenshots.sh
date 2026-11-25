@@ -10,8 +10,9 @@
 # pictures go to docs/screenshots/<page>-<theme>.png; with a version, that release's go to
 # docs/release-notes/<version>/. Look at every picture before committing it.
 #
-# With an ATS slot copy too, the release gets ATS pictures (Overview, Jobs, World map), from a
-# demo ATS profile made the same way.
+# With an ATS slot copy too, the release gets ATS pictures (Overview, Jobs), from a demo ATS
+# profile made the same way. The start screen's pictures list only the demo profiles (each with an
+# autosave too), as on a PC with just them: both games' with an ATS copy, else ETS2's.
 #
 # One launch per game: the app drives itself through steps (scripts/drive.sh, crates/app/src/dev_script.rs):
 # pages, themes, palette commands, and a picture where asked.
@@ -25,7 +26,18 @@ ats_slot="${3:-}"
 # The editor's own settings say English while the pictures are taken, and go back afterwards.
 settings="$HOME/.config/Truck Save Editor/settings.txt"
 work="$(mktemp -d)"
+# The demo profiles, in folders named as the games name theirs: the start screen shows the
+# folder's path, and an added folder's game is told by its name. Made for the run, removed after.
+ets2_profiles="/tmp/Euro Truck Simulator 2/profiles"
+ats_profiles="/tmp/American Truck Simulator/profiles"
+for dir in "$ets2_profiles" "$ats_profiles"; do
+    if [ -e "$(dirname "$dir")" ]; then
+        echo "$(dirname "$dir") is in the way: move it first" >&2
+        exit 1
+    fi
+done
 cleanup() {
+    rm -rf "$(dirname "$ets2_profiles")" "$(dirname "$ats_profiles")"
     if [ -f "$work/settings.txt" ]; then cp "$work/settings.txt" "$settings"; fi
     rm -rf "$work"
 }
@@ -39,7 +51,23 @@ fi
 (cd "$repo" && cargo build -q -p sii --example decode && cargo build -q -p app)
 "$repo/target/debug/examples/decode" "$source_slot/game.sii" "$work/game.txt" >/dev/null
 "$repo/target/debug/examples/decode" "$source_slot/info.sii" "$work/info.txt" >/dev/null
-slot="$(python3 -I "$repo/scripts/demo-profile.py" "$work/game.txt" "$work/info.txt" "$work/profiles")"
+# ATS's demo first, in a folder named after the game (that's how the start screen tells an added
+# folder's game), so ETS2's, made after it, is the newest and the one the start screen picks.
+ats=""
+if [ -n "$ats_slot" ]; then
+    mkdir -p "$work/ats"
+    "$repo/target/debug/examples/decode" "$ats_slot/game.sii" "$work/ats/game.txt" >/dev/null
+    "$repo/target/debug/examples/decode" "$ats_slot/info.sii" "$work/ats/info.txt" >/dev/null
+    ats="$(python3 -I "$repo/scripts/demo-profile.py" "$work/ats/game.txt" "$work/ats/info.txt" \
+        "$ats_profiles" ats)"
+fi
+slot="$(python3 -I "$repo/scripts/demo-profile.py" "$work/game.txt" "$work/info.txt" "$ets2_profiles")"
+# An autosave beside each demo save (the same save, without a name), for the start screen.
+for demo in "$slot" ${ats:+"$ats"}; do
+    cp -r "$demo" "$(dirname "$demo")/autosave"
+    sed -i 's/^ name: .*/ name: ""/' "$(dirname "$demo")/autosave/info.sii"
+done
+touch "$slot/game.sii" "$slot/info.sii"
 
 # What the app does. A picture's name is its path under docs/, without .png.
 pages="overview statistics coach-career fleet world-map gallery"
@@ -91,13 +119,23 @@ pages="overview statistics coach-career fleet world-map gallery"
 "$repo/scripts/drive.sh" "$slot" "$work/script.txt" "$repo/docs" \
     TSE_PAGE=overview TSE_THEME=light TSE_FIND_CITY=hamburg
 
+# The start screen, with only the demo profiles to list (TSE_PROFILE_DIRS_ONLY).
+profile_dirs="$ets2_profiles"
+if [ -n "$ats" ]; then profile_dirs="$profile_dirs:$ats_profiles"; fi
+{
+    echo "run Switch save"
+    echo "wait 1500"
+    echo "theme light"
+    echo "shot screenshots/start-light"
+    echo "theme dark"
+    echo "shot screenshots/start-dark"
+    if [ -n "$version" ]; then echo "shot release-notes/$version/start"; fi
+} >"$work/start-script.txt"
+"$repo/scripts/drive.sh" "$slot" "$work/start-script.txt" "$repo/docs" \
+    TSE_PAGE=overview TSE_THEME=light TSE_PROFILE_DIRS="$profile_dirs" TSE_PROFILE_DIRS_ONLY=1
+
 # ATS: a few release pictures of a demo ATS profile.
-if [ -n "$ats_slot" ] && [ -n "$version" ]; then
-    mkdir -p "$work/ats"
-    "$repo/target/debug/examples/decode" "$ats_slot/game.sii" "$work/ats/game.txt" >/dev/null
-    "$repo/target/debug/examples/decode" "$ats_slot/info.sii" "$work/ats/info.txt" >/dev/null
-    ats="$(python3 -I "$repo/scripts/demo-profile.py" "$work/ats/game.txt" "$work/ats/info.txt" \
-        "$work/ats/profiles" ats)"
+if [ -n "$ats" ] && [ -n "$version" ]; then
     notes="release-notes/$version"
     {
         echo "page overview"
@@ -106,10 +144,7 @@ if [ -n "$ats_slot" ] && [ -n "$version" ]; then
         echo "page jobs"
         echo "wait 1500"
         echo "shot $notes/ats-jobs"
-        echo "page world-map"
-        echo "wait 2500"
-        echo "shot $notes/ats-world-map"
     } >"$work/ats-script.txt"
     "$repo/scripts/drive.sh" "$ats" "$work/ats-script.txt" "$repo/docs" \
-        TSE_GAME=ats TSE_PAGE=overview TSE_THEME=dark TSE_FIND_CITY=sacramento
+        TSE_GAME=ats TSE_PAGE=overview TSE_THEME=dark
 fi
