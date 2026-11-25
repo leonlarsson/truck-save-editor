@@ -888,8 +888,12 @@ impl Render for VehicleDetail {
                                     .update(cx, |session, cx| session.repair(&id, cx));
                             })),
                     )
-                    // Trucks and trailers can be copied; coaches aren't the company's to copy.
-                    .children((vehicle.kind != VehicleKind::Coach).then(|| self.copy_button(cx))),
+                    // Trucks and trailers are copied into a garage; a coach joins the coaches.
+                    .child(if vehicle.kind == VehicleKind::Coach {
+                        self.copy_coach_button(cx)
+                    } else {
+                        self.copy_button(cx)
+                    }),
                 &self.session,
                 removal,
                 cx,
@@ -899,6 +903,24 @@ impl Render for VehicleDetail {
 }
 
 impl VehicleDetail {
+    /// Copy coach: a copy joins the player's coaches (no garage), with a coach's plate for the
+    /// headquarters' country.
+    fn copy_coach_button(&self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
+        let session = self.session.clone();
+        let id = self.id.clone();
+        Button::new("copy-coach")
+            .small()
+            .outline()
+            .label(t!(cx, "copy-coach"))
+            .tip(t!(cx, "copy-coach-tooltip"))
+            .on_click(move |_, _, cx| {
+                let hq = format!("garage.{}", session.read(cx).career().hq_city);
+                let plates = game_data::new_plates(cx, &hq, "bus", 1);
+                session.update(cx, |session, cx| session.copy_coach(&id, plates, cx));
+            })
+            .into_any_element()
+    }
+
     /// Copy to a garage: a menu of the company's garages with room for one more, by city.
     /// Without room anywhere, it's off and says how to make some.
     fn copy_button(&self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {

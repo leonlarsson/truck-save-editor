@@ -270,15 +270,21 @@ enum Addition {
     Copy(String, String, Vec<String>),
     Truck(BoughtTruck),
     Trailer(BoughtTrailer),
+    /// A coach from the coach dealer (Coaches DLC): it joins the player's coaches, not a garage
+    /// (its `garage` is empty).
+    Coach(BoughtTruck),
+    /// A copy of one of the player's coaches (id), with a plate.
+    CopyCoach(String, Vec<String>),
 }
 
 impl Addition {
-    /// The garage it goes in.
-    fn garage(&self) -> &str {
+    /// The garage it goes in (`None` for a coach: coaches aren't kept in garages).
+    fn garage(&self) -> Option<&str> {
         match self {
-            Addition::Copy(_, garage, _) => garage,
-            Addition::Truck(truck) => &truck.garage,
-            Addition::Trailer(trailer) => &trailer.garage,
+            Addition::Copy(_, garage, _) => Some(garage),
+            Addition::Truck(truck) => Some(&truck.garage),
+            Addition::Trailer(trailer) => Some(&trailer.garage),
+            Addition::Coach(_) | Addition::CopyCoach(..) => None,
         }
     }
 }
@@ -1538,6 +1544,20 @@ impl Session {
         self.change(cx, |pending, _| pending.added.push(Addition::Truck(truck)));
     }
 
+    /// Adds a coach from the coach dealer when saving (Undo takes it back).
+    pub fn buy_coach(&mut self, coach: BoughtTruck, cx: &mut Context<Self>) {
+        self.change(cx, |pending, _| pending.added.push(Addition::Coach(coach)));
+    }
+
+    /// Copies one of the player's coaches when saving (Undo takes it back).
+    pub fn copy_coach(&mut self, id: &str, plates: Vec<String>, cx: &mut Context<Self>) {
+        self.change(cx, |pending, _| {
+            pending
+                .added
+                .push(Addition::CopyCoach(id.to_string(), plates));
+        });
+    }
+
     /// Copies a truck or trailer into a garage when saving (Undo takes it back).
     pub fn copy_vehicle(
         &mut self,
@@ -1935,11 +1955,23 @@ impl Session {
         // Each truck or trailer added: a line under it (a copy under what it's a copy of, which
         // may itself have been added just before), saying where it goes.
         for addition in &self.pending.added {
-            let garage = addition.garage();
-            let city =
-                crate::game_data::city_name(cx, garage.strip_prefix("garage.").unwrap_or(garage));
+            // Where it goes: a garage's city, or the player's coaches.
+            let place: SharedString = match addition.garage() {
+                Some(garage) => crate::game_data::city_name(
+                    cx,
+                    garage.strip_prefix("garage.").unwrap_or(garage),
+                )
+                .into(),
+                None => t!(cx, "coach-change-after"),
+            };
             let (subject, what): (SharedString, SharedString) = match addition {
-                Addition::Copy(id, _, _) => (vehicle_subject(id), t!(cx, "copy-change")),
+                Addition::Copy(id, _, _) | Addition::CopyCoach(id, _) => {
+                    (vehicle_subject(id), t!(cx, "copy-change"))
+                }
+                Addition::Coach(coach) => (
+                    crate::game_data::model_name_by_id(cx, &coach.model).into(),
+                    t!(cx, "buy-coach-change"),
+                ),
                 Addition::Truck(truck) => (
                     crate::game_data::model_name_by_id(cx, &truck.model).into(),
                     t!(cx, "buy-change"),
@@ -1949,7 +1981,7 @@ impl Session {
                     t!(cx, "buy-trailer-change"),
                 ),
             };
-            add(&subject, what, t!(cx, "copy-change-before"), city.into());
+            add(&subject, what, t!(cx, "copy-change-before"), place);
         }
         // Each truck, trailer, driver or garage taken out: one line under it.
         for removal in &self.pending.removed {
@@ -2320,6 +2352,12 @@ impl Session {
                         &trailer.garage,
                         &trailer.plates,
                     );
+                }
+                Addition::Coach(coach) => {
+                    let _ = save::buy_coach(&mut slot.game, &coach.accessories, &coach.plates);
+                }
+                Addition::CopyCoach(id, plates) => {
+                    let _ = save::copy_coach(&mut slot.game, id, plates);
                 }
             }
         }
@@ -2747,6 +2785,51 @@ mod tests {
         session.update(cx, |session, cx| session.undo(cx));
         session.update(cx, |session, cx| session.undo(cx));
         assert_eq!(trailers(&session, cx), 0);
+    }
+
+    #[gpui_kit::test]
+    fn adds_and_copies_a_coach_as_undoable_changes(cx: &mut TestAppContext) {
+        let text = FLEET.replace(
+            " trailers: 0\r\n}",
+            " trailers: 0\r\n buses: 1\r\n buses[0]: _nameless.40\r\n}\r\n\r\nvehicle : _nameless.40 {\r\n license_plate: \"AB 123|france\"\r\n license_plate_type: bus\r\n accessories: 0\r\n}",
+        );
+        let session = session_of(&text, cx);
+        let coaches = |session: &Entity<Session>, cx: &mut TestAppContext| {
+            cx.update(|cx| {
+                session
+                    .read(cx)
+                    .vehicles()
+                    .iter()
+                    .filter(|vehicle| vehicle.kind == save::VehicleKind::Coach)
+                    .count()
+            })
+        };
+        assert_eq!(coaches(&session, cx), 1);
+        let parts = sii::parse_text(
+            "SiiNunit\r\n{\r\nvehicle_accessory : .c.data {\r\n data_path: \"/def/vehicle/bus/x/data.sii\"\r\n refund: 0\r\n}\r\n\r\n}\r\n",
+        )
+        .expect("parses")
+        .units()
+        .to_vec();
+        session.update(cx, |session, cx| {
+            session.buy_coach(
+                BoughtTruck {
+                    model: "x".into(),
+                    accessories: parts,
+                    garage: String::new(),
+                    plates: Vec::new(),
+                },
+                cx,
+            )
+        });
+        session.update(cx, |session, cx| {
+            session.copy_coach("_nameless.40", Vec::new(), cx)
+        });
+        assert_eq!(coaches(&session, cx), 3);
+        cx.update(|cx| assert_eq!(session.read(cx).change_count(), 2));
+        session.update(cx, |session, cx| session.undo(cx));
+        session.update(cx, |session, cx| session.undo(cx));
+        assert_eq!(coaches(&session, cx), 1);
     }
 
     /// Two cities, Berlin visited (4 times) and Lyon not; Berlin's dealer unlocked.

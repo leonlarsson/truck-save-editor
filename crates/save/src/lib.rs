@@ -45,7 +45,7 @@ pub use coach::{
     CoachService, CoachStats, coach_services, coach_stats, discover_bus_stops,
     perfect_satisfaction, set_coach_distance, set_coach_passengers,
 };
-pub use copies::{VehicleCopyProblem, copy_targets, copy_vehicle};
+pub use copies::{VehicleCopyProblem, copy_coach, copy_targets, copy_vehicle};
 pub use current_job::{CurrentJob, JobKind, cancel_job, current_job, remove_job_deadline};
 pub use drivers::{Driver, drivers, max_driver};
 pub use error::{Error, Result};
@@ -109,7 +109,7 @@ pub use profiles::{
     Slot, SlotKind, Source, decode_profile_folder, find_profiles, is_loose_save, loose_save,
     plain_path, profile_folders_at, profile_slots, search,
 };
-pub use purchases::{BuyProblem, buy_targets, buy_trailer, buy_truck, trailer_targets};
+pub use purchases::{BuyProblem, buy_coach, buy_targets, buy_trailer, buy_truck, trailer_targets};
 pub use removals::{
     Removal, RemoveProblem, can_remove, discover_roads, discovered_roads, forget_roads, remove,
 };

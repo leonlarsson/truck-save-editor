@@ -35,6 +35,7 @@ pub enum PaletteCommand {
     NewJob,
     BuyTruck,
     BuyTrailer,
+    BuyCoach,
     PerfectCoachSatisfaction,
     DiscoverBusStops,
     RefuelAll,
@@ -85,6 +86,7 @@ fn groups(has_coaches: bool) -> Vec<Vec<PaletteCommand>> {
         actions.push(PaletteCommand::Repair(VehicleKind::Coach));
         actions.push(PaletteCommand::PerfectCoachSatisfaction);
         actions.push(PaletteCommand::DiscoverBusStops);
+        actions.push(PaletteCommand::BuyCoach);
     }
     let app = vec![
         PaletteCommand::Save,
@@ -202,6 +204,11 @@ fn parts(
             t!(cx, "buy-truck"),
             IconName::Truck,
             &["buy", "truck", "dealer", "new", "add", "fleet"],
+        ),
+        PaletteCommand::BuyCoach => (
+            t!(cx, "buy-coach"),
+            IconName::Bus,
+            &["buy", "coach", "bus", "dealer", "new", "add", "fleet"],
         ),
         PaletteCommand::BuyTrailer => (
             t!(cx, "buy-trailer"),

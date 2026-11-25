@@ -143,6 +143,64 @@ fn set_field(unit: &mut Unit, name: &str, value: Value) {
     }
 }
 
+/// A truck or coach in the save to take a coach's layout from: the player's own coach first.
+fn template_coach(document: &Document) -> Option<&Unit> {
+    let player = document.unit(&player(document)?)?;
+    player
+        .items("buses")
+        .iter()
+        .find_map(|id| document.unit(id))
+        .filter(|unit| unit.kind == "vehicle")
+        .or_else(|| template_truck(document))
+}
+
+/// Buys a coach from the coach dealer's stock (Coaches DLC; its accessories as
+/// `gamedata::DealerTruck` gives them). Found in ETS2, 2026-11-25: a coach the game sells goes
+/// only into `player.buses`, with no garage and no profit log, and its plate is a coach's
+/// (`license_plate_type: bus`). Its fields come from the player's coach, else a truck, started as
+/// new as a truck's are. Returns its id.
+pub fn buy_coach(
+    document: &mut Document,
+    accessories: &[Unit],
+    plates: &[String],
+) -> Result<String, BuyProblem> {
+    if accessories.is_empty() {
+        return Err(BuyProblem::Empty);
+    }
+    let template = template_coach(document)
+        .cloned()
+        .ok_or(BuyProblem::NoTemplate)?;
+    let player_id = player(document).ok_or(BuyProblem::NoTemplate)?;
+    let now = crate::jobs::game_time(document);
+    let mut ids = document.unused_nameless_ids(accessories.len() + 1);
+    let coach_id = ids.remove(0);
+    let renames: HashMap<String, String> = accessories
+        .iter()
+        .map(|unit| unit.id.clone())
+        .zip(ids.iter().cloned())
+        .collect();
+    let new_accessories: Vec<Unit> = accessories
+        .iter()
+        .zip(&ids)
+        .map(|(unit, id)| renamed(unit, id, &renames))
+        .collect();
+    let mut coach = start_as_new(&template, "vehicle", &coach_id, &ids, now);
+    set_field(&mut coach, "license_plate_type", Value::single("bus"));
+    crate::plates::set_plates(std::slice::from_mut(&mut coach), plates);
+    document.push(coach);
+    for unit in new_accessories {
+        document.push(unit);
+    }
+    let player_unit = document
+        .unit(&player_id)
+        .cloned()
+        .ok_or(BuyProblem::NoTemplate)?;
+    if let Some(mut player) = document.unit_mut(&player_id) {
+        player.set("buses", push_item(&player_unit, "buses", &coach_id));
+    }
+    Ok(coach_id)
+}
+
 /// The company's garages with room for another trailer (fewer trailers than truck slots), in the
 /// save's order.
 pub fn trailer_targets(document: &Document) -> Vec<String> {
@@ -617,5 +675,25 @@ mod tests {
         assert_eq!(plate(&front).as_deref(), Some("\"A1|france\""));
         assert_eq!(plate(&dolly).as_deref(), Some("\"B2|france\""));
         assert_eq!(plate(&second).as_deref(), Some("\"C3|france\""));
+    }
+
+    #[test]
+    fn buys_a_coach_into_the_players_coaches() {
+        let text = "SiiNunit\r\n{\r\neconomy : e {\r\n player: p\r\n game_time: 99\r\n}\r\n\r\nplayer : p {\r\n buses: 1\r\n buses[0]: _nameless.1.10\r\n trucks: 0\r\n}\r\n\r\nvehicle : _nameless.1.10 {\r\n engine_wear: &3e800000\r\n odometer: 2564\r\n license_plate: \"AB 123|sweden\"\r\n license_plate_type: bus\r\n accessories: 0\r\n}\r\n\r\n}\r\n";
+        let mut document = sii::parse_text(text).expect("parses");
+        let plates = vec!["BTZ 351|sweden".to_string()];
+        let id = buy_coach(&mut document, &dealer_parts(), &plates).expect("bought");
+        let coach = document.unit(&id).expect("the coach");
+        assert_eq!(coach.single("license_plate"), Some("\"BTZ 351|sweden\""));
+        assert_eq!(coach.single("license_plate_type"), Some("bus"));
+        assert_eq!(coach.single("odometer"), Some("0"));
+        assert_eq!(coach.items("accessories").len(), 2);
+        let player = document.unit("p").expect("player");
+        assert_eq!(player.items("buses"), ["_nameless.1.10", id.as_str()]);
+        assert!(player.items("trucks").is_empty());
+        // A copy of it goes into the coaches too.
+        let copy = crate::copy_coach(&mut document, &id, &[]).expect("copied");
+        assert_eq!(document.unit("p").expect("player").items("buses").len(), 3);
+        assert!(document.reachable_from("e").contains(&copy));
     }
 }

@@ -176,6 +176,48 @@ pub(crate) fn push_item(unit: &Unit, field: &str, item: &str) -> Value {
     Value::Array(items)
 }
 
+/// Copies one of the player's coaches (Coaches DLC): as a coach the game sells, the copy goes only
+/// into `player.buses` (no garage, no log; see `purchases::buy_coach`). Plates as for trucks.
+/// Returns the copy's id.
+pub fn copy_coach(
+    document: &mut Document,
+    id: &str,
+    plates: &[String],
+) -> Result<String, VehicleCopyProblem> {
+    let player_id = player(document).ok_or(VehicleCopyProblem::NotOwned)?;
+    let is_coach = document
+        .unit(&player_id)
+        .is_some_and(|player| player.items("buses").iter().any(|item| item == id));
+    if !is_coach {
+        return Err(VehicleCopyProblem::NotOwned);
+    }
+    let originals = parts(document, id)?;
+    let new_ids = document.unused_nameless_ids(originals.len());
+    let ids: HashMap<String, String> = originals.iter().cloned().zip(new_ids).collect();
+    let mut copies: Vec<Unit> = originals
+        .iter()
+        .filter_map(|original| {
+            let unit = document.unit(original)?;
+            let mut copy = renamed(unit, ids.get(original)?, &ids);
+            crate::plates::renew_plate(&mut copy);
+            Some(copy)
+        })
+        .collect();
+    crate::plates::set_plates(&mut copies, plates);
+    let copy_id = ids.get(id).cloned().ok_or(VehicleCopyProblem::NotOwned)?;
+    for unit in copies {
+        document.push(unit);
+    }
+    let player_unit = document
+        .unit(&player_id)
+        .cloned()
+        .ok_or(VehicleCopyProblem::NotOwned)?;
+    if let Some(mut player) = document.unit_mut(&player_id) {
+        player.set("buses", push_item(&player_unit, "buses", &copy_id));
+    }
+    Ok(copy_id)
+}
+
 /// Copies a truck or trailer (by id) into a garage, as described above. Returns the copy's id.
 pub fn copy_vehicle(
     document: &mut Document,

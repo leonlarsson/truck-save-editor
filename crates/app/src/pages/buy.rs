@@ -12,7 +12,7 @@ use gpui_kit::component::{
 };
 use gpui_kit::{
     App, AppContext as _, Context, Entity, IntoElement, ParentElement as _, Render, SharedString,
-    Styled as _, Subscription, Window, div, px,
+    Styled as _, Subscription, Window, div, prelude::FluentBuilder as _, px,
 };
 
 use crate::game_data;
@@ -25,12 +25,15 @@ use crate::ui::{Choice, DetailChoice};
 pub enum Buying {
     Truck,
     Trailer,
+    /// A coach (Coaches DLC): it joins the player's coaches, so there's no garage to pick.
+    Coach,
 }
 
 /// A purchase, ready for the session.
 enum Purchase {
     Truck(BoughtTruck),
     Trailer(BoughtTrailer),
+    Coach(BoughtTruck),
 }
 
 pub struct BuyForm {
@@ -87,6 +90,7 @@ impl BuyForm {
         match self.buying {
             Buying::Truck => session.buy_targets(),
             Buying::Trailer => session.trailer_targets(),
+            Buying::Coach => Vec::new(),
         }
     }
 
@@ -95,12 +99,14 @@ impl BuyForm {
         let currency = self.session.read(cx).game().currency_symbol();
         let price = |price: i64| format!("{currency} {}", crate::format::thousands(price));
         match self.buying {
-            Buying::Truck => {
+            Buying::Truck | Buying::Coach => {
                 let trucks = game_data::dealer_trucks(cx)?;
                 let session = self.session.read(cx);
+                let wants_coach = self.buying == Buying::Coach;
                 Some(
                     trucks
                         .iter()
+                        .filter(|truck| truck.is_coach == wants_coach)
                         .filter(|truck| session.has_dlc(truck.dlc.as_deref()))
                         .map(|truck| DetailChoice {
                             value: truck.path.clone().into(),
@@ -193,18 +199,36 @@ impl BuyForm {
         if !self.is_filled {
             return Err(t!(cx, "buy-reading"));
         }
-        if self.targets(cx).is_empty() {
-            return Err(match self.buying {
-                Buying::Truck => t!(cx, "buy-truck-no-room"),
-                Buying::Trailer => t!(cx, "buy-trailer-no-room"),
-            });
-        }
         // Made up front: a closure making it would hold on to `cx`, which the lookups below need.
         let choose_text: SharedString = match self.buying {
             Buying::Truck => t!(cx, "buy-truck-choose"),
             Buying::Trailer => t!(cx, "buy-trailer-choose"),
+            Buying::Coach => t!(cx, "buy-coach-choose"),
         };
         let choose = || choose_text.clone();
+        // A coach needs no garage: it joins the player's coaches, its plate made for the
+        // headquarters' country (as the game gave one it sold, in ETS2).
+        if self.buying == Buying::Coach {
+            let path = selected(&self.vehicle, cx).ok_or_else(choose)?;
+            let trucks = game_data::dealer_trucks(cx).ok_or_else(choose)?;
+            let coach = trucks
+                .iter()
+                .find(|truck| truck.path == path)
+                .ok_or_else(choose)?;
+            let hq = format!("garage.{}", self.session.read(cx).career().hq_city);
+            return Ok(Purchase::Coach(BoughtTruck {
+                model: coach.model.clone(),
+                accessories: coach.accessories.clone(),
+                garage: String::new(),
+                plates: game_data::new_plates(cx, &hq, "bus", 1),
+            }));
+        }
+        if self.targets(cx).is_empty() {
+            return Err(match self.buying {
+                Buying::Trailer => t!(cx, "buy-trailer-no-room"),
+                _ => t!(cx, "buy-truck-no-room"),
+            });
+        }
         let (Some(path), Some(garage)) = (selected(&self.vehicle, cx), selected(&self.garage, cx))
         else {
             return Err(choose());
@@ -246,6 +270,8 @@ impl BuyForm {
                     plates,
                 }))
             }
+            // Handled above, before any garage is asked for.
+            Buying::Coach => Err(choose()),
         }
     }
 
@@ -256,10 +282,12 @@ impl BuyForm {
         let title = match &purchase {
             Purchase::Truck(_) => t!(cx, "buy-truck-added"),
             Purchase::Trailer(_) => t!(cx, "buy-trailer-added"),
+            Purchase::Coach(_) => t!(cx, "buy-coach-added"),
         };
         self.session.update(cx, |session, cx| match purchase {
             Purchase::Truck(truck) => session.buy_truck(truck, cx),
             Purchase::Trailer(trailer) => session.buy_trailer(trailer, cx),
+            Purchase::Coach(coach) => session.buy_coach(coach, cx),
         });
         window.close_sheet(cx);
         window.push_notification(
@@ -287,6 +315,7 @@ impl Render for BuyForm {
                 t!(cx, "buy-trailer-description"),
                 t!(cx, "buy-trailer-model"),
             ),
+            Buying::Coach => (t!(cx, "buy-coach-description"), t!(cx, "buy-coach-model")),
         };
         v_flex()
             .pt_2()
@@ -298,7 +327,10 @@ impl Render for BuyForm {
                     .child(description),
             )
             .child(field(label, &self.vehicle, placeholder.clone()))
-            .child(field(t!(cx, "column-garage"), &self.garage, placeholder))
+            // Coaches aren't kept in garages.
+            .when(self.buying != Buying::Coach, |this| {
+                this.child(field(t!(cx, "column-garage"), &self.garage, placeholder))
+            })
             .child(
                 v_flex()
                     .gap_2()
@@ -356,6 +388,7 @@ pub fn open(session: Entity<Session>, buying: Buying, window: &mut Window, cx: &
             .title(match buying {
                 Buying::Truck => t!(cx, "buy-truck-title"),
                 Buying::Trailer => t!(cx, "buy-trailer-title"),
+                Buying::Coach => t!(cx, "buy-coach-title"),
             })
             .size(px(crate::pages::details::SHEET_WIDTH))
             .child(view.clone())

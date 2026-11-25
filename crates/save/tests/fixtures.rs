@@ -338,6 +338,52 @@ fn real_saves_buy_a_trailer() {
     }
 }
 
+/// In real saves with a coach: a copy of it (and a coach "bought" with its accessories, standing in
+/// for the dealer's) joins the player's coaches, hangs off the economy, and the save writes and
+/// reads back the same.
+#[test]
+fn real_coaches_copy_and_buy() {
+    for (index, dir) in slot_dirs().into_iter().enumerate() {
+        let mut slot = save::load(&dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display()));
+        let Some(coach) = save::vehicles(&slot.game)
+            .into_iter()
+            .find(|vehicle| vehicle.kind == save::VehicleKind::Coach)
+        else {
+            continue;
+        };
+        let parts: Vec<sii::Unit> = slot
+            .game
+            .unit(&coach.id)
+            .map(|unit| {
+                unit.items("accessories")
+                    .iter()
+                    .filter_map(|id| slot.game.unit(id).cloned())
+                    .collect()
+            })
+            .unwrap_or_default();
+        let copy = save::copy_coach(&mut slot.game, &coach.id, &[])
+            .unwrap_or_else(|problem| panic!("slot {index}: {problem:?}"));
+        let bought = save::buy_coach(&mut slot.game, &parts, &[])
+            .unwrap_or_else(|problem| panic!("slot {index}: {problem:?}"));
+        let coaches: Vec<String> = save::vehicles(&slot.game)
+            .into_iter()
+            .filter(|vehicle| vehicle.kind == save::VehicleKind::Coach)
+            .map(|vehicle| vehicle.id)
+            .collect();
+        assert!(
+            coaches.contains(&copy) && coaches.contains(&bought),
+            "slot {index}"
+        );
+        assert_eq!(save::drop_unreachable(&mut slot.game), 0, "slot {index}");
+        let text = sii::to_text(&slot.game);
+        assert_eq!(
+            sii::to_text(&sii::parse_text(&text).expect("reads back")),
+            text,
+            "slot {index}"
+        );
+    }
+}
+
 #[test]
 fn real_trucks_move_between_garages() {
     for (index, dir) in slot_dirs().into_iter().enumerate() {

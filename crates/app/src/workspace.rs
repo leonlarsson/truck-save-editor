@@ -551,6 +551,14 @@ impl Workspace {
                     cx,
                 );
             }
+            PaletteCommand::BuyCoach => {
+                crate::pages::buy::open(
+                    session.clone(),
+                    crate::pages::buy::Buying::Coach,
+                    window,
+                    cx,
+                );
+            }
             PaletteCommand::BuyTrailer => {
                 crate::pages::buy::open(
                     session.clone(),

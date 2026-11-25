@@ -496,3 +496,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** in a save with nothing to take a plate from (a new career: the dealers' used trucks carry empty plates, and dealer files none), the added truck and trailer came out with blank plates in the game. The game's own formats give the right plate for the region in every case, with ETS2's layout tags and badges.
 
 **Considered:** the region of the company's headquarters (the garage's is where the vehicle lives, and what a dealer there would register it in).
+
+## 2026-11-25: Adding and copying coaches
+
+**Decided:** Fleet's Coaches list (shown for any save with a coach career, even without a coach) has Add a coach…, also in the palette for coach careers: the same panel lists the coach dealer's ready-made coaches (`/def/vehicle/bus_dealer/<brand>/*.sii`, Coaches DLC, read with the truck dealers', `DealerTruck::is_coach`), with no garage to pick. A coach's panel has Copy coach. `save::buy_coach` and `save::copy_coach` put the coach only into `player.buses`: no garage, no profit log, `license_plate_type: bus`, its fields from the player's coach (else a truck) started as new, and a coach plate made the game's way for the headquarters' country.
+
+**Why:** the owner bought a coach at the game's coach dealer and saved: the game had added it to `player.buses` and nothing else, its plate a Swedish coach plate (the headquarters are in Sweden).
+
+**Considered:** a garage for coaches (the game keeps none); the coach's current city for its plate (a new coach has none until it's used).

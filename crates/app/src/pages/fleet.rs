@@ -366,7 +366,11 @@ impl Render for FleetPage {
                 t!(cx, "buy-trailer"),
                 t!(cx, "buy-trailer-description"),
             )),
-            VehicleKind::Coach => None,
+            VehicleKind::Coach => Some((
+                crate::pages::buy::Buying::Coach,
+                t!(cx, "buy-coach"),
+                t!(cx, "buy-coach-description"),
+            )),
         };
         // No trucks (or trailers) yet: say so, with the way to add one right there.
         let empty = buying.clone().map(|(buying, label, _)| {
@@ -377,6 +381,10 @@ impl Render for FleetPage {
                 crate::pages::buy::Buying::Trailer => (
                     t!(cx, "fleet-none-trailers"),
                     t!(cx, "fleet-none-trailers-body"),
+                ),
+                crate::pages::buy::Buying::Coach => (
+                    t!(cx, "fleet-none-coaches"),
+                    t!(cx, "fleet-none-coaches-body"),
                 ),
             };
             let session = self.session.clone();
@@ -400,11 +408,13 @@ impl Render for FleetPage {
         // Trucks, coaches and trailers each get their own list; the switch shows trucks and
         // trailers always (either can be added here), coaches when the save has some.
         let all = self.session.read(cx).vehicles();
+        // A save with a coach career has a Coaches list even without a coach (one can be added).
+        let has_coaches = self.session.read(cx).has_coach_career();
         let count_of = |kind: VehicleKind| all.iter().filter(|v| v.kind == kind).count();
         let kinds: Vec<VehicleKind> =
             [VehicleKind::Truck, VehicleKind::Coach, VehicleKind::Trailer]
                 .into_iter()
-                .filter(|kind| *kind != VehicleKind::Coach || count_of(*kind) > 0)
+                .filter(|kind| *kind != VehicleKind::Coach || count_of(*kind) > 0 || has_coaches)
                 .collect();
         let switch = (kinds.len() > 1).then(|| {
             let buttons = kinds.iter().map(|kind| {

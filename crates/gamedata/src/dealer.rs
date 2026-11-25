@@ -1,5 +1,6 @@
 //! The trucks the game's dealers sell ready-made (their stock offers): one file each under
-//! `/def/vehicle/truck_dealer/<brand>/` in the base game's definitions or a DLC's (ATS keeps each
+//! `/def/vehicle/truck_dealer/<brand>/` (coaches: `/def/vehicle/bus_dealer/<brand>/`, Coaches
+//! DLC) in the base game's definitions or a DLC's (ATS keeps each
 //! truck brand's in its own archive). A file is a `vehicle` unit listing its accessories, then the
 //! accessories, each pointing at a part's definition (`data_path`): written almost as a save keeps
 //! a truck, so buying one copies its accessories into the save.
@@ -25,6 +26,8 @@ pub struct DealerTruck {
     pub path: String,
     /// The model (`daf.xf_euro6`), from its `data` accessory's folder.
     pub model: String,
+    /// Whether it's a coach (a `bus_dealer` offer, Coaches DLC) rather than a truck.
+    pub is_coach: bool,
     /// Its chassis's and engine's names, as text keys or plain text (`4x2`, `@@engine_mx13@@`).
     pub chassis: String,
     pub engine: String,
@@ -75,7 +78,13 @@ pub fn dealer_trucks(install_dir: &Path) -> Vec<DealerTruck> {
     let mut parts: HashMap<String, PartInfo> = HashMap::new();
     let mut trucks: Vec<DealerTruck> = Vec::new();
     for index in 0..archives.len() {
-        for file in dealer_files(&mut archives[index].0, "/def/vehicle/truck_dealer") {
+        // Trucks, and the coach dealer's coaches (Coaches DLC), written the same way.
+        let mut files = dealer_files(&mut archives[index].0, "/def/vehicle/truck_dealer");
+        files.extend(dealer_files(
+            &mut archives[index].0,
+            "/def/vehicle/bus_dealer",
+        ));
+        for file in files {
             if trucks.iter().any(|truck| truck.path == file) {
                 continue;
             }
@@ -292,9 +301,11 @@ fn dealer_truck(
             .single("data_path")
             .map(|text| sii::value::parse_string(text).to_string())?;
         let part = part_info(&data_path, archives, parts);
-        // The model's folder, from `/def/vehicle/truck/<model>/data.sii`.
+        // The model's folder, from `/def/vehicle/truck/<model>/data.sii` (`…/bus/…` for a
+        // coach).
         if let Some(folder) = data_path
             .strip_prefix("/def/vehicle/truck/")
+            .or_else(|| data_path.strip_prefix("/def/vehicle/bus/"))
             .and_then(|rest| rest.strip_suffix("/data.sii"))
         {
             model = Some(folder.to_string());
@@ -315,6 +326,7 @@ fn dealer_truck(
         accessories.push(unit);
     }
     Some(DealerTruck {
+        is_coach: path.starts_with("/def/vehicle/bus_dealer/"),
         path,
         model: model?,
         chassis,
