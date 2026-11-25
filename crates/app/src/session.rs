@@ -102,14 +102,11 @@ struct Pending {
     /// Trucks and drivers to move to another garage (id, garage id), in the order asked; each
     /// takes its whole slot along (see `save::move_to_garage`).
     garage_moves: Vec<(String, String)>,
-    /// Trucks and trailers to copy into a garage (id, garage id), in the order asked (see
-    /// `save::copy_vehicle`). A copy's id is the same in the preview and when saving, since both
-    /// make the copies from the same save in the same order.
-    copies: Vec<(String, String)>,
-    /// Trucks bought from a dealer's stock, in the order asked (see `save::buy_truck`).
-    bought_trucks: Vec<BoughtTruck>,
-    /// Trailers bought from the dealer's stock, in the order asked (see `save::buy_trailer`).
-    bought_trailers: Vec<BoughtTrailer>,
+    /// Trucks and trailers added to the company (copied or bought), in the order asked and
+    /// applied in that order, so a copy of one bought just before finds it. An added vehicle's id
+    /// is the same in the preview and when saving, since both add them to the same save in the
+    /// same order.
+    added: Vec<Addition>,
     /// Whether to cancel the job in progress when saving.
     cancel_job: bool,
     /// Whether to remove the job in progress's deadline when saving.
@@ -184,9 +181,7 @@ impl Pending {
             lock_dealers: BTreeSet::new(),
             lock_recruitments: BTreeSet::new(),
             garage_moves: Vec::new(),
-            copies: Vec::new(),
-            bought_trucks: Vec::new(),
-            bought_trailers: Vec::new(),
+            added: Vec::new(),
             cancel_job: false,
             remove_job_deadline: false,
             removed: Vec::new(),
@@ -265,6 +260,26 @@ pub struct QuickStartPlan {
     /// Dealers to unlock (the cities the game has them in), when asked for. Agencies can't be
     /// unlocked (`Session::can_unlock`).
     pub dealers: Option<BTreeSet<String>>,
+}
+
+/// A truck or trailer added to the company.
+#[derive(Clone, Debug, PartialEq)]
+enum Addition {
+    /// A copy of a truck or trailer (id), into a garage (id).
+    Copy(String, String),
+    Truck(BoughtTruck),
+    Trailer(BoughtTrailer),
+}
+
+impl Addition {
+    /// The garage it goes in.
+    fn garage(&self) -> &str {
+        match self {
+            Addition::Copy(_, garage) => garage,
+            Addition::Truck(truck) => &truck.garage,
+            Addition::Trailer(trailer) => &trailer.garage,
+        }
+    }
 }
 
 /// A truck bought from a dealer's stock: what saving it needs (its accessories as the game's dealer
@@ -834,9 +849,7 @@ impl Session {
             + usize::from(self.places_changed(Place::Dealer))
             + usize::from(self.places_changed(Place::Recruitment))
             + self.moved().len()
-            + self.pending.copies.len()
-            + self.pending.bought_trucks.len()
-            + self.pending.bought_trailers.len()
+            + self.pending.added.len()
             + usize::from(self.pending.cancel_job)
             + usize::from(self.pending.remove_job_deadline)
             + self.pending.removed.len()
@@ -1521,18 +1534,22 @@ impl Session {
 
     /// Buys a dealer's trailer into a garage when saving (Undo takes it back).
     pub fn buy_trailer(&mut self, trailer: BoughtTrailer, cx: &mut Context<Self>) {
-        self.change(cx, |pending, _| pending.bought_trailers.push(trailer));
+        self.change(cx, |pending, _| {
+            pending.added.push(Addition::Trailer(trailer));
+        });
     }
 
     /// Buys a dealer's truck into a garage when saving (Undo takes it back).
     pub fn buy_truck(&mut self, truck: BoughtTruck, cx: &mut Context<Self>) {
-        self.change(cx, |pending, _| pending.bought_trucks.push(truck));
+        self.change(cx, |pending, _| pending.added.push(Addition::Truck(truck)));
     }
 
     /// Copies a truck or trailer into a garage when saving (Undo takes it back).
     pub fn copy_vehicle(&mut self, id: &str, garage: &str, cx: &mut Context<Self>) {
         self.change(cx, |pending, _| {
-            pending.copies.push((id.to_string(), garage.to_string()));
+            pending
+                .added
+                .push(Addition::Copy(id.to_string(), garage.to_string()));
         });
     }
 
@@ -1586,8 +1603,17 @@ impl Session {
         let jobs = t!(cx, "page-jobs");
         let all_data = t!(cx, "page-all-data");
         // A truck or trailer by model and plate, a driver by hometown, a garage by city.
+        // Vehicles added in this session aren't in the save as loaded: those are named as the
+        // save will be (only looked up when needed, since it builds the preview's list).
+        let added_vehicles = std::cell::OnceCell::new();
         let vehicle_subject = |id: &str| -> SharedString {
-            match self.saved_vehicles.iter().find(|v| v.id == id) {
+            let vehicle = self.saved_vehicles.iter().find(|v| v.id == id).or_else(|| {
+                added_vehicles
+                    .get_or_init(|| save::vehicles(&self.preview()))
+                    .iter()
+                    .find(|v| v.id == id)
+            });
+            match vehicle {
                 Some(vehicle) => {
                     let model = crate::game_data::model_name(cx, vehicle).unwrap_or_default();
                     t!(
@@ -1906,47 +1932,24 @@ impl Session {
                 city(&to).into(),
             );
         }
-        // Each copy: a line under the truck or trailer it's a copy of, saying where it goes.
-        for (id, garage) in &self.pending.copies {
+        // Each truck or trailer added: a line under it (a copy under what it's a copy of, which
+        // may itself have been added just before), saying where it goes.
+        for addition in &self.pending.added {
+            let garage = addition.garage();
             let city =
                 crate::game_data::city_name(cx, garage.strip_prefix("garage.").unwrap_or(garage));
-            add(
-                &vehicle_subject(id),
-                t!(cx, "copy-change"),
-                t!(cx, "copy-change-before"),
-                city.into(),
-            );
-        }
-        // Each truck bought: a line under its model, saying where it goes.
-        for truck in &self.pending.bought_trucks {
-            let city = crate::game_data::city_name(
-                cx,
-                truck
-                    .garage
-                    .strip_prefix("garage.")
-                    .unwrap_or(&truck.garage),
-            );
-            add(
-                &crate::game_data::model_name_by_id(cx, &truck.model).into(),
-                t!(cx, "buy-change"),
-                t!(cx, "copy-change-before"),
-                city.into(),
-            );
-        }
-        for trailer in &self.pending.bought_trailers {
-            let city = crate::game_data::city_name(
-                cx,
-                trailer
-                    .garage
-                    .strip_prefix("garage.")
-                    .unwrap_or(&trailer.garage),
-            );
-            add(
-                &crate::game_data::trailer_name(cx, &trailer.model, &trailer.body_type).into(),
-                t!(cx, "buy-trailer-change"),
-                t!(cx, "copy-change-before"),
-                city.into(),
-            );
+            let (subject, what): (SharedString, SharedString) = match addition {
+                Addition::Copy(id, _) => (vehicle_subject(id), t!(cx, "copy-change")),
+                Addition::Truck(truck) => (
+                    crate::game_data::model_name_by_id(cx, &truck.model).into(),
+                    t!(cx, "buy-change"),
+                ),
+                Addition::Trailer(trailer) => (
+                    crate::game_data::trailer_name(cx, &trailer.model, &trailer.body_type).into(),
+                    t!(cx, "buy-trailer-change"),
+                ),
+            };
+            add(&subject, what, t!(cx, "copy-change-before"), city.into());
         }
         // Each truck, trailer, driver or garage taken out: one line under it.
         for removal in &self.pending.removed {
@@ -2292,25 +2295,27 @@ impl Session {
             // only offers moves that fit the preview, which this builds.
             let _ = save::move_to_garage(&mut slot.game, id, garage);
         }
-        // After the moves (a copy goes where there's room once they're done), before the vehicle
-        // edits (an edit made to a copy finds it).
-        for (id, garage) in &self.pending.copies {
-            // One that no longer fits (an earlier change took the room) is skipped; the panel
-            // only offers garages with room in the preview, which this builds.
-            let _ = save::copy_vehicle(&mut slot.game, id, garage);
-        }
-        // Like copies: after the moves, before the vehicle edits.
-        for truck in &self.pending.bought_trucks {
-            // One that no longer fits is skipped, as above.
-            let _ = save::buy_truck(&mut slot.game, &truck.accessories, &truck.garage);
-        }
-        for trailer in &self.pending.bought_trailers {
-            let _ = save::buy_trailer(
-                &mut slot.game,
-                &trailer.units,
-                &trailer.definitions,
-                &trailer.garage,
-            );
+        // After the moves (an addition goes where there's room once they're done), before the
+        // vehicle edits (an edit made to an added truck finds it); in the order asked.
+        for addition in &self.pending.added {
+            // One that no longer fits (an earlier change took the room) is skipped; the panels
+            // only offer garages with room in the preview, which this builds.
+            match addition {
+                Addition::Copy(id, garage) => {
+                    let _ = save::copy_vehicle(&mut slot.game, id, garage);
+                }
+                Addition::Truck(truck) => {
+                    let _ = save::buy_truck(&mut slot.game, &truck.accessories, &truck.garage);
+                }
+                Addition::Trailer(trailer) => {
+                    let _ = save::buy_trailer(
+                        &mut slot.game,
+                        &trailer.units,
+                        &trailer.definitions,
+                        &trailer.garage,
+                    );
+                }
+            }
         }
         for edit in &self.pending.vehicle_edits {
             save::apply_vehicle_edit(&mut slot.game, edit);
@@ -2703,6 +2708,32 @@ mod tests {
         };
         assert_eq!(trailers(&session, cx), 1);
         cx.update(|cx| assert_eq!(session.read(cx).change_count(), 1));
+        // A copy of the trailer just bought, before saving: added after it, so it finds it.
+        let bought = cx.update(|cx| {
+            session
+                .read(cx)
+                .vehicles()
+                .into_iter()
+                .find(|vehicle| vehicle.kind == save::VehicleKind::Trailer)
+                .map(|vehicle| vehicle.id)
+                .expect("the bought trailer")
+        });
+        session.update(cx, |session, cx| {
+            session.copy_vehicle(&bought, "garage.lyon", cx)
+        });
+        assert_eq!(trailers(&session, cx), 2);
+        cx.update(|cx| {
+            let session = session.read(cx);
+            assert_eq!(session.change_count(), 2);
+            // The copy's line names the trailer, not its id.
+            let changes = session.changes(cx);
+            assert!(
+                changes
+                    .iter()
+                    .all(|change| !change.subject.contains("_nameless"))
+            );
+        });
+        session.update(cx, |session, cx| session.undo(cx));
         session.update(cx, |session, cx| session.undo(cx));
         assert_eq!(trailers(&session, cx), 0);
     }
