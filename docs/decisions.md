@@ -472,3 +472,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** checked in the app: every bought or copied vehicle came out with the same plate as the company's own truck or trailer, which reads as a mistake in every list. A plate in the right format for its region is what the game's dealers hand out too. The one-line list cut off the price on a panel this wide.
 
 **Considered:** a used dealer truck's plate (unique, but trailers have no used stock); no plate (unknown what the game does with a truck without one).
+
+## 2026-11-25: "Add a truck", not "Buy a truck"
+
+**Decided:** the dealer panels and their buttons say Add (Add a truck…, Add a trailer…, Add), and the description says nothing is paid and the money stays as it is. The code keeps "buy" for what it does with the game's data (`buy_truck`, `dealer_trucks`: the dealer's stock, bought as the game would, without paying).
+
+**Why:** the owner asked whether Buy takes money; it doesn't, so the word promised something the editor doesn't do. Money is set on Overview.
+
+**Considered:** keeping Buy with a Pay for it checkbox that takes the dealer's price (closer to the game's rules; can come later if asked).
