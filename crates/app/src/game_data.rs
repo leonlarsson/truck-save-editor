@@ -197,6 +197,7 @@ fn forget_read_on_demand(cx: &mut App) {
     cx.set_global(Parts::default());
     cx.set_global(PaintJobs::default());
     cx.set_global(CompanyCargoState::default());
+    cx.set_global(DealerTrucks::default());
     cx.set_global(Pictures::default());
 }
 
@@ -359,6 +360,11 @@ fn data(cx: &App) -> Option<Arc<GameData>> {
 pub fn installed(cx: &App) -> Option<Arc<gamedata::Installed>> {
     cx.try_global::<Loaded>()
         .and_then(|loaded| loaded.installed.clone())
+}
+
+/// Whether the game's data has been read (the game was found).
+pub fn has_data(cx: &App) -> bool {
+    data(cx).is_some()
 }
 
 /// Whether the game's data is being read right now.
@@ -671,6 +677,43 @@ pub fn company_cargo(cx: &mut App) -> Option<Arc<gamedata::CompanyCargo>> {
     })
     .detach();
     None
+}
+
+/// The trucks the dealers sell, once read (`None` inside while reading).
+#[derive(Default)]
+struct DealerTrucks(Option<Option<Arc<Vec<gamedata::DealerTruck>>>>);
+
+impl Global for DealerTrucks {}
+
+/// The trucks the game's dealers sell ready-made (`gamedata::dealer_trucks`). The first ask starts
+/// reading them in the background and returns `None`; the window redraws when they're there.
+pub fn dealer_trucks(cx: &mut App) -> Option<Arc<Vec<gamedata::DealerTruck>>> {
+    if !cx.has_global::<DealerTrucks>() {
+        cx.set_global(DealerTrucks::default());
+    }
+    if let Some(state) = &cx.global::<DealerTrucks>().0 {
+        return state.clone();
+    }
+    let install_dir = data(cx)?.install_dir.clone();
+    cx.global_mut::<DealerTrucks>().0 = Some(None);
+    cx.spawn(async move |cx| {
+        let trucks = cx
+            .background_spawn(async move { gamedata::dealer_trucks(&install_dir) })
+            .await;
+        cx.update(|cx| {
+            cx.global_mut::<DealerTrucks>().0 = Some(Some(Arc::new(trucks)));
+            cx.refresh_windows();
+        });
+    })
+    .detach();
+    None
+}
+
+/// A model's name by its id (`volvo.vnl2018` → `Volvo VNL 2018`), else made from the id.
+pub fn model_name_by_id(cx: &App, model_id: &str) -> String {
+    data(cx)
+        .and_then(|d| d.model_name(model_id))
+        .unwrap_or_else(|| save::model_display_name(model_id))
 }
 
 /// The paint jobs read so far, by model.

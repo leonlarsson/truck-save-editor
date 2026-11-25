@@ -141,7 +141,10 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [ ] Add trucks and trailers from the app, in both games: buy any model the installed game has (as its dealer configures it) into a garage slot, and copy one you already own.
   - [x] Copy a truck or trailer into a garage with room (2026-11-25, `docs/decisions.md`).
   - [ ] A copied truck and trailer checked in the game (owner).
-  - [ ] Buy a new truck or trailer: any model the installed game has, as its dealer configures it.
+  - [x] Buy a truck from a dealer's stock: any the game's dealers sell ready-made, for the DLCs the save has (2026-11-25, `docs/decisions.md`).
+  - [ ] A bought truck checked in the game (owner).
+  - [ ] Buy a trailer from the trailer dealer's stock.
+  - [ ] Build a truck from any parts the configurator offers, starting from a dealer's.
 
 - [ ] Cars: the player's car (`player.cars`, ATS's Road Trip car) in Fleet, with fuel, wear, repairs and plate.
 - [ ] Create a new save: a fresh career in a new local profile, from the start screen (see "Starting fresh").

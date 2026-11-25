@@ -33,6 +33,7 @@ pub enum PaletteCommand {
     VisitEveryViewpoint,
     SavedColours,
     NewJob,
+    BuyTruck,
     PerfectCoachSatisfaction,
     DiscoverBusStops,
     RefuelAll,
@@ -72,6 +73,7 @@ fn groups(has_coaches: bool) -> Vec<Vec<PaletteCommand>> {
         PaletteCommand::UnlockDealers,
         PaletteCommand::KeepOffers,
         PaletteCommand::NewJob,
+        PaletteCommand::BuyTruck,
         PaletteCommand::SavedColours,
     ];
     if has_coaches {
@@ -191,6 +193,11 @@ fn parts(
             t!(cx, "new-job-title"),
             IconName::Container,
             &["job", "freight", "market", "cargo", "offer"],
+        ),
+        PaletteCommand::BuyTruck => (
+            t!(cx, "buy-truck"),
+            IconName::Truck,
+            &["buy", "truck", "dealer", "new", "add", "fleet"],
         ),
         PaletteCommand::SavedColours => (
             t!(cx, "saved-colours"),

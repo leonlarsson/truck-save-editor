@@ -423,6 +423,16 @@ impl Render for FleetPage {
                     h_flex()
                         .gap_2()
                         .child(
+                            Button::new("buy-truck")
+                                .small()
+                                .ghost()
+                                .label(t!(cx, "buy-truck"))
+                                .tip(t!(cx, "buy-truck-description"))
+                                .on_click(cx.listener(|this, _, window, cx| {
+                                    crate::pages::buy_truck::open(this.session.clone(), window, cx)
+                                })),
+                        )
+                        .child(
                             Button::new("saved-colours")
                                 .small()
                                 .ghost()

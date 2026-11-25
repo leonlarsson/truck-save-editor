@@ -1,6 +1,7 @@
 //! The app's pages, one per sidebar entry.
 
 pub mod all_data;
+pub mod buy_truck;
 pub mod cities;
 pub mod coach_career;
 pub mod details;

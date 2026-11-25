@@ -539,6 +539,9 @@ impl Workspace {
             PaletteCommand::SavedColours => {
                 crate::pages::saved_colours::open(session.clone(), window, cx);
             }
+            PaletteCommand::BuyTruck => {
+                crate::pages::buy_truck::open(session.clone(), window, cx);
+            }
             PaletteCommand::PerfectCoachSatisfaction => {
                 session.update(cx, |session, cx| session.perfect_coach_satisfaction(cx));
                 self.show_coach_career(cx);

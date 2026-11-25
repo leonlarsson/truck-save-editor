@@ -47,7 +47,7 @@ impl Kind {
     }
 }
 
-fn player(document: &Document) -> Option<String> {
+pub(crate) fn player(document: &Document) -> Option<String> {
     document
         .first_of_kind("economy")?
         .single("player")
@@ -131,7 +131,7 @@ fn field_ids(value: &Value) -> &[String] {
 }
 
 /// A unit with every value that's a key of `ids` swapped for its new id.
-fn renamed(unit: &Unit, id: &str, ids: &HashMap<String, String>) -> Unit {
+pub(crate) fn renamed(unit: &Unit, id: &str, ids: &HashMap<String, String>) -> Unit {
     let mut copy = Unit::new(unit.kind.clone(), id);
     copy.fields = unit.fields.clone();
     for field in &mut copy.fields {
@@ -155,7 +155,7 @@ fn renamed(unit: &Unit, id: &str, ids: &HashMap<String, String>) -> Unit {
 
 /// An empty log like `log`: its lists emptied and its running totals at 0 (`acc_…`, `total_…`);
 /// anything else (like `history_age`) as it is.
-fn empty_log(log: &Unit, id: &str) -> Unit {
+pub(crate) fn empty_log(log: &Unit, id: &str) -> Unit {
     let mut copy = Unit::new(log.kind.clone(), id);
     copy.fields = log.fields.clone();
     for field in &mut copy.fields {
@@ -169,7 +169,7 @@ fn empty_log(log: &Unit, id: &str) -> Unit {
 }
 
 /// Adds an item to the end of an array field.
-fn push_item(unit: &Unit, field: &str, item: &str) -> Value {
+pub(crate) fn push_item(unit: &Unit, field: &str, item: &str) -> Value {
     let mut items = unit.items(field).to_vec();
     items.push(item.to_string());
     Value::Array(items)

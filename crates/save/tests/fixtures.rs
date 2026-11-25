@@ -214,6 +214,53 @@ fn real_trucks_and_trailers_copy_into_a_garage() {
     }
 }
 
+/// In real saves, with or without a truck of the company's: a truck bought into a garage with a
+/// free slot is in the fleet, new (no wear, a full tank), hangs off the economy, and the save
+/// writes and reads back the same. A used truck's accessories stand in for a dealer's (the test
+/// has no game data).
+#[test]
+fn real_saves_buy_a_truck() {
+    for (index, dir) in slot_dirs().into_iter().enumerate() {
+        let mut slot = save::load(&dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display()));
+        let Some(garage) = save::buy_targets(&slot.game).into_iter().next() else {
+            continue;
+        };
+        let Some(parts) = slot
+            .game
+            .units_of_kind("used_truck_offer")
+            .filter_map(|offer| offer.single("truck"))
+            .find_map(|id| slot.game.unit(id))
+            .map(|truck| {
+                truck
+                    .items("accessories")
+                    .iter()
+                    .filter_map(|id| slot.game.unit(id).cloned())
+                    .collect::<Vec<sii::Unit>>()
+            })
+        else {
+            continue;
+        };
+        let id = save::buy_truck(&mut slot.game, &parts, &garage)
+            .unwrap_or_else(|problem| panic!("slot {index}: {problem:?}"));
+        let truck = save::vehicles(&slot.game)
+            .into_iter()
+            .find(|vehicle| vehicle.id == id)
+            .unwrap_or_else(|| panic!("slot {index}: the truck is in the fleet"));
+        assert_eq!(truck.wear.worst(), 0.0, "slot {index}");
+        assert_eq!(
+            save::drop_unreachable(&mut slot.game),
+            0,
+            "slot {index}: the truck hangs off the economy"
+        );
+        let text = sii::to_text(&slot.game);
+        assert_eq!(
+            sii::to_text(&sii::parse_text(&text).expect("reads back")),
+            text,
+            "slot {index}"
+        );
+    }
+}
+
 #[test]
 fn real_trucks_move_between_garages() {
     for (index, dir) in slot_dirs().into_iter().enumerate() {

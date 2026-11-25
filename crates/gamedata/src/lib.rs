@@ -8,6 +8,7 @@
 mod cities;
 mod companies;
 mod content;
+mod dealer;
 mod icon;
 mod install;
 mod photo_album;
@@ -25,6 +26,7 @@ use save::{Game, LevelTable};
 
 pub use companies::{CompanyCargo, company_cargo};
 pub use content::{Installed, installed};
+pub use dealer::{DealerTruck, dealer_trucks};
 pub use icon::{ALPHA, BLUE, GREEN, GameIcon, RED};
 pub use install::find_install;
 pub use photo_album::{AlbumItem, PhotoAlbum};

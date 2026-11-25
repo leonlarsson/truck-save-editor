@@ -106,6 +106,8 @@ struct Pending {
     /// `save::copy_vehicle`). A copy's id is the same in the preview and when saving, since both
     /// make the copies from the same save in the same order.
     copies: Vec<(String, String)>,
+    /// Trucks bought from a dealer's stock, in the order asked (see `save::buy_truck`).
+    bought_trucks: Vec<BoughtTruck>,
     /// Whether to cancel the job in progress when saving.
     cancel_job: bool,
     /// Whether to remove the job in progress's deadline when saving.
@@ -181,6 +183,7 @@ impl Pending {
             lock_recruitments: BTreeSet::new(),
             garage_moves: Vec::new(),
             copies: Vec::new(),
+            bought_trucks: Vec::new(),
             cancel_job: false,
             remove_job_deadline: false,
             removed: Vec::new(),
@@ -259,6 +262,16 @@ pub struct QuickStartPlan {
     /// Dealers to unlock (the cities the game has them in), when asked for. Agencies can't be
     /// unlocked (`Session::can_unlock`).
     pub dealers: Option<BTreeSet<String>>,
+}
+
+/// A truck bought from a dealer's stock: what saving it needs (its accessories as the game's dealer
+/// file has them, each with its `refund`), and its model for the list of changes.
+#[derive(Clone, Debug, PartialEq)]
+pub struct BoughtTruck {
+    /// The model (`volvo.vnl2018`).
+    pub model: String,
+    pub accessories: Vec<sii::Unit>,
+    pub garage: String,
 }
 
 /// One change, for the list shown before saving.
@@ -807,6 +820,7 @@ impl Session {
             + usize::from(self.places_changed(Place::Recruitment))
             + self.moved().len()
             + self.pending.copies.len()
+            + self.pending.bought_trucks.len()
             + usize::from(self.pending.cancel_job)
             + usize::from(self.pending.remove_job_deadline)
             + self.pending.removed.len()
@@ -1477,6 +1491,17 @@ impl Session {
         save::copy_targets(&self.preview(), id)
     }
 
+    /// The garages a truck could be bought into (a free truck slot), as the save will be after the
+    /// changes so far.
+    pub fn buy_targets(&self) -> Vec<String> {
+        save::buy_targets(&self.preview())
+    }
+
+    /// Buys a dealer's truck into a garage when saving (Undo takes it back).
+    pub fn buy_truck(&mut self, truck: BoughtTruck, cx: &mut Context<Self>) {
+        self.change(cx, |pending, _| pending.bought_trucks.push(truck));
+    }
+
     /// Copies a truck or trailer into a garage when saving (Undo takes it back).
     pub fn copy_vehicle(&mut self, id: &str, garage: &str, cx: &mut Context<Self>) {
         self.change(cx, |pending, _| {
@@ -1865,6 +1890,22 @@ impl Session {
                 city.into(),
             );
         }
+        // Each truck bought: a line under its model, saying where it goes.
+        for truck in &self.pending.bought_trucks {
+            let city = crate::game_data::city_name(
+                cx,
+                truck
+                    .garage
+                    .strip_prefix("garage.")
+                    .unwrap_or(&truck.garage),
+            );
+            add(
+                &crate::game_data::model_name_by_id(cx, &truck.model).into(),
+                t!(cx, "buy-change"),
+                t!(cx, "copy-change-before"),
+                city.into(),
+            );
+        }
         // Each truck, trailer, driver or garage taken out: one line under it.
         for removal in &self.pending.removed {
             let subject: SharedString = match removal {
@@ -2216,6 +2257,11 @@ impl Session {
             // only offers garages with room in the preview, which this builds.
             let _ = save::copy_vehicle(&mut slot.game, id, garage);
         }
+        // Like copies: after the moves, before the vehicle edits.
+        for truck in &self.pending.bought_trucks {
+            // One that no longer fits is skipped, as above.
+            let _ = save::buy_truck(&mut slot.game, &truck.accessories, &truck.garage);
+        }
         for edit in &self.pending.vehicle_edits {
             save::apply_vehicle_edit(&mut slot.game, edit);
         }
@@ -2535,6 +2581,36 @@ mod tests {
         });
         session.update(cx, |session, cx| session.undo(cx));
         assert_eq!(trucks(&session, cx), 1);
+    }
+
+    #[gpui_kit::test]
+    fn buys_a_truck_as_one_undoable_change(cx: &mut TestAppContext) {
+        let session = session_of(FLEET, cx);
+        let parts = sii::parse_text(
+            "SiiNunit\r\n{\r\nvehicle_accessory : .t.data {\r\n data_path: \"/def/vehicle/truck/x/data.sii\"\r\n refund: 0\r\n}\r\n\r\n}\r\n",
+        )
+        .expect("parses")
+        .units()
+        .to_vec();
+        cx.update(|cx| assert_eq!(session.read(cx).buy_targets(), ["garage.lyon"]));
+        session.update(cx, |session, cx| {
+            session.buy_truck(
+                BoughtTruck {
+                    model: "x".into(),
+                    accessories: parts,
+                    garage: "garage.lyon".into(),
+                },
+                cx,
+            )
+        });
+        cx.update(|cx| {
+            let session = session.read(cx);
+            assert_eq!(session.vehicles().len(), 2);
+            assert_eq!(session.change_count(), 1);
+            assert!(session.buy_targets().is_empty());
+        });
+        session.update(cx, |session, cx| session.undo(cx));
+        cx.update(|cx| assert_eq!(session.read(cx).vehicles().len(), 1));
     }
 
     /// Two cities, Berlin visited (4 times) and Lyon not; Berlin's dealer unlocked.
