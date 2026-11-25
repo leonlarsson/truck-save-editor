@@ -146,7 +146,9 @@ Agreed work, in order. Each step should end with something the owner can see or 
   - [x] Add a trailer (or road train) from the dealer's stock (2026-11-25, `docs/decisions.md`).
   - [x] An added road train checked in the game (owner, ATS, 2026-11-25: the whole train, its own plate).
   - [x] An added trailer in a save that had no trailer before (owner, ATS, 2026-11-25: loads, the garage and company count it, with its picture).
-  - [ ] Adding and copying in ETS2 (owner).
+  - [x] Adding and copying in ETS2 (owner, 2026-11-25: a truck, a B-double and a copy in Milan, with Italian plates made the game's way).
+  - [x] An agency unlocked by the editor opens in the game, and hiring online works (owner, ATS, 2026-11-25).
+  - [ ] Coaches: how the game gets a player a second coach, if it does (owner), then adding or changing coaches to match.
   - [ ] Build a truck from any parts the configurator offers, starting from a dealer's.
 
 - [ ] Cars: the player's car (`player.cars`, ATS's Road Trip car) in Fleet, with fuel, wear, repairs and plate.
@@ -173,7 +175,6 @@ Agreed work, in order. Each step should end with something the owner can see or 
   - [x] The odometer and a trailer's weights are edited in miles and pounds for ATS; hazardous cargo and states in ATS's words.
   - [ ] ATS (owner): what Career Progress says for recruitment agencies, to compare with the editor's 25.
   - [x] Recruitment agencies unlocked in the save stay shut in the game (black screen, no hiring online): the agency screen was still locked (`screen.recruit` in `economy.screen_access_list`); saves now open the screens the career has earned, and agencies can be unlocked again (2026-11-25, `docs/decisions.md`).
-  - [ ] An agency unlocked by the editor checked in the game (owner): its screen opens, hiring online works.
   - [x] A real check in ATS (owner, 2026-11-25): money, experience, a dealer unlocked and a garage upgraded by the editor, saved and loaded in the game, all as expected (agencies aside, see below).
   - [x] Quick travel was off for the ATS save because it has no truck of its own yet (quick jobs only); it now says so, and World map says there's no truck instead of putting one at the map's origin (2026-11-24).
   - [x] ATS's cargo names in full (the game's `local.override.sii` was not read), its BC3 company logos, Garages and Buy all without cities of map DLCs that aren't installed, the start screen's folders for the picked game (2026-11-24).
