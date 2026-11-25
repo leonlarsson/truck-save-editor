@@ -265,6 +265,36 @@ pub fn sector_contents(bytes: &[u8]) -> MapContents {
     }
 }
 
+/// Leaves out the roads of map DLCs that aren't installed: the base map holds the roads of states
+/// and countries whose DLC isn't installed too (ATS's `base_map.scs` has Utah's, Colorado's …), and
+/// the game shows those regions empty. Each road goes with the city whose area is nearest it (any
+/// city on the map); a road is kept when that city is one the installed game has
+/// (`installed_cities`, by token). Nothing is left out when the list is empty (no game data).
+pub fn keep_installed_roads(map: &mut MapContents, installed_cities: &HashSet<String>) {
+    if installed_cities.is_empty() {
+        return;
+    }
+    let centres: Vec<(f32, f32, bool)> = map
+        .places
+        .iter()
+        .filter(|place| place.kind == MapPlaceKind::CityArea)
+        .map(|area| (area.x, area.z, installed_cities.contains(&area.city)))
+        .collect();
+    if centres.is_empty() {
+        return;
+    }
+    map.roads.retain(|road| {
+        centres
+            .iter()
+            .map(|(x, z, is_installed)| {
+                let (dx, dz) = (road.x - x, road.z - z);
+                (dx * dx + dz * dz, *is_installed)
+            })
+            .min_by(|a, b| a.0.total_cmp(&b.0))
+            .is_some_and(|(_, is_installed)| is_installed)
+    });
+}
+
 /// The cities with a recruitment agency: the city area each agency's building (a prefab whose
 /// model is one of `agency_models`, by token) stands in, the smallest when areas overlap, else the
 /// nearest area within `AGENCY_REACH` (a building can stand just past its city's area: checked on

@@ -518,3 +518,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** the owner asked for it ("just store the icons in the repo"); with both games supported, which game a save belongs to should show at a glance, also on the taskbar.
 
 **Considered:** reading the icons from the installed game's program at runtime (no artwork in the repository, but none without the game installed, and work for nothing the owner wants); the games' wide logos (`material/ui/logo`, still read at runtime for the start screen), which don't fit a square.
+
+## 2026-11-25: World map leaves out the roads of map DLCs that aren't installed
+
+**Decided:** `gamedata::keep_installed_roads` drops the map's roads whose nearest city area belongs to a city the installed game doesn't have, when the map is read; World map and Discover every road use what's left.
+
+**Why:** ATS's `base_map.scs` holds the roads of states whose DLC isn't installed (Utah, Colorado, Wyoming, New Mexico …); the game's own map shows those states empty (checked with the owner, 2026-11-25), while World map drew their roads, and Discover every road would have marked them.
+
+**Considered:** the map items' DLC markers (not worked out, and the nearest city answers the same question from data already read); a distance limit from installed cities (cuts roads off at arbitrary lines).

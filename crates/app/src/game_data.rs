@@ -299,10 +299,15 @@ fn load(cx: &mut App) {
                 (data, installed)
             })
             .await;
-        // Which buildings are recruitment agencies, for finding them on the map below.
+        // Which buildings are recruitment agencies, for finding them on the map below, and which
+        // cities the installed game has (the map's roads of other map DLCs are left out).
         let agency_models = data
             .as_ref()
             .map(|data| data.agency_models.clone())
+            .unwrap_or_default();
+        let installed_cities: std::collections::HashSet<String> = data
+            .as_ref()
+            .map(|data| data.cities().map(|(city, _)| city.to_string()).collect())
             .unwrap_or_default();
         // Another game picked meanwhile: this one's read isn't shown (it's read again if picked).
         let is_current = cx.update(|cx| current_game(cx) == game);
@@ -320,7 +325,8 @@ fn load(cx: &mut App) {
         // Then the map's roads: a second or two of reading, which only Discover every road needs.
         let roads = cx
             .background_spawn(async move {
-                let map = gamedata::map_contents(game, roads_dir.as_deref()?);
+                let mut map = gamedata::map_contents(game, roads_dir.as_deref()?);
+                gamedata::keep_installed_roads(&mut map, &installed_cities);
                 let ids: Vec<u64> = map.roads.iter().map(|road| road.id).collect();
                 let agency_cities = gamedata::agency_cities(&map, &agency_models);
                 (!map.roads.is_empty()).then(|| RoadsRead {

@@ -34,7 +34,8 @@ pub use photo_album::{AlbumItem, PhotoAlbum};
 pub use plates::{PlateFormat, make_plate};
 pub use roads::{
     MapContents, MapMarker, MapPlace, MapPlaceKind, MapPrefab, MapRoad, agency_cities,
-    decode_token, map_contents, map_roads, road_ids, sector_contents, sector_roads,
+    decode_token, keep_installed_roads, map_contents, map_roads, road_ids, sector_contents,
+    sector_roads,
 };
 pub use texture::{decode_rgba, distance_field_coverage};
 pub use vehicles::{PaintJob, Part, PartKind, model_paint_jobs, model_parts};
