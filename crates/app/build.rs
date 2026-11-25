@@ -10,6 +10,7 @@ fn main() {
     println!("cargo:rustc-env=APP_NAME={PRODUCT_NAME}");
     println!("cargo:rerun-if-changed=assets/icon.ico");
     println!("cargo:rerun-if-changed=../../LICENSE");
+    embed_live_plugin();
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
         return;
     }
@@ -17,6 +18,40 @@ fn main() {
     // details, so say so instead of failing the build.
     if let Err(error) = embed_windows_resources() {
         println!("cargo:warning=The app icon and version details weren't embedded: {error}");
+    }
+}
+
+/// Puts Live's plugin (`tse_live.dll`, built from `crates/live-plugin`) inside the .exe, when
+/// it has been built: the code then carries its bytes (`live::EMBEDDED_PLUGIN`) and writes them
+/// into the game's folder when the player asks. The plugin is a separate build, so it must be
+/// built first (`scripts/windows.sh` and CI do); without it the app builds as before and Live
+/// says the plugin is missing.
+fn embed_live_plugin() {
+    // Tell the compiler the setting exists, whether or not it's set.
+    println!("cargo::rustc-check-cfg=cfg(has_live_plugin)");
+    // The plugin is a Windows library, for the game on Windows: other builds carry none.
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
+        return;
+    }
+    // Cargo builds everything of one build into the same folder, `target/<profile>`: the folder
+    // that holds `build`, which `OUT_DIR` is somewhere inside (how deep differs between Cargo
+    // versions). Only that folder is looked in, so a file of the same name anywhere else is
+    // never taken for the plugin.
+    let out_dir = std::env::var_os("OUT_DIR").map(std::path::PathBuf::from);
+    let Some(plugin) = out_dir.as_deref().and_then(|out| {
+        out.ancestors()
+            .find(|dir| dir.file_name().is_some_and(|name| name == "build"))
+            .and_then(std::path::Path::parent)
+            .map(|profile| profile.join("tse_live.dll"))
+    }) else {
+        return;
+    };
+    // Built again when the plugin appears or changes. (It's the plugin of whatever was built
+    // last in this folder: the scripts and CI always build it right before the app.)
+    println!("cargo:rerun-if-changed={}", plugin.display());
+    if plugin.is_file() {
+        println!("cargo:rustc-env=TSE_LIVE_PLUGIN={}", plugin.display());
+        println!("cargo:rustc-cfg=has_live_plugin");
     }
 }
 

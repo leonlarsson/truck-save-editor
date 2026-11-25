@@ -700,3 +700,26 @@ fn a_save_is_duplicated_from_the_start_screen(cx: &mut TestAppContext) {
     );
     let _ = std::fs::remove_dir_all(&root);
 }
+
+#[gpui_kit::test]
+fn live_shows_the_way_there_until_the_game_is_heard(cx: &mut TestAppContext) {
+    let slot = TempSlot::new("live");
+    let (handle, _) = open(cx, &slot);
+    run_command(cx, handle, "live");
+    // No game: how to get there (the plugin), and no dashboard.
+    act(cx, handle, |window, _| {
+        assert!(window.try_find("add-plugin").is_some());
+        assert!(window.try_find("follow-truck").is_none());
+    });
+    // The game is heard: the drive, with the map following the truck.
+    act(cx, handle, |_, cx| crate::live::set_for_test(cx, true));
+    act(cx, handle, |window, _| {
+        assert!(window.try_find("follow-truck").is_some());
+        assert!(window.try_find("add-plugin").is_none());
+    });
+    // The game quits: back to the way there.
+    act(cx, handle, |_, cx| crate::live::set_for_test(cx, false));
+    act(cx, handle, |window, _| {
+        assert!(window.try_find("add-plugin").is_some());
+    });
+}

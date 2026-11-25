@@ -38,7 +38,9 @@ gpui_kit::assets::icon_assets!(
         Eye,
         Camera,
         Building2,
-        Bus
+        Bus,
+        Radio,
+        Navigation
     ]
 );
 

@@ -1,7 +1,9 @@
 //! The frame every page shares: a header (title, a line of context, actions) and a scrolling body
 //! with the same insets, so pages line up with each other.
 
-use gpui_kit::component::{ActiveTheme as _, StyledExt as _, h_flex, v_flex};
+use gpui_kit::component::{
+    ActiveTheme as _, Sizable as _, StyledExt as _, h_flex, tag::Tag, v_flex,
+};
 use gpui_kit::{
     AnyElement, App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div,
     prelude::FluentBuilder as _,
@@ -10,6 +12,8 @@ use gpui_kit::{
 #[derive(IntoElement)]
 pub struct PageHeader {
     title: SharedString,
+    /// A word beside the title about the page as a whole (Experimental).
+    tag: Option<SharedString>,
     subtitle: Option<SharedString>,
     actions: Vec<AnyElement>,
 }
@@ -18,9 +22,15 @@ impl PageHeader {
     pub fn new(title: impl Into<SharedString>) -> Self {
         Self {
             title: title.into(),
+            tag: None,
             subtitle: None,
             actions: Vec::new(),
         }
+    }
+
+    pub fn tag(mut self, tag: impl Into<SharedString>) -> Self {
+        self.tag = Some(tag.into());
+        self
     }
 
     pub fn subtitle(mut self, subtitle: impl Into<SharedString>) -> Self {
@@ -49,7 +59,15 @@ impl RenderOnce for PageHeader {
             .child(
                 v_flex()
                     .min_w_0()
-                    .child(div().text_xl().font_semibold().child(self.title))
+                    .child(
+                        h_flex()
+                            .gap_3()
+                            .items_center()
+                            .child(div().text_xl().font_semibold().child(self.title))
+                            .when_some(self.tag, |this, tag| {
+                                this.child(Tag::secondary().outline().small().child(tag))
+                            }),
+                    )
                     .when_some(self.subtitle, |this, subtitle| {
                         this.child(
                             div()

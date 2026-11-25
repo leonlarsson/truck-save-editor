@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   core:
-    name: Save format (sii, save)
+    name: Save format (sii, save) and Live (live, live-plugin)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,8 +21,8 @@ jobs:
         run: rustup toolchain install
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all --check
-      - run: cargo clippy -p sii -p save --all-targets -- -D warnings
-      - run: cargo test -p sii -p save
+      - run: cargo clippy -p sii -p save -p live -p live-plugin --all-targets -- -D warnings
+      - run: cargo test -p sii -p save -p live
       # The app shows every crate's licence (Settings → About); the list it's built with must
       # match the crates it's built from.
       - uses: taiki-e/install-action@v2
@@ -47,6 +47,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo clippy -p app --all-targets -- -D warnings
       - run: cargo test -p app
+      # The plugin for Live (tse_live.dll) first: the app's build puts it inside the .exe.
+      - run: cargo build -p live-plugin --release
       - run: cargo build -p app --release
       - uses: actions/upload-artifact@v4
         with:

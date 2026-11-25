@@ -9,6 +9,8 @@ mod fill_table;
 mod filter_bar;
 mod game_icon;
 mod level_picker;
+mod map_card;
+mod meter;
 mod page;
 mod path_text;
 mod picks;
@@ -26,6 +28,8 @@ pub use fill_table::{FillsWidth, fill_table, fill_widths};
 pub use filter_bar::{FilterBar, FilterChanged, fold, table_or_empty};
 pub use game_icon::GameIconView;
 pub use level_picker::LevelPicker;
+pub use map_card::MapCard;
+pub use meter::Meter;
 pub use page::{PageHeader, page_body};
 pub use path_text::path_text;
 pub use picks::{

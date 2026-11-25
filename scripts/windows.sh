@@ -20,10 +20,13 @@ rsync -a --delete --exclude /target --exclude /fixtures --exclude /.git "$repo/"
 cd "$dest"
 # WSL keeps the Windows PATH it saw when it started, which misses a Rust installed since, so put
 # rustup's folder first. On the first build, rustup downloads the Rust version in rust-toolchain.toml.
-cmd.exe /c "set PATH=%USERPROFILE%\\.cargo\\bin;%PATH% && cargo build --release -p app" 2>&1
+# The plugin first (`tse_live.dll`, for Live): the app's build puts it inside the .exe (build.rs).
+cmd.exe /c "set PATH=%USERPROFILE%\\.cargo\\bin;%PATH% && cargo build --release -p live-plugin && cargo build --release -p app" 2>&1
 
 exe="$dest/target/release/truck-save-editor.exe"
 echo "Built: $(wslpath -w "$exe")"
 if [ "$mode" = "run" ]; then
-    "$exe" &
+    # Its output goes nowhere: left attached, whatever reads this script's output (a pipe, a
+    # tool waiting for it) would wait until the editor is closed.
+    "$exe" >/dev/null 2>&1 &
 fi

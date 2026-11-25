@@ -60,6 +60,20 @@ const WIDEST_ROAD: f32 = 6.0;
 const DRIVEN_WIDER_FROM: f32 = 40.0;
 /// The truck's marker's radius on screen, in pixels.
 const MARKER: f32 = 6.0;
+/// The running game's truck's marker: how far the arrowhead's tip is from its middle, and the
+/// radius of the soft disc behind it, in pixels.
+const LIVE_ARROW: f32 = 11.0;
+const LIVE_HALO: f32 = 18.0;
+/// The trail behind the running game's truck: its width in pixels, and how far apart two of its
+/// points can be, in metres, and still be joined (farther: the truck was moved, not driven).
+const TRAIL_WIDTH: f32 = 3.0;
+const TRAIL_GAP: f32 = 500.0;
+/// How far apart, in pixels, two points of the trail are drawn: closer ones change nothing.
+const TRAIL_DETAIL: f32 = 2.0;
+/// The flag on the job's destination: its pole's height and the flag's size, in pixels.
+const FLAG_POLE: f32 = 18.0;
+const FLAG_WIDTH: f32 = 11.0;
+const FLAG_HEIGHT: f32 = 8.0;
 /// The closest zoom: metres a screen pixel shows.
 const CLOSEST: f32 = 1.5;
 /// One button press's zoom.
@@ -365,6 +379,8 @@ struct Layers {
     driven: bool,
     not_driven: bool,
     truck: bool,
+    /// Where the truck is right now, while the game runs (see `crate::live`).
+    live: bool,
     garages: bool,
     names: bool,
     viewpoints: bool,
@@ -377,6 +393,7 @@ impl Default for Layers {
             driven: true,
             not_driven: true,
             truck: true,
+            live: true,
             garages: true,
             names: true,
             viewpoints: true,
@@ -391,6 +408,7 @@ enum Layer {
     Driven,
     NotDriven,
     Truck,
+    Live,
     Garages,
     Names,
     Viewpoints,
@@ -403,6 +421,7 @@ impl Layers {
             Layer::Driven => self.driven,
             Layer::NotDriven => self.not_driven,
             Layer::Truck => self.truck,
+            Layer::Live => self.live,
             Layer::Garages => self.garages,
             Layer::Names => self.names,
             Layer::Viewpoints => self.viewpoints,
@@ -415,6 +434,7 @@ impl Layers {
             Layer::Driven => &mut self.driven,
             Layer::NotDriven => &mut self.not_driven,
             Layer::Truck => &mut self.truck,
+            Layer::Live => &mut self.live,
             Layer::Garages => &mut self.garages,
             Layer::Names => &mut self.names,
             Layer::Viewpoints => &mut self.viewpoints,
@@ -492,12 +512,24 @@ pub struct MapView {
     /// Whether the map still has to move to the found city (it's asked for before the map has
     /// been laid out, or before the game's places are read).
     needs_to_show_found: bool,
+    /// Whether the map keeps the running game's truck in the middle (Live's map). Dragging the
+    /// map lets go.
+    follows_live: bool,
+    /// Whether the map still has to move in close on the truck it started following.
+    needs_live_zoom: bool,
+    /// Only the map, edge to edge, without its legend and frame: for Live, which lays its own
+    /// cards and buttons over it (`zoom_in`, `zoom_out`, `fit`).
+    is_bare: bool,
+    /// The city the running game's job goes to, by token: flagged on the map.
+    destination: Option<String>,
     _work: Vec<Task<()>>,
 }
 
 impl MapView {
     pub fn new(session: Entity<Session>, cx: &mut Context<Self>) -> Self {
         cx.observe(&session, |_, _, cx| cx.notify()).detach();
+        // The running game's truck moves: drawn again with each new position.
+        crate::live::observe(cx).detach();
         Self {
             session,
             view: None,
@@ -517,6 +549,10 @@ impl MapView {
             hovered: None,
             found: None,
             needs_to_show_found: false,
+            follows_live: false,
+            needs_live_zoom: false,
+            is_bare: false,
+            destination: None,
             _work: Vec::new(),
         }
     }
@@ -573,7 +609,8 @@ impl MapView {
         cx.notify();
     }
 
-    fn fit(&mut self, cx: &mut Context<Self>) {
+    /// Shows the whole map.
+    pub fn fit(&mut self, cx: &mut Context<Self>) {
         if let (Some(index), Some(area)) = (&self.index, self.area.get()) {
             self.view = Some(Self::fitted(
                 index.world,
@@ -872,6 +909,41 @@ impl MapView {
                 })
             })
             .collect()
+    }
+
+    /// Only the map, edge to edge: no legend, no frame (see `is_bare`).
+    pub fn bare(mut self) -> Self {
+        self.is_bare = true;
+        self
+    }
+
+    /// Flags the city the running game's job goes to (`None`: no flag).
+    pub fn set_destination(&mut self, city: Option<String>, cx: &mut Context<Self>) {
+        if self.destination != city {
+            self.destination = city;
+            cx.notify();
+        }
+    }
+
+    /// One step closer, or farther out, around the middle (the legend's + and −).
+    pub fn zoom_in(&mut self, cx: &mut Context<Self>) {
+        self.zoom(1.0 / STEP, None, cx);
+    }
+
+    pub fn zoom_out(&mut self, cx: &mut Context<Self>) {
+        self.zoom(STEP, None, cx);
+    }
+
+    /// Whether the map keeps the running game's truck in the middle.
+    pub fn follows_live(&self) -> bool {
+        self.follows_live
+    }
+
+    /// Starts or stops keeping the running game's truck in the middle, close up.
+    pub fn follow_live(&mut self, follows: bool, cx: &mut Context<Self>) {
+        self.follows_live = follows;
+        self.needs_live_zoom = follows;
+        cx.notify();
     }
 
     /// Moves the map to a point, close up (a viewpoint's or photo trophy's Show on map).
@@ -1197,6 +1269,30 @@ fn draw_tile(
 
 impl Render for MapView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // The running game's truck: where it is (in the game's metres) and where it points.
+        // Only when it's this save's game that runs: the other game's positions are on another
+        // map.
+        let is_this_game = crate::live::snapshot(cx).is_some_and(|snapshot| {
+            crate::live::game_of(&snapshot) == self.session.read(cx).game()
+        });
+        let live = crate::live::snapshot(cx)
+            .filter(|snapshot| snapshot.has_position && is_this_game)
+            .map(|snapshot| (snapshot.x as f32, snapshot.z as f32, snapshot.heading));
+        if self.follows_live
+            && let (Some((x, z, _)), Some(view)) = (live, self.view)
+        {
+            let metres_per_pixel = if self.needs_live_zoom {
+                view.metres_per_pixel.clamp(CLOSEST, FOUND_ZOOM)
+            } else {
+                view.metres_per_pixel
+            };
+            self.needs_live_zoom = false;
+            self.view = Some(View {
+                x,
+                z,
+                metres_per_pixel,
+            });
+        }
         self.prepare(window, cx);
         let paint = self.tiles_to_paint();
         let names = self.names(cx);
@@ -1251,6 +1347,7 @@ impl Render for MapView {
         let driven_label = t!(cx, "map-view-driven");
         let not_driven_label = t!(cx, "map-view-not-driven");
         let truck_label = t!(cx, "map-view-truck");
+        let live_label = t!(cx, "map-view-live");
         let garages_label = t!(cx, "map-view-garages");
         let names_label = t!(cx, "map-view-names");
         let viewpoints_label = t!(cx, "gallery-viewpoints");
@@ -1272,7 +1369,12 @@ impl Render for MapView {
             gpui_kit::assets::IconName::Camera,
             cx,
         );
-        let (primary, muted, danger) = (theme.primary, theme.muted_foreground, theme.danger);
+        let (primary, muted, danger, info) = (
+            theme.primary,
+            theme.muted_foreground,
+            theme.danger,
+            theme.info,
+        );
         let legend = h_flex()
             .gap_1()
             .flex_wrap()
@@ -1300,6 +1402,21 @@ impl Render for MapView {
                 truck_label,
                 cx,
             ))
+            // Only while the game is heard: there's nothing to show or hide otherwise.
+            .children(live.is_some().then(|| {
+                item(
+                    "layer-live",
+                    Layer::Live,
+                    // An arrowhead, where the saved position is a dot: not told apart by colour
+                    // alone.
+                    gpui_kit::component::Icon::new(gpui_kit::assets::IconName::Navigation)
+                        .xsmall()
+                        .text_color(info)
+                        .into_any_element(),
+                    live_label,
+                    cx,
+                )
+            }))
             .child(item(
                 "layer-garages",
                 Layer::Garages,
@@ -1398,6 +1515,63 @@ impl Render for MapView {
             _ => None,
         };
 
+        // The running game's truck, over everything: on screen, with the way it points. Heading
+        // is 0 to 1 counterclockwise from north, and the screen's y grows downward (south).
+        let live_at = match (
+            live.filter(|_| self.layers.live),
+            self.view,
+            self.area.get(),
+        ) {
+            (Some((x, z, heading)), Some(view), Some(area)) => {
+                let angle = heading * std::f32::consts::TAU;
+                Some((to_screen(view, area, x, z), (-angle.sin(), -angle.cos())))
+                    .filter(|(at, _)| area.contains(at))
+            }
+            _ => None,
+        };
+
+        // Where the running game's truck has been, as runs of points on screen. A new run starts
+        // where two points are far apart: the truck was moved (a ferry, quick travel, a save
+        // loaded), not driven.
+        let mut trail_runs: Vec<Vec<Point<Pixels>>> = Vec::new();
+        if self.layers.live
+            && is_this_game
+            && let (Some(view), Some(area)) = (self.view, self.area.get())
+        {
+            let trail = crate::live::trail(cx);
+            let mut before: Option<[f32; 2]> = None;
+            for at in trail.iter() {
+                let is_new_run = before
+                    .is_none_or(|before| (at[0] - before[0]).hypot(at[1] - before[1]) > TRAIL_GAP);
+                if is_new_run {
+                    trail_runs.push(Vec::new());
+                }
+                if let Some(run) = trail_runs.last_mut() {
+                    // Zoomed out, many points fall on the same few pixels: only those that
+                    // move the line are kept, so a long session's trail stays cheap to draw.
+                    let on_screen = to_screen(view, area, at[0], at[1]);
+                    let moves_the_line = run.last().is_none_or(|last| {
+                        f32::from(on_screen.x - last.x).abs() >= TRAIL_DETAIL
+                            || f32::from(on_screen.y - last.y).abs() >= TRAIL_DETAIL
+                    });
+                    if moves_the_line {
+                        run.push(on_screen);
+                    }
+                }
+                before = Some(*at);
+            }
+        }
+        // The job's destination: the city's place on the map.
+        let destination_at = match (&self.destination, &self.places, self.view, self.area.get()) {
+            (Some(token), Some(places), Some(view), Some(area)) if self.layers.live => places
+                .cities
+                .iter()
+                .find(|city| &city.token == token)
+                .map(|city| to_screen(view, area, city.x, city.z))
+                .filter(|at| area.contains(at)),
+            _ => None,
+        };
+
         // What a click opens, in the order they're drawn, topmost first: the names (over the
         // map), the viewpoints and photo trophies, the truck, the garages.
         let mut targets = Vec::new();
@@ -1462,6 +1636,9 @@ impl Render for MapView {
             _ => None,
         };
         let marker = (theme.danger, theme.background);
+        // The arrow, its edge, and the disc behind it. Not the accent colour: that's the driven
+        // roads', which the truck is usually on.
+        let live_marker = (theme.info, theme.background, theme.foreground.opacity(0.22));
         let garage_colors = (theme.foreground, theme.background, theme.primary);
         let area = self.area.clone();
         let entity = cx.entity().downgrade();
@@ -1512,228 +1689,324 @@ impl Render for MapView {
                         BorderStyle::Solid,
                     ));
                 }
+                // Where the running game's truck has been: a line behind it.
+                for run in &trail_runs {
+                    let mut points = run.iter();
+                    let Some(first) = points.next() else {
+                        continue;
+                    };
+                    let mut line = gpui_kit::PathBuilder::stroke(px(TRAIL_WIDTH));
+                    line.move_to(*first);
+                    for at in points {
+                        line.line_to(*at);
+                    }
+                    if let Ok(line) = line.build() {
+                        window.paint_path(line, live_marker.0.opacity(0.7));
+                    }
+                }
+                // The job's destination: a flag on a pole, standing on the city.
+                if let Some(foot) = destination_at {
+                    let pole = Bounds::new(
+                        point(foot.x - px(1.0), foot.y - px(FLAG_POLE)),
+                        size(px(2.0), px(FLAG_POLE)),
+                    );
+                    let flag = Bounds::new(
+                        point(foot.x + px(1.0), foot.y - px(FLAG_POLE)),
+                        size(px(FLAG_WIDTH), px(FLAG_HEIGHT)),
+                    );
+                    for (shape, corner) in [(pole, 0.0), (flag, 1.5)] {
+                        window.paint_quad(quad(
+                            shape,
+                            px(corner),
+                            garage_colors.0,
+                            px(0.0),
+                            garage_colors.0,
+                            BorderStyle::Solid,
+                        ));
+                    }
+                    window.paint_quad(quad(
+                        square_around(foot, px(6.0), 0.0),
+                        px(3.0),
+                        garage_colors.0,
+                        px(0.0),
+                        garage_colors.0,
+                        BorderStyle::Solid,
+                    ));
+                }
+                // The running game's truck: an arrowhead pointing the way it drives, on a soft
+                // disc, as the game's own map shows the player.
+                if let Some((middle, (ahead_x, ahead_y))) = live_at {
+                    let halo = px(LIVE_HALO);
+                    window.paint_quad(quad(
+                        square_around(middle, halo * 2.0, 0.0),
+                        halo,
+                        live_marker.2,
+                        px(0.0),
+                        live_marker.2,
+                        BorderStyle::Solid,
+                    ));
+                    // The arrow is drawn pointing up, then turned: `ahead` is the way the truck
+                    // points on screen, `right` a quarter turn clockwise from it.
+                    let (right_x, right_y) = (-ahead_y, ahead_x);
+                    let turned = |x: f32, y: f32| {
+                        point(
+                            middle.x + px(x * right_x - y * ahead_x),
+                            middle.y + px(x * right_y - y * ahead_y),
+                        )
+                    };
+                    // Tip, right wing, the notch at the back, left wing.
+                    let outline = [
+                        turned(0.0, -LIVE_ARROW),
+                        turned(LIVE_ARROW * 0.72, LIVE_ARROW * 0.8),
+                        turned(0.0, LIVE_ARROW * 0.38),
+                        turned(-LIVE_ARROW * 0.72, LIVE_ARROW * 0.8),
+                    ];
+                    let shape = |mut path: gpui_kit::PathBuilder| {
+                        path.move_to(outline[0]);
+                        for corner in &outline[1..] {
+                            path.line_to(*corner);
+                        }
+                        path.close();
+                        path.build()
+                    };
+                    if let Ok(arrow) = shape(gpui_kit::PathBuilder::fill()) {
+                        window.paint_path(arrow, live_marker.0);
+                    }
+                    // An edge in the page's colour, so it stands out on roads of any colour.
+                    if let Ok(edge) = shape(gpui_kit::PathBuilder::stroke(px(1.5))) {
+                        window.paint_path(edge, live_marker.1);
+                    }
+                }
             },
         )
         .size_full();
 
-        v_flex().size_full().gap_3().child(legend).child(
-            div()
-                .id("map-view")
-                .relative()
-                .flex_1()
-                .min_h_0()
-                .overflow_hidden()
-                .rounded(theme.radius)
-                .border_1()
-                .border_color(theme.border)
-                // A pointer over what a click opens; elsewhere, the map is dragged.
-                .map(|this| {
-                    if self.hovered.is_some() {
-                        this.cursor_pointer()
-                    } else {
-                        this.cursor_grab()
-                    }
-                })
-                .on_hover(cx.listener(|this, is_hovered: &bool, _, cx| {
-                    if !*is_hovered {
-                        this.pointer = None;
-                        if this.hovered.take().is_some() {
-                            cx.notify();
+        let is_bare = self.is_bare;
+        v_flex()
+            .size_full()
+            .when(!is_bare, |this| this.gap_3().child(legend))
+            .child(
+                div()
+                    .id("map-view")
+                    .relative()
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_hidden()
+                    .when(!is_bare, |this| {
+                        this.rounded(theme.radius)
+                            .border_1()
+                            .border_color(theme.border)
+                    })
+                    // A pointer over what a click opens; elsewhere, the map is dragged.
+                    .map(|this| {
+                        if self.hovered.is_some() {
+                            this.cursor_pointer()
+                        } else {
+                            this.cursor_grab()
                         }
-                    }
-                }))
-                .on_scroll(
-                    cx.listener(|this, event: &gpui_kit::ScrollEvent, window, cx| {
-                        this.pointer = Some(event.position);
-                        let delta = f32::from(event.delta.pixel_delta(window.line_height()).y);
-                        // One wheel notch zooms by about a third.
-                        this.zoom((-delta / 70.0).exp(), Some(event.position), cx);
-                        cx.stop_propagation();
-                    }),
-                )
-                .on_mouse_down(
-                    MouseButton::Left,
-                    cx.listener(|this, event: &gpui_kit::MouseDownEvent, _, _| {
-                        if let Some(view) = this.view {
-                            this.drag = Some((event.position, view));
-                        }
-                    }),
-                )
-                .on_mouse_move(
-                    cx.listener(|this, event: &gpui_kit::MouseMoveEvent, _, cx| {
-                        this.pointer = Some(event.position);
-                        let Some((from, start)) = this.drag else {
-                            // Not dragging: drawn again only when what's under the pointer
-                            // changes.
-                            if this.target_at(event.position) != this.hovered {
+                    })
+                    .on_hover(cx.listener(|this, is_hovered: &bool, _, cx| {
+                        if !*is_hovered {
+                            this.pointer = None;
+                            if this.hovered.take().is_some() {
                                 cx.notify();
                             }
-                            return;
-                        };
-                        if event.pressed_button != Some(MouseButton::Left) {
-                            this.drag = None;
-                            return;
                         }
-                        let moved = event.position - from;
-                        this.view = Some(View {
-                            x: start.x - f32::from(moved.x) * start.metres_per_pixel,
-                            z: start.z - f32::from(moved.y) * start.metres_per_pixel,
-                            ..start
-                        });
-                        cx.notify();
-                    }),
-                )
-                .on_mouse_up(
-                    MouseButton::Left,
-                    cx.listener(|this, event: &gpui_kit::MouseUpEvent, window, cx| {
-                        let Some((from, _)) = this.drag.take() else {
-                            return;
-                        };
-                        // What's under the pointer counts again now the drag is over.
-                        cx.notify();
-                        // Let go about where it was pressed: a click, not a drag.
-                        let moved = event.position - from;
-                        let is_click = f32::from(moved.x).abs() <= CLICK_SLOP
-                            && f32::from(moved.y).abs() <= CLICK_SLOP;
-                        if is_click && let Some(target) = this.target_at(event.position) {
-                            this.open(target, window, cx);
+                    }))
+                    .on_scroll(
+                        cx.listener(|this, event: &gpui_kit::ScrollEvent, window, cx| {
+                            this.pointer = Some(event.position);
+                            let delta = f32::from(event.delta.pixel_delta(window.line_height()).y);
+                            // One wheel notch zooms by about a third.
+                            this.zoom((-delta / 70.0).exp(), Some(event.position), cx);
+                            cx.stop_propagation();
+                        }),
+                    )
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|this, event: &gpui_kit::MouseDownEvent, _, _| {
+                            if let Some(view) = this.view {
+                                this.drag = Some((event.position, view));
+                            }
+                        }),
+                    )
+                    .on_mouse_move(
+                        cx.listener(|this, event: &gpui_kit::MouseMoveEvent, _, cx| {
+                            this.pointer = Some(event.position);
+                            let Some((from, start)) = this.drag else {
+                                // Not dragging: drawn again only when what's under the pointer
+                                // changes.
+                                if this.target_at(event.position) != this.hovered {
+                                    cx.notify();
+                                }
+                                return;
+                            };
+                            if event.pressed_button != Some(MouseButton::Left) {
+                                this.drag = None;
+                                return;
+                            }
+                            let moved = event.position - from;
+                            // The player takes the map: it stops following the truck.
+                            this.follows_live = false;
+                            this.view = Some(View {
+                                x: start.x - f32::from(moved.x) * start.metres_per_pixel,
+                                z: start.z - f32::from(moved.y) * start.metres_per_pixel,
+                                ..start
+                            });
+                            cx.notify();
+                        }),
+                    )
+                    .on_mouse_up(
+                        MouseButton::Left,
+                        cx.listener(|this, event: &gpui_kit::MouseUpEvent, window, cx| {
+                            let Some((from, _)) = this.drag.take() else {
+                                return;
+                            };
+                            // What's under the pointer counts again now the drag is over.
+                            cx.notify();
+                            // Let go about where it was pressed: a click, not a drag.
+                            let moved = event.position - from;
+                            let is_click = f32::from(moved.x).abs() <= CLICK_SLOP
+                                && f32::from(moved.y).abs() <= CLICK_SLOP;
+                            if is_click && let Some(target) = this.target_at(event.position) {
+                                this.open(target, window, cx);
+                            }
+                        }),
+                    )
+                    .child(map)
+                    // Viewpoints (an eye) and photo trophies (a camera): filled once visited or
+                    // captured, hollow before (so it doesn't rest on colour alone).
+                    .children(gallery_markers.into_iter().map(|marker| {
+                        let offset = self.area.get().map(|area| area.origin).unwrap_or_default();
+                        let side = marker.side();
+                        let is_hovered = self.hovered.as_ref()
+                            == Some(&Target::Gallery(marker.kind, marker.id.clone()));
+                        // Zoomed in, the game's own icon, as its map shows it (ringed when hovered).
+                        let game_icon = marker
+                            .has_icon
+                            .then(|| game_data::map_icon(cx, marker.game_icon_name()))
+                            .flatten();
+                        if let Some(icon) = game_icon {
+                            // A ring two pixels out, there always (clear unless hovered) so the
+                            // icon doesn't move when it shows.
+                            let ring = px(2.0);
+                            return div()
+                                .absolute()
+                                .left(marker.at.x - offset.x - side / 2.0 - ring)
+                                .top(marker.at.y - offset.y - side / 2.0 - ring)
+                                .size(side + ring * 2.0)
+                                .border_2()
+                                .rounded(px(4.0))
+                                .border_color(if is_hovered {
+                                    theme.primary
+                                } else {
+                                    gpui_kit::transparent_black()
+                                })
+                                .child(
+                                    crate::ui::GameIconView::new(icon)
+                                        .size(f32::from(side) / f32::from(window.rem_size())),
+                                )
+                                .into_any_element();
                         }
-                    }),
-                )
-                .child(map)
-                // Viewpoints (an eye) and photo trophies (a camera): filled once visited or
-                // captured, hollow before (so it doesn't rest on colour alone).
-                .children(gallery_markers.into_iter().map(|marker| {
-                    let offset = self.area.get().map(|area| area.origin).unwrap_or_default();
-                    let side = marker.side();
-                    let is_hovered = self.hovered.as_ref()
-                        == Some(&Target::Gallery(marker.kind, marker.id.clone()));
-                    // Zoomed in, the game's own icon, as its map shows it (ringed when hovered).
-                    let game_icon = marker
-                        .has_icon
-                        .then(|| game_data::map_icon(cx, marker.game_icon_name()))
-                        .flatten();
-                    if let Some(icon) = game_icon {
-                        // A ring two pixels out, there always (clear unless hovered) so the
-                        // icon doesn't move when it shows.
-                        let ring = px(2.0);
-                        return div()
+                        // Dots (zoomed out, or without the game's icons) in the game's colour for
+                        // the kind: the viewpoint's purple, the captured photo trophy's orange.
+                        let kind_colour = match marker.kind {
+                            GalleryKind::Viewpoint => game_colour(cx, "viewpoint", gamedata::RED),
+                            GalleryKind::Landmark => {
+                                game_colour(cx, "photo_sight_captured", gamedata::GREEN)
+                            }
+                        }
+                        .unwrap_or(theme.foreground);
+                        let (fill, ink) = if marker.is_done {
+                            (kind_colour, theme.background)
+                        } else {
+                            (theme.background, theme.muted_foreground)
+                        };
+                        let icon = match marker.kind {
+                            GalleryKind::Viewpoint => gpui_kit::assets::IconName::Eye,
+                            GalleryKind::Landmark => gpui_kit::assets::IconName::Camera,
+                        };
+                        div()
                             .absolute()
-                            .left(marker.at.x - offset.x - side / 2.0 - ring)
-                            .top(marker.at.y - offset.y - side / 2.0 - ring)
-                            .size(side + ring * 2.0)
-                            .border_2()
-                            .rounded(px(4.0))
+                            .left(marker.at.x - offset.x - side / 2.0)
+                            .top(marker.at.y - offset.y - side / 2.0)
+                            .size(side)
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .rounded_full()
+                            .bg(fill)
+                            .border_1()
+                            .when(!marker.is_done, |this| this.border_2())
                             .border_color(if is_hovered {
                                 theme.primary
+                            } else if marker.is_done {
+                                theme.background
                             } else {
-                                gpui_kit::transparent_black()
+                                kind_colour
                             })
-                            .child(
-                                crate::ui::GameIconView::new(icon)
-                                    .size(f32::from(side) / f32::from(window.rem_size())),
-                            )
-                            .into_any_element();
-                    }
-                    // Dots (zoomed out, or without the game's icons) in the game's colour for
-                    // the kind: the viewpoint's purple, the captured photo trophy's orange.
-                    let kind_colour = match marker.kind {
-                        GalleryKind::Viewpoint => game_colour(cx, "viewpoint", gamedata::RED),
-                        GalleryKind::Landmark => {
-                            game_colour(cx, "photo_sight_captured", gamedata::GREEN)
-                        }
-                    }
-                    .unwrap_or(theme.foreground);
-                    let (fill, ink) = if marker.is_done {
-                        (kind_colour, theme.background)
-                    } else {
-                        (theme.background, theme.muted_foreground)
-                    };
-                    let icon = match marker.kind {
-                        GalleryKind::Viewpoint => gpui_kit::assets::IconName::Eye,
-                        GalleryKind::Landmark => gpui_kit::assets::IconName::Camera,
-                    };
-                    div()
-                        .absolute()
-                        .left(marker.at.x - offset.x - side / 2.0)
-                        .top(marker.at.y - offset.y - side / 2.0)
-                        .size(side)
-                        .flex()
-                        .items_center()
-                        .justify_center()
-                        .rounded_full()
-                        .bg(fill)
-                        .border_1()
-                        .when(!marker.is_done, |this| this.border_2())
-                        .border_color(if is_hovered {
-                            theme.primary
-                        } else if marker.is_done {
-                            theme.background
-                        } else {
-                            kind_colour
-                        })
-                        .when(marker.has_icon, |this| {
-                            this.child(
-                                gpui_kit::component::Icon::new(icon)
-                                    .size(px(GALLERY_MARKER - 6.0))
-                                    .text_color(ink),
-                            )
-                        })
-                        .into_any_element()
-                }))
-                // Cities' names over the map: the ones visited in full colour.
-                .children(names.into_iter().map(|name| {
-                    let offset = self.area.get().map(|area| area.origin).unwrap_or_default();
-                    let is_hovered = hovered_city.as_ref() == Some(&name.token);
-                    div()
-                        .absolute()
-                        .left(name.room.origin.x - offset.x)
-                        .top(name.room.origin.y - offset.y)
-                        .px_1()
-                        .rounded(theme.radius)
-                        .bg(theme.background.opacity(0.7))
-                        .text_xs()
-                        .whitespace_nowrap()
-                        .text_color(if name.is_visited || is_hovered {
-                            theme.foreground
-                        } else {
-                            theme.muted_foreground
-                        })
-                        // The city found: in the accent colour, so it's seen at once (and not by
-                        // colour alone: it's the one always named, in the middle).
-                        .when(name.is_found, |this| {
-                            this.bg(theme.primary).text_color(theme.primary_foreground)
-                        })
-                        // Hovered, it reads as a link: a click opens the city.
-                        .when(is_hovered, |this| this.underline())
-                        .child(name.name)
-                }))
-                .children(hover_label.map(|(top_right, height, label)| {
-                    let offset = self.area.get().map(|area| area.origin).unwrap_or_default();
-                    div()
-                        .absolute()
-                        .left(top_right.x - offset.x + px(2.0))
-                        .top(top_right.y - offset.y + height / 2.0 - px(NAME_HEIGHT / 2.0))
-                        .px_1()
-                        .rounded(theme.radius)
-                        .bg(theme.background.opacity(0.85))
-                        .text_xs()
-                        .whitespace_nowrap()
-                        .text_color(theme.foreground)
-                        .child(label)
-                }))
-                .children(message.map(|message| {
-                    div()
-                        .absolute()
-                        .inset_0()
-                        .flex()
-                        .items_center()
-                        .justify_center()
-                        .text_sm()
-                        .text_color(theme.muted_foreground)
-                        .child(message)
-                })),
-        )
+                            .when(marker.has_icon, |this| {
+                                this.child(
+                                    gpui_kit::component::Icon::new(icon)
+                                        .size(px(GALLERY_MARKER - 6.0))
+                                        .text_color(ink),
+                                )
+                            })
+                            .into_any_element()
+                    }))
+                    // Cities' names over the map: the ones visited in full colour.
+                    .children(names.into_iter().map(|name| {
+                        let offset = self.area.get().map(|area| area.origin).unwrap_or_default();
+                        let is_hovered = hovered_city.as_ref() == Some(&name.token);
+                        div()
+                            .absolute()
+                            .left(name.room.origin.x - offset.x)
+                            .top(name.room.origin.y - offset.y)
+                            .px_1()
+                            .rounded(theme.radius)
+                            .bg(theme.background.opacity(0.7))
+                            .text_xs()
+                            .whitespace_nowrap()
+                            .text_color(if name.is_visited || is_hovered {
+                                theme.foreground
+                            } else {
+                                theme.muted_foreground
+                            })
+                            // The city found: in the accent colour, so it's seen at once (and not by
+                            // colour alone: it's the one always named, in the middle).
+                            .when(name.is_found, |this| {
+                                this.bg(theme.primary).text_color(theme.primary_foreground)
+                            })
+                            // Hovered, it reads as a link: a click opens the city.
+                            .when(is_hovered, |this| this.underline())
+                            .child(name.name)
+                    }))
+                    .children(hover_label.map(|(top_right, height, label)| {
+                        let offset = self.area.get().map(|area| area.origin).unwrap_or_default();
+                        div()
+                            .absolute()
+                            .left(top_right.x - offset.x + px(2.0))
+                            .top(top_right.y - offset.y + height / 2.0 - px(NAME_HEIGHT / 2.0))
+                            .px_1()
+                            .rounded(theme.radius)
+                            .bg(theme.background.opacity(0.85))
+                            .text_xs()
+                            .whitespace_nowrap()
+                            .text_color(theme.foreground)
+                            .child(label)
+                    }))
+                    .children(message.map(|message| {
+                        div()
+                            .absolute()
+                            .inset_0()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .text_sm()
+                            .text_color(theme.muted_foreground)
+                            .child(message)
+                    })),
+            )
     }
 }
 

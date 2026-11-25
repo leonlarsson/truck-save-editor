@@ -166,6 +166,25 @@ Agreed work, in order. Each step should end with something the owner can see or 
 - [ ] A log of what the editor did, viewable in the app.
 - [ ] French and Spanish (languages are the owner's call).
 
+## Live (2026-11-25, prototype)
+
+The running game in the editor (`docs/decisions.md`). Built without the game at hand; nothing below is checked in game yet.
+
+- [x] The plugin (`crates/live-plugin`, the game's telemetry SDK), the snapshot and the connection (`crates/live`), the Live page (numbers, job, wear, events, a map that follows the truck) and a live marker on World map.
+- [x] In game (owner, 2026-11-25, both games): the plugin added from the Live page, the page filling in, the marker on the right road and pointing the right way, fines showing as they happen, pausing, quitting, and removing the plugin while driving.
+- [ ] In game: a delivery and a toll showing up with their amounts; a cargo job's strip and destination flag.
+- [ ] Live without a save open (from the start screen).
+- [x] Remove the plugin from anywhere on Live, at any time (2026-11-25): the Plugin menu is on the page whatever the game is doing. While the game has the file loaded it's renamed out of the way (so the game doesn't load it again) and deleted once the game has closed. Tried in game (owner, 2026-11-25, ATS): removed while driving, Live keeps working until the game closes.
+- [x] Live has its own place at the top of the sidebar, with whether the game is heard; the page is map-first, with the numbers in cards over the map (2026-11-25, designs agreed with the owner).
+- [x] The plugin ships inside the .exe (2026-11-25).
+- [x] A session tally (driven, earned, XP, fines and tolls), the speed limit as a sign with Over the limit, the road driven this session as a trail, the job's destination flagged, an Experimental tag (2026-11-25). The tally needs the newer plugin: the page says so, and the Plugin menu updates it.
+- [ ] Money, XP and level kept current (the last save plus the events), and the newest autosave read when the game writes one.
+- [ ] The route travelled this session drawn on the map; the job's destination marked.
+- [ ] The game's names for fines; the README and a screenshot once it's past a prototype.
+- [ ] Live editing: Apply through the game's quick save and quick load (the plugin can press both). Needs the in-game check that quick load reads the file from disk.
+- [ ] The release that brings Live: the owner's recording (`docs/screenshots/live.gif`, in the README) goes in its notes too, copied to `docs/release-notes/<version>/`.
+- [x] In ATS (owner, 2026-11-25): the page fills in with mph, gallons, miles and dollars, on ATS's map, with the arrow and the trail on the right roads.
+
 ## Later
 
 - [ ] American Truck Simulator: test on real ATS saves (the code is written for both from the start). Until then, ATS profiles and saves show a warning (2026-11-22). Still ETS2-only: the game's data (city names, ranks, engines, icons, the DLC check), distances in miles, and Settings (the game's folder, whether it's running, its config.cfg).

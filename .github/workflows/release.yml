@@ -36,8 +36,20 @@ jobs:
             exit 1
           }
           "version=$version" >> $env:GITHUB_OUTPUT
-      - run: cargo test --locked -p sii -p save -p hashfs -p gamedata -p app
+      - run: cargo test --locked -p sii -p save -p hashfs -p gamedata -p live -p app
+      # Live's plugin first: the app's build puts it inside the .exe (crates/app/build.rs).
+      - run: cargo build --locked -p live-plugin --release
       - run: cargo build --locked -p app --release
+      - name: Check the plugin is inside the .exe
+        shell: pwsh
+        run: |
+          $exe = [System.IO.File]::ReadAllBytes("target/release/truck-save-editor.exe")
+          # The plugin's entry point is named in its bytes, and nowhere in the app's own code.
+          $text = [System.Text.Encoding]::ASCII.GetString($exe)
+          if (-not $text.Contains("scs_telemetry_init")) {
+            Write-Error "The .exe doesn't carry Live's plugin (tse_live.dll). Was it built before the app?"
+            exit 1
+          }
       - name: Check the .exe (no C runtime DLL, no console window)
         shell: pwsh
         run: |

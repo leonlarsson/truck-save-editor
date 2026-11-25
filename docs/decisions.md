@@ -535,6 +535,20 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 
 **Considered:** editing the title by hand when publishing (the step that slipped before).
 
+## 2026-11-25: Live: a plugin in the game tells the editor what's happening (prototype)
+
+**Decided:** the editor can show the running game: the truck on the map, speed, fuel, the job, wear, and deliveries, fines and tolls as they happen (the Live page, and a live marker on every map). The game's own telemetry SDK gives this to plugins it loads from `bin\win_x64\plugins`, so there is a plugin: `crates/live-plugin` (`tse_live.dll`), which the Live page copies into the game's folder when asked, and removes again. The plugin sends a snapshot as one line of JSON ten times a second to whoever connects on `127.0.0.1:47227`; the editor keeps looking for it. Everything but the SDK's C interface lives in `crates/live` (the snapshot, the line format, both ends of the connection), tested without the game.
+
+**Why:** the owner asked for it (a live dashboard first, live editing after). The SDK is the game's supported way in: it survives game updates, where reading the game's memory would break on each one. It is read-only by nature, which keeps "never lose a save" out of the question for this part.
+
+**`unsafe`, in one crate:** the SDK is C (pointers, C strings, callbacks), so `live-plugin` alone leaves the workspace's `unsafe_code = "forbid"`, with every block explained, the structures' sizes checked at compile time as the SDK's headers check them, and no panics (one would end the game). The app and every other crate stay without.
+
+**The connection:** loopback TCP from Rust's own library needs no `unsafe` and no new dependency on either side, and Windows doesn't ask about the firewall for `127.0.0.1`. The plugin reads nothing the editor sends. This is not "using the network" in the sense of `updates.rs`: nothing leaves the computer.
+
+**Open (this is a prototype):** not yet run in the game. Releases are a single .exe, and the plugin is a second file the app looks for beside itself: how it ships (inside the .exe, or a zip) is undecided, so until then a downloaded release says the plugin file is missing. Money, XP and level aren't in the telemetry (they could be kept current from the last save plus the delivery, fine and toll events). Live needs a save open, since it's a page of the workspace. Both games running at once share one port: the second isn't heard.
+
+**Considered:** shared memory between plugin and editor (`unsafe` in the app too); a named pipe (not in Rust's own library); reading the game's memory (breaks on every game update); watching the save folder for autosaves alone (nothing to install, but minutes old: still worth having as the fallback).
+
 ## 2026-11-25: The map draws roads as lines, from the map's nodes
 
 **Decided:** `gamedata` reads the nodes of the game's map (`.base` sector files: a position, a rotation, the item behind and the item ahead) and makes a line for each road, from the node it's ahead of to the node it's behind, curved the way the nodes point (a Hermite curve, as the game lays roads). The map view draws those lines in its tiles; a road or junction without one keeps its dot. Roads as dots in the map's legend (kept in the settings) draws every road as a dot again, as before. A junction's own lanes are in its prefab's file, which isn't read: one with two ends is the curve between them, one with more a line from each end to their middle.
@@ -543,3 +557,20 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 
 **Considered:** reading every item's full layout to find its nodes (dozens of item kinds, each changing between map formats: the reason items are recognised where they start instead); the prefabs' own files for junctions' real lanes (the next step if junctions look too rough); joining dots by nearness (wrong at every interchange).
 
+## 2026-11-25: Live's plugin ships inside the .exe, and can be removed at any time
+
+**Decided:** the app's build puts `tse_live.dll` inside the .exe (`build.rs`, when the plugin was built first, as `scripts/windows.sh` and CI do); Add the plugin writes it into the game's folder. This replaces "beside the .exe" from the entry above. Removing (and updating) works while the game runs: Windows won't delete a library in use but lets it be renamed, so the file is renamed to `tse_live.dll.removed` (the game only loads `.dll` files) and deleted the next time the editor looks once the game has let go. The plugin sends a version with every snapshot, so the editor can offer to update an older one.
+
+**Why:** one file to download, nothing fetched from the network, and the plugin always matches the editor. Removing at any time was the owner's ask: the page only offered it before the game was heard, and a delete fails mid-game.
+
+**Considered:** a separate download the editor fetches and checks against a fingerprint (more to build and to go wrong: offline, blocked, half-finished); a zip with both files (changes what a release is); a link for the player to download the plugin themselves (steps to follow, for something the editor can do in one click).
+
+**Tried in game (owner, 2026-11-25):** removed while driving in ATS: the page says the running game keeps using it, and Live keeps working until the game closes.
+
+## 2026-11-25: Live is map-first, at the top of the sidebar
+
+**Decided:** Live is the sidebar's first entry (under a short heading of its own, since the kit's sidebar takes groups only), with what the game is doing beside its name. The page is the map, edge to edge (`MapView::bare`), following the truck, with cards over it (`ui::MapCard`): the speed against the limit as a road sign, fuel, rest and the clock; the truck's wear as bars; this session (driven, earned, XP, fines and tolls, counted by the plugin since the game started) with the newest events; the job along the foot as a bar from origin to destination. The road driven this session is drawn as a trail, and the job's destination is flagged. A Plugin menu and an Experimental tag are always on the page.
+
+**Why:** the owner found it hidden under Map ("it's a lot more than a map"), and picked this layout from four designs (map first, a dashboard, the setup steps, the Plugin menu).
+
+**Considered:** a dashboard of panels with the map as one of them (the map is the best part, and it was squeezed); the plugin's controls on Game settings (out of reach from where the player is when they want it gone).

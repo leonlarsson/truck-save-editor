@@ -42,8 +42,9 @@ mod vehicle_edits;
 
 pub use career::{ADR_ALL, Career, CoachSkills, MAX_COACH_SKILL_LEVEL, MAX_SKILL_LEVEL, Skills};
 pub use coach::{
-    CoachService, CoachStats, coach_services, coach_stats, discover_bus_stops,
-    perfect_satisfaction, set_coach_distance, set_coach_passengers,
+    CoachService, CoachStats, CurrentCoachService, coach_services, coach_stats,
+    current_coach_service, discover_bus_stops, perfect_satisfaction, set_coach_distance,
+    set_coach_passengers,
 };
 pub use copies::{VehicleCopyProblem, copy_coach, copy_targets, copy_vehicle};
 pub use current_job::{CurrentJob, JobKind, cancel_job, current_job, remove_job_deadline};

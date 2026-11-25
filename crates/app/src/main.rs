@@ -14,6 +14,7 @@ mod game_data;
 mod game_icons;
 mod i18n;
 mod labels;
+mod live;
 mod pages;
 mod palette;
 mod quick_start;
@@ -100,13 +101,14 @@ fn main() {
             updates::init(cx);
             theme::init(cx);
             game_data::init(cx);
+            live::init(cx);
             bind_keys(cx);
             crash_for_testing();
 
             let options = WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
                     None,
-                    dev_window_size().unwrap_or(size(px(1200.), px(800.))),
+                    dev_window_size().unwrap_or(size(px(1360.), px(860.))),
                     cx,
                 ))),
                 window_min_size: Some(size(px(880.), px(560.))),

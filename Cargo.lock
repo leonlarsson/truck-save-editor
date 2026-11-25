@@ -225,6 +225,7 @@ dependencies = [
  "gpui-kit",
  "hashfs",
  "image",
+ "live",
  "save",
  "serde_json",
  "sii",
@@ -4143,6 +4144,21 @@ name = "litrs"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4744e383959f0db86ede514b809b1c53251889093803c05267acc7d4e7030d70"
+
+[[package]]
+name = "live"
+version = "0.4.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "live-plugin"
+version = "0.4.0"
+dependencies = [
+ "live",
+]
 
 [[package]]
 name = "lock_api"

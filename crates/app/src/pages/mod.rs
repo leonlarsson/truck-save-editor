@@ -12,6 +12,7 @@ pub mod game_settings;
 pub mod garages;
 pub mod jobs;
 pub mod licences;
+pub mod live;
 pub mod map_view;
 pub mod new_job;
 pub mod open_save;
@@ -33,6 +34,8 @@ use gpui_kit::assets::IconName;
 /// editor's own), at its foot.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Page {
+    /// The running game (first in the sidebar, above the save's own pages).
+    Live,
     Overview,
     Statistics,
     CoachCareer,
@@ -49,7 +52,8 @@ pub enum Page {
 }
 
 impl Page {
-    pub const ALL: [Page; 13] = [
+    pub const ALL: [Page; 14] = [
+        Page::Live,
         Page::Overview,
         Page::Statistics,
         Page::CoachCareer,
@@ -67,6 +71,9 @@ impl Page {
     /// Coach career shows only for a save with a coach career (see `is_shown`).
     pub const CAREER: [Page; 3] = [Page::Overview, Page::Statistics, Page::CoachCareer];
     pub const COMPANY: [Page; 4] = [Page::Fleet, Page::Garages, Page::Drivers, Page::Jobs];
+    /// Live stands alone at the top of the sidebar: it's about the running game, not one part of
+    /// the save.
+    pub const LIVE: [Page; 1] = [Page::Live];
     /// The map's pages: the cities, the map itself (the game's World map), the Gallery.
     pub const MAP: [Page; 3] = [Page::Cities, Page::WorldMap, Page::Gallery];
     pub const ADVANCED: [Page; 2] = [Page::AllData, Page::GameSettings];
@@ -87,6 +94,7 @@ impl Page {
             Page::Cities => t!(cx, "page-cities"),
             Page::WorldMap => t!(cx, "page-world-map"),
             Page::Gallery => t!(cx, "page-gallery"),
+            Page::Live => t!(cx, "page-live"),
             Page::Jobs => t!(cx, "page-jobs"),
             Page::AllData => t!(cx, "page-all-data"),
             Page::GameSettings => t!(cx, "page-game-settings"),
@@ -106,6 +114,7 @@ impl Page {
             Page::Cities => "cities",
             Page::WorldMap => "world-map",
             Page::Gallery => "gallery",
+            Page::Live => "live",
             Page::Jobs => "jobs",
             Page::AllData => "all-data",
             Page::GameSettings => "game-settings",
@@ -124,6 +133,7 @@ impl Page {
             Page::Cities => IconName::Building2,
             Page::WorldMap => IconName::Map,
             Page::Gallery => IconName::Camera,
+            Page::Live => IconName::Radio,
             Page::Jobs => IconName::Container,
             Page::AllData => IconName::Database,
             Page::GameSettings => IconName::Gamepad2,

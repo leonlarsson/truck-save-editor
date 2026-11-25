@@ -1,0 +1,27 @@
+[package]
+name = "live-plugin"
+description = "The plugin the game loads (through its own telemetry SDK) to tell the editor what's happening while it runs. Read-only."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+# `tse_live.dll`, for the game's `bin\win_x64\plugins` folder.
+name = "tse_live"
+crate-type = ["cdylib"]
+
+[dependencies]
+live = { path = "../live" }
+
+# Not the workspace's lints: this is the one crate that may use `unsafe`, because the game's SDK is
+# a C interface (see docs/decisions.md). Everything else is as strict as the rest.
+[lints.rust]
+unsafe_code = "allow"
+unsafe_op_in_unsafe_fn = "deny"
+
+[lints.clippy]
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+undocumented_unsafe_blocks = "warn"

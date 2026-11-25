@@ -87,6 +87,84 @@ pub fn coach_services(document: &Document) -> Vec<CoachService> {
         .collect()
 }
 
+/// The coach service being driven: `player.current_bus_job` points at a `player_bus_job`, whose
+/// `stages[]` are `player_bus_job_stage` units (one per leg, each from a `source_bus_stop` to a
+/// `target_bus_stop`), `stage_idx` the leg being driven, and `passengers[]` who's on board.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct CurrentCoachService {
+    /// The leg being driven, counting from 1, and how many there are.
+    pub stage: usize,
+    pub stages: usize,
+    /// The stops of the leg being driven, as the save names them (`bus_stop.city.berlin`, or
+    /// `bus_stop.viewpoints.<name>` for a stop at a viewpoint).
+    pub from_stop: String,
+    pub to_stop: String,
+    /// The leg's planned length.
+    pub planned_distance_km: i64,
+    /// When it should arrive, in the game's minutes; `None` when the game hasn't planned it yet.
+    pub planned_arrival: Option<i64>,
+    pub passengers: usize,
+    /// How happy the passengers on board are, 0 to 1: the average of each one's own
+    /// (`player_bus_passenger.satisfaction`), which is what the game shows. `None` without
+    /// passengers.
+    pub satisfaction: Option<f32>,
+}
+
+impl CurrentCoachService {
+    /// The city a stop is in, by token, when it's a city's stop (`bus_stop.city.berlin`).
+    pub fn stop_city(stop: &str) -> Option<&str> {
+        stop.strip_prefix("bus_stop.city.")
+    }
+}
+
+/// The coach service being driven, if there is one.
+pub fn current_coach_service(document: &Document) -> Option<CurrentCoachService> {
+    let player = document
+        .first_of_kind("economy")?
+        .single("player")
+        .and_then(|id| document.unit(id))?;
+    let job = document
+        .unit(player.single("current_bus_job")?)
+        .filter(|unit| unit.kind == "player_bus_job")?;
+    let stages = job.items("stages");
+    let index = job
+        .single("stage_idx")
+        .and_then(value::parse_i64)
+        .and_then(|index| usize::try_from(index).ok())
+        .unwrap_or(0);
+    let stage = document.unit(stages.get(index)?)?;
+    let text = |field: &str| stage.single(field).unwrap_or_default().to_string();
+    let passengers: Vec<&String> = job
+        .items("passengers")
+        .iter()
+        .filter(|id| id.as_str() != "null")
+        .collect();
+    let moods: Vec<f32> = passengers
+        .iter()
+        .filter_map(|id| document.unit(id))
+        .filter_map(|passenger| passenger.single("satisfaction").and_then(value::parse_f32))
+        .collect();
+    let satisfaction = (!moods.is_empty())
+        .then(|| (moods.iter().sum::<f32>() / moods.len() as f32).clamp(0.0, 1.0));
+    Some(CurrentCoachService {
+        stage: index + 1,
+        stages: stages.len(),
+        from_stop: text("source_bus_stop"),
+        to_stop: text("target_bus_stop"),
+        planned_distance_km: stage
+            .single("planned_distance")
+            .and_then(value::parse_i64)
+            .unwrap_or(0),
+        // The game writes the largest 32-bit number for "not planned yet".
+        planned_arrival: stage
+            .single("planned_arrival_time")
+            .and_then(value::parse_i64)
+            .filter(|minutes| *minutes < i64::from(u32::MAX)),
+        passengers: passengers.len(),
+        satisfaction,
+    })
+}
+
 /// The ids of the coach job log's entries, in the log's order.
 fn log_entries(document: &Document) -> Vec<String> {
     let Some(log) = document
@@ -276,6 +354,28 @@ mod tests {
 
     /// Two services (30 and 10 passengers), three bus stops, one of them found.
     const SAVE: &str = "SiiNunit\r\n{\r\neconomy : e {\r\n bus_job_log: log\r\n bus_stops: 3\r\n bus_stops[0]: stop.a\r\n bus_stops[1]: stop.b\r\n bus_stops[2]: stop.c\r\n total_distances_by_mode: 3\r\n total_distances_by_mode[0]: 9000\r\n total_distances_by_mode[1]: 450\r\n total_distances_by_mode[2]: 0\r\n}\r\n\r\nbus_job_log : log {\r\n entries: 2\r\n entries[0]: job.1\r\n entries[1]: job.2\r\n}\r\n\r\nbus_job_log_entry : job.1 {\r\n source_bus_stop_name: \"city.harbourtown\"\r\n target_bus_stop_name: \"city.hilltown\"\r\n stage_count: 2\r\n exp_delta: 120\r\n reward: 3400\r\n travelled_distance: 211.6\r\n end_time: 3000\r\n total_passengers: 30\r\n satisfaction: 0.5\r\n}\r\n\r\nbus_job_log_entry : job.2 {\r\n total_passengers: 10\r\n satisfaction: 1\r\n}\r\n\r\nbus_stop : stop.a {\r\n discovered: true\r\n}\r\n\r\nbus_stop : stop.b {\r\n discovered: false\r\n}\r\n\r\nbus_stop : stop.c {\r\n discovered: false\r\n}\r\n\r\n}\r\n";
+
+    #[test]
+    fn reads_the_service_being_driven() {
+        const DRIVING: &str = "SiiNunit\r\n{\r\neconomy : e {\r\n player: p\r\n}\r\n\r\nplayer : p {\r\n current_bus_job: bus.job\r\n}\r\n\r\nplayer_bus_job : bus.job {\r\n stages: 2\r\n stages[0]: stage.1\r\n stages[1]: stage.2\r\n stage_idx: 1\r\n passengers: 2\r\n passengers[0]: rider.1\r\n passengers[1]: rider.2\r\n}\r\n\r\nplayer_bus_passenger : rider.1 {\r\n satisfaction: 1\r\n}\r\n\r\nplayer_bus_passenger : rider.2 {\r\n satisfaction: 0.5\r\n}\r\n\r\nplayer_bus_job_stage : stage.1 {\r\n source_bus_stop: bus_stop.city.harbourtown\r\n target_bus_stop: bus_stop.viewpoints.oldmill\r\n planned_distance: 120\r\n planned_arrival_time: 5000\r\n}\r\n\r\nplayer_bus_job_stage : stage.2 {\r\n source_bus_stop: bus_stop.viewpoints.oldmill\r\n target_bus_stop: bus_stop.city.hilltown\r\n planned_distance: 90\r\n planned_arrival_time: 4294967295\r\n}\r\n\r\n}\r\n";
+        let document = sii::parse_text(DRIVING).expect("parses");
+        let service = current_coach_service(&document).expect("a service is being driven");
+        assert_eq!((service.stage, service.stages), (2, 2));
+        assert_eq!(service.from_stop, "bus_stop.viewpoints.oldmill");
+        assert_eq!(
+            CurrentCoachService::stop_city(&service.to_stop),
+            Some("hilltown")
+        );
+        assert_eq!(CurrentCoachService::stop_city(&service.from_stop), None);
+        assert_eq!(service.planned_distance_km, 90);
+        assert_eq!(service.planned_arrival, None);
+        assert_eq!(service.passengers, 2);
+        assert_eq!(service.satisfaction, Some(0.75));
+
+        // No service: the save in the other tests has none.
+        let document = sii::parse_text(SAVE).expect("parses");
+        assert_eq!(current_coach_service(&document), None);
+    }
 
     #[test]
     fn lists_the_services() {

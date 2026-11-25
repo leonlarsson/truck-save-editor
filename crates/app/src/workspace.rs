@@ -175,7 +175,19 @@ pub struct Workspace {
     /// A save that's loaded, waiting for the game's data (names, levels) so its pages don't show
     /// fallbacks first and then change.
     waiting: Option<Session>,
+    /// What the sidebar's Live entry last said the game is doing (heard, paused), so the sidebar
+    /// is drawn again only when that changes, not ten times a second while driving.
+    live_state: (bool, bool),
     _subscriptions: Vec<Subscription>,
+}
+
+/// What the game is doing, as the sidebar's Live entry says it: whether it's heard, and whether
+/// it's paused.
+fn live_state(cx: &App) -> (bool, bool) {
+    match crate::live::snapshot(cx) {
+        Some(snapshot) => (true, snapshot.is_paused),
+        None => (false, false),
+    }
 }
 
 /// An open save and the pages showing it.
@@ -191,6 +203,7 @@ struct Opened {
     cities: Entity<CitiesPage>,
     world_map: Entity<crate::pages::world_map::WorldMapPage>,
     gallery: Entity<crate::pages::gallery::GalleryView>,
+    live: Entity<crate::pages::live::LivePage>,
     jobs: Entity<JobsPage>,
     game_settings: Entity<crate::pages::game_settings::GameSettingsPage>,
     settings: Entity<SettingsPage>,
@@ -253,7 +266,20 @@ impl Workspace {
             opened: None,
             opening: None,
             waiting: None,
-            _subscriptions: vec![subscription, language_changed, game_data_loaded, map_read],
+            live_state: live_state(cx),
+            _subscriptions: vec![
+                subscription,
+                language_changed,
+                game_data_loaded,
+                map_read,
+                crate::live::observe_with(cx, |this, cx| {
+                    let now = live_state(cx);
+                    if this.live_state != now {
+                        this.live_state = now;
+                        cx.notify();
+                    }
+                }),
+            ],
         };
         if let Some((profile, slot)) = dev_start_slot() {
             workspace.open(profile, slot, window, cx);
@@ -382,6 +408,7 @@ impl Workspace {
             cx.new(|cx| crate::pages::world_map::WorldMapPage::new(session.clone(), window, cx));
         let gallery =
             cx.new(|cx| crate::pages::gallery::GalleryView::new(session.clone(), window, cx));
+        let live = cx.new(|cx| crate::pages::live::LivePage::new(session.clone(), cx));
         let jobs = cx.new(|cx| JobsPage::new(session.clone(), window, cx));
         let game_settings =
             cx.new(|cx| crate::pages::game_settings::GameSettingsPage::new(window, cx));
@@ -399,6 +426,7 @@ impl Workspace {
             cities,
             world_map,
             gallery,
+            live,
             jobs,
             game_settings,
             settings,
@@ -1049,6 +1077,9 @@ impl Workspace {
                         .on_click(cx.listener(|this, _, window, cx| this.open_palette(window, cx))),
                 ),
             )
+            // Live stands alone above the save's groups: about the running game, not the save. (The
+            // kit's sidebar takes groups only, so it has a heading: the game.)
+            .child(SidebarGroup::new(t!(cx, "sidebar-live")).child(self.menu(&Page::LIVE, cx)))
             .child(SidebarGroup::new(t!(cx, "sidebar-career")).child(self.menu(&Page::CAREER, cx)))
             .child(
                 SidebarGroup::new(t!(cx, "sidebar-company")).child(self.menu(&Page::COMPANY, cx)),
@@ -1122,6 +1153,29 @@ impl Workspace {
             SidebarMenuItem::new(page.title(cx))
                 .icon(Icon::new(page.icon()))
                 .active(page == self.page)
+                // Live says what the game is doing, beside its name.
+                .when(page == Page::Live, |item| {
+                    item.suffix(|_, cx| {
+                        let (state, is_heard) = match crate::live::snapshot(cx) {
+                            Some(snapshot) if snapshot.is_paused => {
+                                (t!(cx, "live-state-paused"), true)
+                            }
+                            Some(_) => (t!(cx, "live-state-driving"), true),
+                            None => (t!(cx, "live-state-off"), false),
+                        };
+                        let theme = cx.theme();
+                        // The words say it; the heard states are only a little stronger.
+                        div()
+                            .text_xs()
+                            .when(is_heard, |this| this.font_medium())
+                            .text_color(if is_heard {
+                                theme.foreground
+                            } else {
+                                theme.muted_foreground
+                            })
+                            .child(state)
+                    })
+                })
                 .on_click(cx.listener(move |this, _, _, cx| {
                     this.page = page;
                     cx.notify();
@@ -1153,6 +1207,10 @@ impl Workspace {
         // The settings pages aren't about the save: no save subtitle there.
         let is_about_the_save = !matches!(self.page, Page::Settings | Page::GameSettings);
         PageHeader::new(self.page.title(cx))
+            // Live is new, and only tried by a few: said beside its title.
+            .when(self.page == Page::Live, |header| {
+                header.tag(t!(cx, "live-experimental"))
+            })
             .when(is_about_the_save, |header| header.subtitle(subtitle))
             .action(
                 div()
@@ -1255,6 +1313,10 @@ impl Workspace {
             Page::Gallery => div()
                 .size_full()
                 .child(opened.gallery.clone())
+                .into_any_element(),
+            Page::Live => div()
+                .size_full()
+                .child(opened.live.clone())
                 .into_any_element(),
             Page::Jobs => div()
                 .size_full()
