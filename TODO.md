@@ -145,7 +145,8 @@ Agreed work, in order. Each step should end with something the owner can see or 
   - [x] An added truck checked in the game (owner, ATS, 2026-11-25). ETS2 still to check.
   - [x] Add a trailer (or road train) from the dealer's stock (2026-11-25, `docs/decisions.md`).
   - [x] An added road train checked in the game (owner, ATS, 2026-11-25: the whole train, its own plate).
-  - [ ] An added trailer in a save that had no trailer before, and in ETS2 (owner).
+  - [x] An added trailer in a save that had no trailer before (owner, ATS, 2026-11-25: loads, the garage and company count it, with its picture).
+  - [ ] Adding and copying in ETS2 (owner).
   - [ ] Build a truck from any parts the configurator offers, starting from a dealer's.
 
 - [ ] Cars: the player's car (`player.cars`, ATS's Road Trip car) in Fleet, with fuel, wear, repairs and plate.
