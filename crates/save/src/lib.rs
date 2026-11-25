@@ -20,6 +20,7 @@ mod jobs;
 mod levels;
 mod map;
 mod paint;
+mod plates;
 mod player_state;
 mod player_vehicle;
 mod preview;

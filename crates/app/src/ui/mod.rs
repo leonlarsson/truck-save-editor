@@ -28,7 +28,9 @@ pub use game_icon::GameIconView;
 pub use level_picker::LevelPicker;
 pub use page::{PageHeader, page_body};
 pub use path_text::path_text;
-pub use picks::{Choice, PickBar, Picks, keep_clicks, owned_garages, pick_box, picks_done};
+pub use picks::{
+    Choice, DetailChoice, PickBar, Picks, keep_clicks, owned_garages, pick_box, picks_done,
+};
 pub use section::Section;
 pub use stat::Stat;
 pub use step_buttons::StepButtons;

@@ -808,7 +808,7 @@ remove-why-unknown = Listy w tym zapisie mają kształt, którego edytor nie zna
 removal-before = W twojej firmie
 removal-after = Usunięte
 copy-to-garage = Kopiuj do garażu
-copy-tooltip = Dodaje kopię do twojej firmy przy zapisie, w wybranym garażu: te same części, lakier, tablica i zużycie. Cofnij odwraca zmianę.
+copy-tooltip = Dodaje kopię do twojej firmy przy zapisie, w wybranym garażu: te same części, lakier i zużycie, z własną tablicą. Cofnij odwraca zmianę.
 copy-no-room = Żaden z twoich garaży nie ma miejsca na kolejny: kup lub rozbuduj garaż w zakładce Garaże albo zwolnij miejsce.
 copy-change = Nowa kopia
 copy-change-before = Brak
@@ -816,7 +816,7 @@ buy-truck = Kup ciężarówkę…
 buy-truck-title = Kup ciężarówkę
 buy-truck-description = Dodaje nową ciężarówkę do twojej firmy przy zapisie, tak jak dealerzy w grze sprzedają ją gotową, w garażu z wolnym miejscem. Jest za darmo: żadne pieniądze nie są pobierane. Cofnij odwraca zmianę.
 buy-truck-model = Ciężarówka
-buy-truck-option = { $model } · { $chassis } · { $engine } · { $price }
+buy-truck-option = { $chassis } · { $engine } · { $price }
 buy-button = Kup
 buy-truck-added = Ciężarówka kupiona: dołączy do twojej firmy przy zapisie.
 buy-truck-choose = Wybierz ciężarówkę i garaż.
@@ -828,7 +828,12 @@ buy-trailer = Kup naczepę…
 buy-trailer-title = Kup naczepę
 buy-trailer-description = Dodaje nową naczepę do twojej firmy przy zapisie, tak jak dealer w grze sprzedaje ją gotową, w garażu z miejscem na nią. Jest za darmo: żadne pieniądze nie są pobierane. Cofnij odwraca zmianę.
 buy-trailer-model = Naczepa
-buy-trailer-option = { $model } · { $chassis } · { $price }
+buy-trailer-option = { $chassis } · { $price }
+buy-trailer-option-train = { $chassis } · { $count ->
+    [few] zestaw { $count } naczep
+    [many] zestaw { $count } naczep
+   *[other] zestaw { $count } naczep
+} · { $price }
 buy-trailer-added = Naczepa kupiona: dołączy do twojej firmy przy zapisie.
 buy-trailer-choose = Wybierz naczepę i garaż.
 buy-trailer-no-room = Żaden z twoich garaży nie ma miejsca na kolejną naczepę (garaż mieści ich tyle, ile ma miejsc na ciężarówki): kup lub rozbuduj garaż w zakładce Garaże.

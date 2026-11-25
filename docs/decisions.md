@@ -464,3 +464,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** completes buying from the dealers for both kinds; the shape was read off a road train the game had just sold (ATS). The no-template case (a new career that never owned a trailer) leans on the game filling in missing fields as it does for its own dealer files, which needs checking in the game.
 
 **Considered:** refusing to buy a trailer into a save without one (safe, but the first trailer is exactly when buying one matters).
+
+## 2026-11-25: Added trucks and trailers get plates of their own
+
+**Decided:** a bought or copied truck or trailer gets a new plate in the format of the one its fields came from: the region after `|` and any formatting tags kept, each letter and digit replaced (letters without I, O and Q), picked from the vehicle's new id so the preview and the save agree (`save/src/plates.rs`). Replaces "the copy keeps its plate" and "the other truck's plate is kept" in the two entries above. The Buy lists show each vehicle on two lines (`ui::DetailChoice`: the name, then chassis, engine and price), and a road train's count of trailers (a dolly, with no body, doesn't count).
+
+**Why:** checked in the app: every bought or copied vehicle came out with the same plate as the company's own truck or trailer, which reads as a mistake in every list. A plate in the right format for its region is what the game's dealers hand out too. The one-line list cut off the price on a panel this wide.
+
+**Considered:** a used dealer truck's plate (unique, but trailers have no used stock); no plate (unknown what the game does with a truck without one).

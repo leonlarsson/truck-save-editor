@@ -8,11 +8,12 @@
 use std::collections::BTreeSet;
 
 use gpui_kit::component::{
-    Sizable as _,
+    ActiveTheme as _, Sizable as _,
     button::{Button, ButtonVariants as _},
     checkbox::Checkbox,
     h_flex,
     select::SelectItem,
+    v_flex,
 };
 use gpui_kit::{
     AnyElement, App, ElementId, IntoElement, ParentElement as _, RenderOnce, SharedString,
@@ -188,6 +189,41 @@ impl SelectItem for Choice {
 
     fn title(&self) -> SharedString {
         self.name.clone()
+    }
+
+    fn value(&self) -> &Self::Value {
+        &self.value
+    }
+}
+
+/// An item with a second line of details under its name (a truck to buy: its model, then its
+/// chassis, engine and price), for lists whose items don't fit on one line. Searching and
+/// assistive technology use both lines together.
+#[derive(Clone)]
+pub struct DetailChoice {
+    pub value: SharedString,
+    pub name: SharedString,
+    pub detail: SharedString,
+}
+
+impl SelectItem for DetailChoice {
+    type Value = SharedString;
+
+    fn title(&self) -> SharedString {
+        format!("{} · {}", self.name, self.detail).into()
+    }
+
+    /// The trigger shows the name alone; the row both lines.
+    fn display_title(&self) -> Option<AnyElement> {
+        Some(self.name.clone().into_any_element())
+    }
+
+    fn render(&self, _: &mut Window, cx: &mut App) -> impl IntoElement {
+        let muted = cx.theme().muted_foreground;
+        v_flex()
+            .py_0p5()
+            .child(div().child(self.name.clone()))
+            .child(div().text_xs().text_color(muted).child(self.detail.clone()))
     }
 
     fn value(&self) -> &Self::Value {

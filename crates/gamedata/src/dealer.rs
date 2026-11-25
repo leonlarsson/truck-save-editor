@@ -53,6 +53,8 @@ pub struct DealerTrailer {
     /// The front trailer's type as the game defines it (a `trailer_def` unit, by its name:
     /// `trailer_def.scs.box.single_53_3.reefer`). The trailers behind it have none in a save.
     pub definitions: Vec<sii::Unit>,
+    /// How many trailers it is: 1, or a road train's (a dolly, with no body, doesn't count).
+    pub trailers: usize,
     pub price: i64,
     pub dlc: Option<String>,
 }
@@ -196,6 +198,22 @@ fn dealer_trailer(
         let unit = units.remove(position);
         units.insert(0, unit);
     }
+    // Trailers with a body: a dolly between two has none.
+    let trailers = units
+        .iter()
+        .filter(|unit| unit.kind == "trailer")
+        .filter(|trailer| {
+            trailer.items("accessories").iter().any(|id| {
+                units.iter().any(|unit| {
+                    unit.id == *id
+                        && unit
+                            .single("data_path")
+                            .is_some_and(|path| path.contains("/body/"))
+                })
+            })
+        })
+        .count()
+        .max(1);
     let body_type = units
         .first()
         .and_then(|unit| unit.single("trailer_definition"))
@@ -210,6 +228,7 @@ fn dealer_trailer(
         chassis,
         units,
         definitions,
+        trailers,
         price,
         dlc,
     })

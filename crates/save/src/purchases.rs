@@ -8,7 +8,8 @@
 //! - wear at 0 (`…_wear`, `…_wear_unfixable`; the per-axle lists empty, as on trucks the game has
 //!   never driven),
 //! - a full tank (`fuel_relative`), the odometer and trip counters at 0, no passengers,
-//! - bought now (`purchase_time`: the save's game time).
+//! - bought now (`purchase_time`: the save's game time),
+//! - a plate of its own: the other truck's format and region, new characters (`plates.rs`).
 //!
 //! Everything else (the plate, mirror and seat settings) is the other truck's. Its accessories are
 //! the dealer's, under new ids, and it's linked in as a copy is (see `copies.rs`): in
@@ -121,6 +122,8 @@ fn start_as_new(
             continue;
         };
     }
+    // Not the template's plate: the same format with new characters.
+    crate::plates::renew_plate(&mut vehicle);
     vehicle
 }
 
@@ -437,7 +440,9 @@ mod tests {
         assert_eq!(truck.single("purchase_time"), Some("4321"));
         assert!(truck.items("wheels_wear").is_empty());
         // Kept from the other truck.
-        assert_eq!(truck.single("license_plate"), Some("\"XY 987|france\""));
+        // A plate of its own, in the format and region of the truck it took its fields from.
+        let plate = truck.single("license_plate").expect("a plate");
+        assert!(plate.ends_with("|france\"") && plate != "\"XY 987|france\"");
         assert_eq!(truck.single("user_fov"), Some("0"));
         // The dealer's parts, under new ids, with their refunds.
         let parts = truck.items("accessories").to_vec();

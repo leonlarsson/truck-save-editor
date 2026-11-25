@@ -10,7 +10,8 @@
 //!   by every trailer of that type, and listed once in `player.trailer_defs`) is shared by the
 //!   copy too.
 //!
-//! The copy keeps everything else (plate, odometer, wear, fuel). Worked out from saves where the
+//! The copy keeps everything else (odometer, wear, fuel) but its plate, which gets new characters in
+//! the same format (`plates.rs`). Worked out from saves where the
 //! game had just sold a truck and a trailer (ATS, 2026-11-25), and from ETS2 fleets.
 
 use std::collections::HashMap;
@@ -215,7 +216,10 @@ pub fn copy_vehicle(
         .iter()
         .filter_map(|original| {
             let unit = document.unit(original)?;
-            Some(renamed(unit, ids.get(original)?, &ids))
+            let mut copy = renamed(unit, ids.get(original)?, &ids);
+            // Its own plate, like a bought one (`plates.rs`); parts have none.
+            crate::plates::renew_plate(&mut copy);
+            Some(copy)
         })
         .collect();
     let copy_id = ids.get(id).cloned().ok_or(VehicleCopyProblem::NotOwned)?;
@@ -279,7 +283,8 @@ mod tests {
         );
         let copy = copy_vehicle(&mut document, "_nameless.1.10", "garage.lyon").expect("copies");
         let vehicle = document.unit(&copy).expect("the copy");
-        assert_eq!(vehicle.single("license_plate"), Some("\"AB 123|sweden\""));
+        let plate = vehicle.single("license_plate").expect("a plate");
+        assert!(plate.ends_with("|sweden\"") && plate != "\"AB 123|sweden\"");
         // Its own parts, not the original's.
         // Owned: the document is changed again below, which a borrow of it would block.
         let parts = vehicle.items("accessories").to_vec();

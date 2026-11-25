@@ -7,7 +7,7 @@ use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Sizable as _, WindowExt as _,
     button::{Button, ButtonVariants as _},
     notification::{Notification, NotificationType},
-    select::{SearchableVec, Select, SelectEvent, SelectState},
+    select::{SearchableVec, Select, SelectEvent, SelectItem, SelectState},
     v_flex,
 };
 use gpui_kit::{
@@ -18,7 +18,7 @@ use gpui_kit::{
 use crate::game_data;
 use crate::i18n::t;
 use crate::session::{BoughtTrailer, BoughtTruck, Session};
-use crate::ui::Choice;
+use crate::ui::{Choice, DetailChoice};
 
 /// What's being bought.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -36,7 +36,7 @@ enum Purchase {
 pub struct BuyForm {
     session: Entity<Session>,
     buying: Buying,
-    vehicle: Entity<SelectState<SearchableVec<Choice>>>,
+    vehicle: Entity<SelectState<SearchableVec<DetailChoice>>>,
     garage: Entity<SelectState<SearchableVec<Choice>>>,
     /// Whether the lists have been filled (the dealers' stock is read on first use).
     is_filled: bool,
@@ -55,12 +55,16 @@ impl BuyForm {
                 SelectState::new(SearchableVec::new(Vec::new()), None, window, cx).searchable(true)
             })
         };
-        let (vehicle, garage) = (select(window, cx), select(window, cx));
+        // The vehicles' list has two lines an item; the garages' one.
+        let vehicle = cx.new(|cx| {
+            SelectState::new(SearchableVec::new(Vec::new()), None, window, cx).searchable(true)
+        });
+        let garage = select(window, cx);
         // Picking (the only event) changes whether Buy can be pressed.
         let _subscriptions = vec![
             cx.subscribe(
                 &vehicle,
-                |_, _, _: &SelectEvent<SearchableVec<Choice>>, cx| cx.notify(),
+                |_, _, _: &SelectEvent<SearchableVec<DetailChoice>>, cx| cx.notify(),
             ),
             cx.subscribe(
                 &garage,
@@ -87,7 +91,7 @@ impl BuyForm {
     }
 
     /// The dealer's stock as choices (this save's DLCs only), once it's read.
-    fn choices(&self, cx: &mut Context<Self>) -> Option<Vec<Choice>> {
+    fn choices(&self, cx: &mut Context<Self>) -> Option<Vec<DetailChoice>> {
         let currency = self.session.read(cx).game().currency_symbol();
         let price = |price: i64| format!("{currency} {}", crate::format::thousands(price));
         match self.buying {
@@ -98,12 +102,12 @@ impl BuyForm {
                     trucks
                         .iter()
                         .filter(|truck| session.has_dlc(truck.dlc.as_deref()))
-                        .map(|truck| Choice {
+                        .map(|truck| DetailChoice {
                             value: truck.path.clone().into(),
-                            name: t!(
+                            name: game_data::model_name_by_id(cx, &truck.model).into(),
+                            detail: t!(
                                 cx,
                                 "buy-truck-option",
-                                model = game_data::model_name_by_id(cx, &truck.model),
                                 chassis = game_data::resolve(cx, &truck.chassis),
                                 engine = game_data::resolve(cx, &truck.engine),
                                 price = price(truck.price)
@@ -119,16 +123,26 @@ impl BuyForm {
                     trailers
                         .iter()
                         .filter(|trailer| session.has_dlc(trailer.dlc.as_deref()))
-                        .map(|trailer| Choice {
+                        .map(|trailer| DetailChoice {
                             value: trailer.path.clone().into(),
-                            name: t!(
-                                cx,
-                                "buy-trailer-option",
-                                model =
-                                    game_data::trailer_name(cx, &trailer.model, &trailer.body_type),
-                                chassis = game_data::resolve(cx, &trailer.chassis),
-                                price = price(trailer.price)
-                            ),
+                            name: game_data::trailer_name(cx, &trailer.model, &trailer.body_type)
+                                .into(),
+                            detail: if trailer.trailers > 1 {
+                                t!(
+                                    cx,
+                                    "buy-trailer-option-train",
+                                    chassis = game_data::resolve(cx, &trailer.chassis),
+                                    count = trailer.trailers,
+                                    price = price(trailer.price)
+                                )
+                            } else {
+                                t!(
+                                    cx,
+                                    "buy-trailer-option",
+                                    chassis = game_data::resolve(cx, &trailer.chassis),
+                                    price = price(trailer.price)
+                                )
+                            },
                         })
                         .collect(),
                 )
@@ -167,13 +181,6 @@ impl BuyForm {
         self.is_filled = true;
     }
 
-    fn selected(select: &Entity<SelectState<SearchableVec<Choice>>>, cx: &App) -> Option<String> {
-        select
-            .read(cx)
-            .selected_value()
-            .map(|value| value.to_string())
-    }
-
     /// What would be bought, or why Buy can't be pressed yet.
     fn purchase(&self, cx: &mut Context<Self>) -> Result<Purchase, SharedString> {
         if !game_data::has_data(cx) {
@@ -198,10 +205,8 @@ impl BuyForm {
             Buying::Trailer => t!(cx, "buy-trailer-choose"),
         };
         let choose = || choose_text.clone();
-        let (Some(path), Some(garage)) = (
-            Self::selected(&self.vehicle, cx),
-            Self::selected(&self.garage, cx),
-        ) else {
+        let (Some(path), Some(garage)) = (selected(&self.vehicle, cx), selected(&self.garage, cx))
+        else {
             return Err(choose());
         };
         match self.buying {
@@ -261,14 +266,6 @@ impl Render for BuyForm {
         self.fill(window, cx);
         let purchase = self.purchase(cx);
         let why_not = purchase.as_ref().err().cloned();
-        let field = |label: SharedString,
-                     select: &Entity<SelectState<SearchableVec<Choice>>>,
-                     placeholder: SharedString| {
-            v_flex()
-                .gap_1p5()
-                .child(div().text_sm().child(label))
-                .child(Select::new(select).small().placeholder(placeholder))
-        };
         let placeholder = if self.is_filled {
             t!(cx, "new-job-pick")
         } else {
@@ -312,6 +309,33 @@ impl Render for BuyForm {
                     })),
             )
     }
+}
+
+/// The value picked in a list (an id), if any. Generic over the list's items: the vehicles' list
+/// has two lines an item (`DetailChoice`), the garages' one (`Choice`).
+fn selected<T>(select: &Entity<SelectState<SearchableVec<T>>>, cx: &App) -> Option<String>
+where
+    T: SelectItem<Value = SharedString> + 'static,
+{
+    select
+        .read(cx)
+        .selected_value()
+        .map(|value| value.to_string())
+}
+
+/// A labelled list to pick from.
+fn field<T>(
+    label: SharedString,
+    select: &Entity<SelectState<SearchableVec<T>>>,
+    placeholder: SharedString,
+) -> impl IntoElement
+where
+    T: SelectItem<Value = SharedString> + 'static,
+{
+    v_flex()
+        .gap_1p5()
+        .child(div().text_sm().child(label))
+        .child(Select::new(select).small().placeholder(placeholder))
 }
 
 /// Opens Buy a truck (or a trailer) in a side panel.
