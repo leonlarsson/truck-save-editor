@@ -856,10 +856,24 @@ impl OpenSavePage {
                                                         .child(labels::slot_name(cx, slot)),
                                                 )
                                                 .child(
+                                                    // Hovering shows the exact time under the
+                                                    // rough one (`labels::exact_time`).
                                                     div()
+                                                        .id(SharedString::from(format!(
+                                                            "slot-time-{}",
+                                                            slot.folder
+                                                        )))
                                                         .text_xs()
                                                         .text_color(cx.theme().muted_foreground)
-                                                        .child(detail),
+                                                        .child(detail)
+                                                        .when_some(
+                                                            slot.modified,
+                                                            |line, modified| {
+                                                                line.tip(labels::exact_time(
+                                                                    modified,
+                                                                ))
+                                                            },
+                                                        ),
                                                 )
                                                 .children(missing.filter(|count| *count > 0).map(
                                                     |count| {

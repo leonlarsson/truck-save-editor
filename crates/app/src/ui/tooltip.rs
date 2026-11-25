@@ -3,9 +3,10 @@
 //! long explanation ran off the screen as one line. `.tip(text)` breaks the text into lines first,
 //! at spaces, then sets the component's tooltip. Every tooltip in the app goes through it.
 
-use gpui_kit::SharedString;
 use gpui_kit::component::button::Button;
 use gpui_kit::component::checkbox::Checkbox;
+use gpui_kit::component::tooltip::Tooltip;
+use gpui_kit::{Div, SharedString, Stateful, StatefulInteractiveElement as _};
 
 /// About 60 characters a line: some 360 pixels in the tooltip's small type, comfortable to read.
 const LINE_CHARACTERS: usize = 60;
@@ -47,6 +48,15 @@ impl Tip for Button {
 impl Tip for Checkbox {
     fn tip(self, text: impl Into<SharedString>) -> Self {
         self.tooltip(wrap_tooltip(&text.into()))
+    }
+}
+
+/// Plain elements with an id (`div().id(…)`): text that explains itself on hover, like a save's
+/// exact time under its "2 hours ago".
+impl Tip for Stateful<Div> {
+    fn tip(self, text: impl Into<SharedString>) -> Self {
+        let text: SharedString = wrap_tooltip(&text.into()).into();
+        self.tooltip(move |window, cx| Tooltip::new(text.clone()).build(window, cx))
     }
 }
 

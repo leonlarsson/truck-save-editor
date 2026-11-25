@@ -23,6 +23,9 @@ image = { version = "0.25", default-features = false }
 # Asking GitHub for the latest release (updates.rs): the only time the editor uses the network.
 ureq = "3.5.2"
 serde_json = "1.0.154"
+# The exact local date and time a save was made, under its "2 hours ago" (labels::exact_time).
+# Already in the build through other libraries; Rust's own library has no local time.
+chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
 
 [dev-dependencies]
 # UI integration tests: headless windows driven by real clicks and keys.

@@ -188,6 +188,15 @@ pub fn picks_outcome(cx: &App, action: PickAction, done: usize, count: usize) ->
     }
 }
 
+/// When something happened, exactly, in this PC's time: `2026-11-25 13:25`, as the game's load
+/// menu writes dates (numbers only, so it reads the same in every language). Shown on hover over
+/// `ago`'s rough time.
+pub fn exact_time(when: SystemTime) -> String {
+    chrono::DateTime::<chrono::Local>::from(when)
+        .format("%Y-%m-%d %H:%M")
+        .to_string()
+}
+
 /// How long ago something happened, roughly: `just now`, `5 minutes ago`, `3 years ago`.
 /// (Relative times need no time zone, and read better than dates in lists.)
 pub fn ago(cx: &App, when: SystemTime) -> SharedString {
