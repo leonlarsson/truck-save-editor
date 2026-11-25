@@ -200,7 +200,6 @@ save-profile-failed = Der Spielstand wurde geschrieben, der Unternehmensname abe
 ## Warnings
 
 newer-game-warning = Dieser Spielstand stammt aus einer neueren Spielversion, als mit diesem Editor getestet wurde. Alles, was der Editor nicht versteht, bleibt unverändert, aber prüfe deine Änderungen im Spiel und behalte die Sicherung.
-ats-warning = Die Unterstützung für American Truck Simulator ist neu. Seine Spielstände werden sicher geöffnet und gespeichert, mit einer Sicherung. Prüfe deine Änderungen im Spiel.
 
 ## Undo and redo
 

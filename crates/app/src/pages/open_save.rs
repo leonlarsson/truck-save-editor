@@ -1069,21 +1069,10 @@ impl Render for OpenSavePage {
                     .count();
                 v_flex()
                     .gap_6()
-                    // Across the column's full width, like the save rows and the warning below.
+                    // Across the column's full width, like the save rows below.
                     .child(self.render_games(profiles, cx))
                     .when(profiles_of_game > 1, |this| {
                         this.child(div().px_3().child(self.render_profiles(profiles, cx)))
-                    })
-                    // Before opening one: what isn't supported for this game yet.
-                    .when(profile.game != Game::Ets2, |this| {
-                        this.child(
-                            Alert::warning("unsupported-game", t!(cx, "ats-warning"))
-                                .text_color(cx.theme().foreground)
-                                .icon(
-                                    Icon::new(IconName::TriangleAlert)
-                                        .text_color(cx.theme().warning),
-                                ),
-                        )
                     })
                     .child(
                         h_flex()

@@ -1,13 +1,13 @@
 # Truck Save Editor
 
-A save editor for **Euro Truck Simulator 2**: fast, safe and pleasant to use. Change your money and level, your fleet and drivers, your garages and the map, see every road you've driven, and never lose a save doing it.
+A save editor for **Euro Truck Simulator 2** and **American Truck Simulator**: fast, safe and pleasant to use. Change your money and level, your fleet and drivers, your garages and the map, see every road you've driven, and never lose a save doing it.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/overview-dark.png">
   <img alt="The editor's Overview: money, experience shown as levels with the game's rank names, and skills" src="docs/screenshots/overview-light.png">
 </picture>
 
-> **Early version.** Most features have been checked in the game (on a Steam Cloud profile, in the current game version); every save is backed up before it's written, and a backup is one click to restore. American Truck Simulator saves open too, reading ATS's own data (its map, cities, cargo, miles and dollars); its support is new, so the editor says to check your changes in the game.
+> **Early version.** Most features have been checked in the game (on a Steam Cloud profile, in the current game version); every save is backed up before it's written, and a backup is one click to restore. Both games are supported, each with its own data (ATS's map, cities, cargo, miles and dollars).
 
 ## Download
 

@@ -504,3 +504,9 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** the owner bought a coach at the game's coach dealer and saved: the game had added it to `player.buses` and nothing else, its plate a Swedish coach plate (the headquarters are in Sweden).
 
 **Considered:** a garage for coaches (the game keeps none); the coach's current city for its plate (a new coach has none until it's used).
+
+## 2026-11-25: American Truck Simulator is supported in full
+
+**Decided:** the notice that ATS support is new (on the start screen and on every page of an ATS save) is gone, for 0.4.0; the README names both games.
+
+**Why:** every part of the editor reads ATS's own data, and the owner checked the edits in ATS (money and experience, dealers and agencies, garages, adding and copying trucks and trailers, a career without a truck or trailer of its own).

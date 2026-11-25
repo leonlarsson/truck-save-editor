@@ -1314,7 +1314,6 @@ impl Render for Workspace {
                     .h_full()
                     .child(self.render_header(&session, cx))
                     .children(newer_game_warning(&session, cx))
-                    .children(unsupported_game_warning(&session, cx))
                     .child(div().flex_1().min_h_0().child(self.render_page(opened))),
             )
             .into_any_element()
@@ -1329,17 +1328,6 @@ fn newer_game_warning(session: &Entity<Session>, cx: &App) -> Option<Alert> {
         // The words in the normal text colour (amber text on pale amber is hard to read); the
         // icon and background say it's a warning.
         Alert::warning("newer-game", t!(cx, "newer-game-warning"))
-            .banner()
-            .text_color(cx.theme().foreground)
-            .icon(Icon::new(IconName::TriangleAlert).text_color(cx.theme().warning))
-    })
-}
-
-/// Says so when the save is from a game the editor doesn't fully support yet (ATS: its game data,
-/// miles and settings aren't read yet), on every page while it's open.
-fn unsupported_game_warning(session: &Entity<Session>, cx: &App) -> Option<Alert> {
-    (session.read(cx).game() != save::Game::Ets2).then(|| {
-        Alert::warning("unsupported-game", t!(cx, "ats-warning"))
             .banner()
             .text_color(cx.theme().foreground)
             .icon(Icon::new(IconName::TriangleAlert).text_color(cx.theme().warning))

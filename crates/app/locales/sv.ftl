@@ -196,7 +196,6 @@ save-profile-failed = Sparfilen skrevs, men inte företagsnamnet: det väntar fo
 ## Warnings
 
 newer-game-warning = Den här sparfilen kommer från en nyare version av spelet än redigeraren har testats med. Allt som redigeraren inte förstår lämnas orört, men kontrollera dina ändringar i spelet och behåll säkerhetskopian.
-ats-warning = Stödet för American Truck Simulator är nytt. Dess sparfiler öppnas och sparas säkert, med en säkerhetskopia. Kontrollera dina ändringar i spelet.
 
 ## Undo and redo
 

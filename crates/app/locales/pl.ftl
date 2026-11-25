@@ -208,7 +208,6 @@ save-profile-failed = Zapis gry został zapisany, ale nazwa firmy nie: wciąż c
 ## Warnings
 
 newer-game-warning = Ten zapis pochodzi z nowszej wersji gry niż ta, z którą edytor był testowany. Wszystko, czego edytor nie rozumie, zostaje bez zmian, ale sprawdź swoje zmiany w grze i zachowaj kopię zapasową.
-ats-warning = Obsługa American Truck Simulator jest nowa. Zapisy otwierają się i zapisują bezpiecznie, z kopią zapasową. Sprawdź swoje zmiany w grze.
 
 ## Undo and redo
 
