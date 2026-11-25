@@ -182,7 +182,7 @@ The running game in the editor (`docs/decisions.md`). Built without the game at 
 - [ ] The route travelled this session drawn on the map; the job's destination marked.
 - [ ] The game's names for fines; the README and a screenshot once it's past a prototype.
 - [ ] Live editing: Apply through the game's quick save and quick load (the plugin can press both). Needs the in-game check that quick load reads the file from disk.
-- [ ] The release that brings Live: the owner's recording (`docs/screenshots/live.gif`, in the README) goes in its notes too, copied to `docs/release-notes/<version>/`.
+- [x] 0.5.0 prepared (2026-11-25): notes with the owner's recording and World map's picture, version bumped. Tagging and publishing are the owner's call.
 - [x] In ATS (owner, 2026-11-25): the page fills in with mph, gallons, miles and dollars, on ATS's map, with the arrow and the trail on the right roads.
 
 ## Later
