@@ -351,10 +351,15 @@ impl Render for CitiesPage {
                                     .small()
                                     .outline()
                                     .label(t!(cx, "map-unlock-recruitments"))
-                                    // Off for good, with why: the game must find each agency
-                                    // itself (`Session::can_unlock`).
-                                    .tip(t!(cx, "agency-unlock-off"))
-                                    .disabled(true),
+                                    .tip(if agencies_unknown {
+                                        t!(cx, "map-agencies-reading")
+                                    } else {
+                                        t!(cx, "map-unlock-recruitments-tooltip")
+                                    })
+                                    .disabled(!has_agencies || self.recruitments.is_complete())
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        this.unlock(Place::Recruitment, cx)
+                                    })),
                             ),
                     ),
             )

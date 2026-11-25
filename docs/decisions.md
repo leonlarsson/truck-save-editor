@@ -480,3 +480,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** the owner asked whether Buy takes money; it doesn't, so the word promised something the editor doesn't do. Money is set on Overview.
 
 **Considered:** keeping Buy with a Pay for it checkbox that takes the dealer's price (closer to the game's rules; can come later if asked).
+
+## 2026-11-25: Earned screens open when a save is written; agencies can be unlocked again
+
+**Decided:** `economy.screen_access_list` is the list of game screens a career hasn't unlocked yet; the game takes one off when the career first earns it. When a save is prepared for writing, `save::unlock_earned_screens` takes off the ones the career has earned by what it holds: Truck Manager, truck upgrades and diagnostics and the freight market (`screen.truckman`, `truck.upgrades`, `truck.diag`, `jobs.company`) with a truck of its own; Trailer Manager and trailer upgrades (`screen.trailerman`, `trailer.upgrades`) with a trailer of its own; the agency screen (`screen.recruit`) with an unlocked agency. Nothing else is touched. Recruitment agencies can be unlocked again (reverts "Recruitment agencies can't be unlocked, only locked", above): the palette command, Quick start's choice and the city panel's Unlock are back.
+
+**Why:** a trailer added to a save that never had one showed in the garage, but the game said "To access the Trailer Manager you need to buy your first trailer"; `screen.trailerman` was still on the list. Comparing the owner's saves before and after the game sold a truck and a trailer showed which screens it takes off for them, and the agency repaired by a drive past differed from the broken one only by `screen.recruit` coming off: the black screen and the refused online hiring were that one locked screen, not something the game keeps out of the save, as the earlier entry concluded.
+
+**Considered:** taking the screens off only for vehicles the editor adds in this session (the game's saves the editor wrote earlier would stay broken until edited again with that change).

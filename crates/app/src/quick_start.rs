@@ -31,10 +31,11 @@ enum Choice {
     HqGarage,
     VisitCities,
     Dealers,
+    Recruitments,
 }
 
 impl Choice {
-    const ALL: [Choice; 7] = [
+    const ALL: [Choice; 8] = [
         Choice::Money,
         Choice::TruckSkills,
         Choice::Adr,
@@ -42,6 +43,7 @@ impl Choice {
         Choice::HqGarage,
         Choice::VisitCities,
         Choice::Dealers,
+        Choice::Recruitments,
     ];
     const RICH_START: [Choice; 5] = [
         Choice::Money,
@@ -112,6 +114,9 @@ impl QuickStart {
             Choice::Dealers if game_data::place_cities(cx, Place::Dealer).is_none() => {
                 Some(t!(cx, "quick-start-needs-game"))
             }
+            Choice::Recruitments if game_data::place_cities(cx, Place::Recruitment).is_none() => {
+                Some(t!(cx, "quick-start-needs-game"))
+            }
             _ => None,
         }
     }
@@ -136,6 +141,7 @@ impl QuickStart {
             }
             Choice::VisitCities => t!(cx, "map-visit-all"),
             Choice::Dealers => t!(cx, "map-unlock-dealers"),
+            Choice::Recruitments => t!(cx, "map-unlock-recruitments"),
         }
     }
 
@@ -158,6 +164,9 @@ impl QuickStart {
             visit_cities: available(Choice::VisitCities),
             dealers: available(Choice::Dealers)
                 .then(|| self.session.read(cx).place_cities(Place::Dealer, cx))
+                .flatten(),
+            recruitments: available(Choice::Recruitments)
+                .then(|| self.session.read(cx).place_cities(Place::Recruitment, cx))
                 .flatten(),
         };
         self.session

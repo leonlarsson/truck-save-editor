@@ -257,9 +257,9 @@ pub struct QuickStartPlan {
     /// Buy (or make large) the garage in the headquarters city.
     pub hq_garage: bool,
     pub visit_cities: bool,
-    /// Dealers to unlock (the cities the game has them in), when asked for. Agencies can't be
-    /// unlocked (`Session::can_unlock`).
+    /// Dealers and agencies to unlock (the cities the game has them in), when asked for.
     pub dealers: Option<BTreeSet<String>>,
+    pub recruitments: Option<BTreeSet<String>>,
 }
 
 /// A truck or trailer added to the company.
@@ -614,11 +614,16 @@ impl Session {
             if plan.visit_cities {
                 pending.visit_all();
             }
-            if let Some(cities) = &plan.dealers {
-                let saved: BTreeSet<String> = save::unlocked(&this.loaded.game, Place::Dealer)
-                    .into_iter()
-                    .collect();
-                pending.unlock_cities(Place::Dealer, cities, &saved);
+            for (place, cities) in [
+                (Place::Dealer, &plan.dealers),
+                (Place::Recruitment, &plan.recruitments),
+            ] {
+                if let Some(cities) = cities {
+                    let saved: BTreeSet<String> = save::unlocked(&this.loaded.game, place)
+                        .into_iter()
+                        .collect();
+                    pending.unlock_cities(place, cities, &saved);
+                }
             }
         });
     }
@@ -924,9 +929,6 @@ impl Session {
 
     /// Unlocks the dealers (or agencies) in every city of `cities` (which the game's data knows).
     pub fn unlock_all(&mut self, place: Place, cities: &BTreeSet<String>, cx: &mut Context<Self>) {
-        if !Self::can_unlock(place) {
-            return;
-        }
         let saved: BTreeSet<String> = save::unlocked(&self.loaded.game, place)
             .into_iter()
             .collect();
@@ -1176,26 +1178,12 @@ impl Session {
         if self.unlocked(place).contains(token) {
             return;
         }
-        // Taking back a lock asked for earlier is always fine: the save had it unlocked.
-        if !Self::can_unlock(place) && !self.pending.locks(place).contains(token) {
-            return;
-        }
         self.change(cx, |pending, _| {
             // Asked to be locked earlier: taking that back is enough.
             if !pending.locks_mut(place).remove(token) {
                 pending.unlocks_mut(place).insert(token.to_string());
             }
         });
-    }
-
-    /// Whether the editor can unlock this kind of place. Not a recruitment agency: the game has
-    /// to discover one itself. Unlocked in the save, an agency stays shut: entering it shows a
-    /// black screen and hiring online asks to discover one first (found in ATS on 2026-11-25,
-    /// and players report the same in ETS2). What the game does on discovery isn't in anything
-    /// it saves, so the editor can't do it; locking an agency again and driving past it repairs
-    /// one (see `docs/decisions.md`).
-    pub fn can_unlock(place: Place) -> bool {
-        place == Place::Dealer
     }
 
     /// Locks one city's dealer (or agency) again, as if the player had never driven past it.
