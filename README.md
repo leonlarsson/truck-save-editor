@@ -156,4 +156,4 @@ Built in Rust with [GPUI](https://www.gpui.rs/) through [GPUI Kit](https://gpui-
 
 ## License
 
-[MIT](LICENSE). Not affiliated with or endorsed by SCS Software. Euro Truck Simulator 2 and American Truck Simulator are trademarks of SCS Software. The editor reads the game's data from your own install; none of SCS's text or artwork is included.
+[MIT](LICENSE). Not affiliated with or endorsed by SCS Software. Euro Truck Simulator 2 and American Truck Simulator are trademarks of SCS Software. The editor reads the game's data from your own install; the only SCS artwork included is each game's own icon, to show which game a save belongs to.

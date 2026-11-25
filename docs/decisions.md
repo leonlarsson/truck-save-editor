@@ -510,3 +510,11 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Decided:** the notice that ATS support is new (on the start screen and on every page of an ATS save) is gone, for 0.4.0; the README names both games.
 
 **Why:** every part of the editor reads ATS's own data, and the owner checked the edits in ATS (money and experience, dealers and agencies, garages, adding and copying trucks and trailers, a career without a truck or trailer of its own).
+
+## 2026-11-25: The games' icons are in the repository; the window title names the game
+
+**Decided:** each game's own icon (the 256-pixel one in `eurotrucks2.exe` and `amtrucks.exe`, as Steam shows it) is stored in `crates/app/assets/games/` and shown beside the open save's name at the top of the sidebar, in place of the yellow truck. The window title names the game after the save (`AMERICA SAVE · American Truck Simulator — Truck Save Editor (0.4.0)`). The README says the icons are the only SCS artwork included.
+
+**Why:** the owner asked for it ("just store the icons in the repo"); with both games supported, which game a save belongs to should show at a glance, also on the taskbar.
+
+**Considered:** reading the icons from the installed game's program at runtime (no artwork in the repository, but none without the game installed, and work for nothing the owner wants); the games' wide logos (`material/ui/logo`, still read at runtime for the start screen), which don't fit a square.

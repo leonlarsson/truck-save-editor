@@ -11,6 +11,7 @@ mod dev_script;
 mod duplicate;
 mod format;
 mod game_data;
+mod game_icons;
 mod i18n;
 mod labels;
 mod pages;

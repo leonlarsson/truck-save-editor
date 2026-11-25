@@ -784,7 +784,12 @@ impl Workspace {
                 let name = labels::slot_name(cx, session.slot());
                 let is_edited = session.change_count() > 0;
                 let mark = if is_edited { " •" } else { "" };
-                (format!("{name}{mark} — {}", crate::app_title()), is_edited)
+                // The game too: with both games' saves about, the taskbar says which is which.
+                let game = session.game().name();
+                (
+                    format!("{name}{mark} · {game} — {}", crate::app_title()),
+                    is_edited,
+                )
             }
             None => (crate::app_title(), false),
         };
@@ -984,17 +989,11 @@ impl Workspace {
                 h_flex()
                     .gap_2()
                     .min_w_0()
+                    // The save's game, by its own icon.
                     .child(
-                        div()
-                            .flex()
-                            .items_center()
-                            .justify_center()
+                        gpui_kit::img(crate::game_icons::icon(session.read(cx).game()))
                             .size_8()
-                            .flex_shrink_0()
-                            .rounded(cx.theme().radius)
-                            .bg(cx.theme().sidebar_primary)
-                            .text_color(cx.theme().sidebar_primary_foreground)
-                            .child(Icon::new(IconName::Truck)),
+                            .flex_shrink_0(),
                     )
                     .child(
                         v_flex()
