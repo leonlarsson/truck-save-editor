@@ -526,9 +526,3 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** ATS's `base_map.scs` holds the roads of states whose DLC isn't installed (Utah, Colorado, Wyoming, New Mexico …); the game's own map shows those states empty (checked with the owner, 2026-11-25), while World map drew their roads, and Discover every road would have marked them.
 
 **Considered:** the map items' DLC markers (not worked out, and the nearest city answers the same question from data already read); a distance limit from installed cities (cuts roads off at arbitrary lines).
-
-## 2026-11-25: Truck Save Editor is the final product name
-
-**Decided:** the product is named Truck Save Editor for good (the owner's call); it was a working name until now. It stays written in one place, `PRODUCT_NAME` in `crates/app/build.rs`, which the code reads as `APP_NAME`.
-
-**Why:** it says what the app is for both games without using either game's name (SCS trademarks). Keeping the one constant costs nothing and keeps the name out of the code.

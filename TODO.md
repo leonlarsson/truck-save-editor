@@ -183,6 +183,5 @@ Agreed work, in order. Each step should end with something the owner can see or 
   - [ ] An ATS save with a truck of its own (owner): to check the truck panel, plates, paint, parts and trailers with ATS's data.
   - [x] The game's map shows states of map DLCs that aren't installed empty; World map now leaves their roads out too (2026-11-25).
 - [x] App icon (`scripts/make-icon.py`, embedded in the .exe) and a release workflow (version tag → draft release).
-- [x] The product name: Truck Save Editor, final (the owner, 2026-11-25), still written once (`PRODUCT_NAME` in `crates/app/build.rs`).
 - [ ] Signed Windows builds (see `docs/releasing.md` → Code signing).
 - [ ] Web version, on hold (the owner's call, 2026-11-21): the desktop app comes first. The core crates stay free of UI and disk access so it stays possible (GPUI's web target, or a page around the core compiled to wasm), but no work on it until it's picked up again.
