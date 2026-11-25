@@ -2392,6 +2392,9 @@ impl Session {
             let cities: Vec<String> = self.pending.locks(place).iter().cloned().collect();
             save::lock(&mut slot.game, place, &cities);
         }
+        // Screens the career has earned by what it now holds (an own truck or trailer, an unlocked
+        // agency) open, as the game opens them when it sells or discovers one (`save::screens`).
+        save::unlock_earned_screens(&mut slot.game);
         // The game reads a save as one tree from the economy; drop anything an edit cut off
         // (a cancelled job's units, a reference cleared in All data).
         save::drop_unreachable(&mut slot.game);

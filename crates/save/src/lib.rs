@@ -32,6 +32,7 @@ mod profiles;
 mod purchases;
 mod removals;
 mod requirements;
+mod screens;
 mod statistics;
 #[cfg(feature = "native")]
 mod store;
@@ -113,6 +114,7 @@ pub use removals::{
     Removal, RemoveProblem, can_remove, discover_roads, discovered_roads, forget_roads, remove,
 };
 pub use requirements::{Requirement, RequirementKind, parse_requirement, requirements};
+pub use screens::{locked_screens, unlock_earned_screens};
 pub use statistics::{
     Delivery, DeliveryKind, Earnings, Totals, deliveries, driver_earnings, earnings, totals,
     truck_earnings,
