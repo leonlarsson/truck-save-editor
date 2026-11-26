@@ -173,9 +173,8 @@ impl Render for DriverDetail {
         let is_maxed = skills == Skills::maxed();
         let id = self.id.clone();
 
-        v_flex()
+        crate::ui::Divided::groups()
             .pt_2()
-            .gap_6()
             .child(
                 h_flex()
                     .gap_3()

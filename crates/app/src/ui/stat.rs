@@ -33,9 +33,10 @@ impl RenderOnce for Stat {
                     .child(self.label),
             )
             .child(
+                // The number is what's read: large, and no heavier than it needs to be.
                 div()
-                    .text_xl()
-                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
+                    .text_2xl()
+                    .font_weight(gpui_kit::FontWeight::MEDIUM)
                     .child(self.value),
             )
     }

@@ -42,7 +42,7 @@ pub fn fact(label: SharedString, value: impl IntoElement, cx: &App) -> impl Into
 pub fn group(title: SharedString, body: impl IntoElement) -> impl IntoElement {
     v_flex()
         .gap_2()
-        .child(div().text_sm().font_medium().child(title))
+        .child(div().text_sm().font_semibold().child(title))
         .child(body)
 }
 

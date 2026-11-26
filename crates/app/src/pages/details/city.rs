@@ -194,9 +194,8 @@ impl Render for CityDetail {
             value_with_action(state, Some(open))
         });
 
-        v_flex()
+        crate::ui::Divided::groups()
             .pt_2()
-            .gap_6()
             .child(group(
                 t!(cx, "detail-about"),
                 v_flex()

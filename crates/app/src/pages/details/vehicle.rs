@@ -614,9 +614,8 @@ impl Render for VehicleDetail {
             session.world_of_trucks_plate().is_some()
                 && session.own_truck().as_deref() == Some(self.id.as_str())
         };
-        v_flex()
+        crate::ui::Divided::groups()
             .pt_2()
-            .gap_6()
             .child(group(
                 t!(cx, "detail-about"),
                 v_flex()

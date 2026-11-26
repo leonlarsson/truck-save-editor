@@ -17,7 +17,7 @@ use gpui_kit::{
 use crate::game_data;
 use crate::i18n::t;
 use crate::settings;
-use crate::ui::{Section, page_body, path_text};
+use crate::ui::{Divided, Section, page_body, path_text};
 use crate::workspace::backups_root;
 
 pub struct GameSettingsPage {
@@ -179,6 +179,7 @@ impl GameSettingsPage {
             }
         };
         Section::new(t!(cx, "game-settings"))
+            .aside()
             .description(t!(cx, "game-settings-description"))
             .child(body)
     }
@@ -196,11 +197,11 @@ impl Render for GameSettingsPage {
         };
 
         page_body().child(
-            v_flex()
-                .gap_6()
-                .max_w(rems(46.))
+            Divided::sections()
+                .max_w(rems(60.))
                 .child(
                     Section::new(t!(cx, "settings-game"))
+                        .aside()
                         .description(t!(cx, "settings-game-description", game = game.name()))
                         .child(
                             v_flex()

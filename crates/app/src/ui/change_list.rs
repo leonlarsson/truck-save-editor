@@ -48,12 +48,13 @@ impl RenderOnce for ChangeList {
         let muted = cx.theme().muted_foreground;
         let foreground = cx.theme().foreground;
         let danger = cx.theme().danger;
-        // Framed, apart from the dialog's own words around it, with every colour set here: a
+        // On a surface of its own, apart from the dialog's own words around it, with every colour set here: a
         // dialog's description is muted throughout, and the new values should stand out.
         v_flex()
             .gap_4()
             .p_3()
             .rounded(cx.theme().radius)
+            .bg(cx.theme().group_box)
             .border_1()
             .border_color(cx.theme().border)
             .children(grouped(self.changes).into_iter().map(|(subject, changes)| {

@@ -574,3 +574,14 @@ One file of short entries instead of a folder of Architecture Decision Records. 
 **Why:** the owner found it hidden under Map ("it's a lot more than a map"), and picked this layout from four designs (map first, a dashboard, the setup steps, the Plugin menu).
 
 **Considered:** a dashboard of panels with the map as one of them (the map is the best part, and it was squeezed); the plugin's controls on Game settings (out of reach from where the player is when they want it gone).
+
+## 2026-11-26: Regions without boxes
+
+**Decided:** a page's regions are no longer bordered cards. `Section` has no border or background: regions are told apart by their titles, by space, and by a hairline between neighbours (`Divided::sections()`; `Divided::rows()` does the same for the rows of a list). Two other looks exist for a reason each: `.panel()`, a surface a shade off the page with a hairline around it (the theme's `group_box` colour; a fill with no line was tried first and read as a bright slab), for the one or two things a page leads with (Overview's money and level, the job in progress); and `.aside()`, the title beside the content, for settings. The change list, the empty state and Live's setup steps lost their frames the same way.
+
+**Why:** every region being a box with the same thin border made pages read as wireframes, with nothing leading. The Design Guides ask for size, weight, spacing and separators before containers, and for emphasis to be scarce: with boxes gone, the filled panels are the emphasis.
+
+**Panels too:** a side panel's groups are `Divided::groups()`. `Stat`'s numerals grew a size.
+
+**Kept:** cards over a map (`MapCard`) keep their border and shadow, since they sit above other content; tables keep the kit's frame and stripes (frameless tables were tried the same day and the owner preferred the frame).
+

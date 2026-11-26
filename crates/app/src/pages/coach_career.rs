@@ -25,8 +25,8 @@ use crate::pages::overview::{Career, skill_icon, skill_label, with_level};
 use crate::session::Session;
 use crate::ui::Tip as _;
 use crate::ui::{
-    AmountChanged, AmountField, FilterBar, FilterChanged, LevelPicker, RowLook, Section, Stat,
-    TextColumn, TextRow, TextTable, page_body,
+    AmountChanged, AmountField, Divided, FilterBar, FilterChanged, LevelPicker, RowLook, Section,
+    Stat, TextColumn, TextRow, TextTable, page_body,
 };
 
 pub struct CoachCareerPage {
@@ -221,6 +221,8 @@ impl CoachCareerPage {
     fn render_experience(&self, cx: &mut Context<Self>) -> Section {
         let experience = self.session.read(cx).career().coach_experience.unwrap_or(0);
         let section = Section::new(t!(cx, "coach-experience"))
+            .panel()
+            .max_w(rems(30.))
             .description(t!(cx, "coach-experience-description"));
         with_level(
             section,
@@ -277,7 +279,7 @@ impl CoachCareerPage {
                             });
                         })),
                 )
-                .children(rows),
+                .child(Divided::rows().children(rows)),
         )
     }
 
@@ -414,8 +416,7 @@ impl CoachCareerPage {
 impl Render for CoachCareerPage {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         page_body().child(
-            v_flex()
-                .gap_6()
+            Divided::sections()
                 .max_w(rems(60.))
                 .child(self.render_experience(cx))
                 .children(self.render_skills(cx))

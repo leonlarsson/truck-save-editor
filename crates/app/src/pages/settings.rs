@@ -18,7 +18,7 @@ use gpui_kit::{
 use crate::i18n::{Language, set_language, t};
 use crate::settings::{self, Appearance};
 use crate::theme;
-use crate::ui::{Section, page_body, path_text};
+use crate::ui::{Divided, Section, page_body, path_text};
 use crate::updates::{self, UpdateState};
 use crate::workspace::backups_root;
 
@@ -78,19 +78,22 @@ impl Render for SettingsPage {
 
         let backups = backups_root();
         page_body().child(
-            v_flex()
-                .gap_6()
-                .max_w(rems(46.))
+            Divided::sections()
+                .max_w(rems(60.))
                 .child(
                     Section::new(t!(cx, "settings-language"))
+                        .aside()
                         .description(t!(cx, "settings-language-description"))
                         .child(h_flex().child(languages)),
                 )
                 .child(
-                    Section::new(t!(cx, "settings-appearance")).child(h_flex().child(appearance)),
+                    Section::new(t!(cx, "settings-appearance"))
+                        .aside()
+                        .child(h_flex().child(appearance)),
                 )
                 .child(
                     Section::new(t!(cx, "settings-backups"))
+                        .aside()
                         .description(t!(cx, "settings-backups-description"))
                         .child(
                             v_flex()
@@ -117,6 +120,7 @@ impl Render for SettingsPage {
                 .child(self.render_updates(cx))
                 .child(
                     Section::new(t!(cx, "settings-reset"))
+                        .aside()
                         .description(t!(cx, "settings-reset-description"))
                         .child(
                             h_flex().child(
@@ -129,7 +133,7 @@ impl Render for SettingsPage {
                         ),
                 )
                 .child(
-                    Section::new(t!(cx, "settings-about")).child(
+                    Section::new(t!(cx, "settings-about")).aside().child(
                         v_flex()
                             .gap_2()
                             .child(div().text_sm().child(format!(
@@ -247,6 +251,7 @@ impl SettingsPage {
                 .into_any_element(),
         };
         Section::new(t!(cx, "settings-updates"))
+            .aside()
             .description(t!(cx, "settings-updates-description"))
             .child(
                 v_flex().gap_3().child(div().text_sm().child(status)).child(

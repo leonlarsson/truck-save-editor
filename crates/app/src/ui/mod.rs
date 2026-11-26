@@ -4,6 +4,7 @@
 mod amount_field;
 mod change_list;
 mod colour;
+mod divided;
 mod empty_state;
 mod fill_table;
 mod filter_bar;
@@ -23,6 +24,7 @@ mod tooltip;
 pub use amount_field::{AmountChanged, AmountField};
 pub use change_list::ChangeList;
 pub use colour::{to_hsla, to_rgb8};
+pub use divided::Divided;
 pub use empty_state::EmptyState;
 pub use fill_table::{FillsWidth, fill_table, fill_widths};
 pub use filter_bar::{FilterBar, FilterChanged, fold, table_or_empty};
@@ -41,13 +43,15 @@ pub use step_buttons::StepButtons;
 pub use text_table::{RowLook, TextColumn, TextRow, TextTable};
 pub use tooltip::Tip;
 
-/// The order a click on a column heading sorts by: ascending first, then the other way.
+/// The order a click on a column heading sorts by: ascending first, then descending, then back to
+/// the save's own order (`ColumnSort::Default`), so a sort can always be taken off again.
 pub fn next_sort(
     current: Option<gpui_kit::component::table::ColumnSort>,
 ) -> gpui_kit::component::table::ColumnSort {
     use gpui_kit::component::table::ColumnSort;
     match current {
         Some(ColumnSort::Ascending) => ColumnSort::Descending,
+        Some(ColumnSort::Descending) => ColumnSort::Default,
         _ => ColumnSort::Ascending,
     }
 }

@@ -32,7 +32,7 @@ use crate::labels;
 use crate::live::PluginState;
 use crate::pages::map_view::MapView;
 use crate::session::Session;
-use crate::ui::{MapCard, Meter, Section, Tip as _, page_body};
+use crate::ui::{Divided, MapCard, Meter, Section, Tip as _, page_body};
 use crate::units;
 
 /// Metres a second in a kilometre an hour, and in a mile an hour.
@@ -271,13 +271,11 @@ impl LivePage {
                     action: Option<AnyElement>,
                     cx: &App| {
             let theme = cx.theme();
+            // No box of its own: the steps are rows of one list, with a line between each two.
             h_flex()
                 .gap_4()
                 .items_center()
-                .p_4()
-                .border_1()
-                .border_color(theme.border)
-                .rounded(theme.radius_lg)
+                .py_1()
                 .child(
                     div()
                         .size(rems(1.75))
@@ -366,10 +364,9 @@ impl LivePage {
                         .items_start()
                         .flex_wrap()
                         .child(
-                            v_flex()
+                            Divided::rows()
                                 .flex_1()
                                 .min_w(rems(24.))
-                                .gap_3()
                                 .child(step(
                                     1,
                                     is_added,
@@ -400,6 +397,7 @@ impl LivePage {
                         )
                         .child(
                             Section::new(t!(cx, "live-facts"))
+                                .panel()
                                 .w(rems(24.))
                                 .child(fact(
                                     t!(cx, "live-fact-reads"),

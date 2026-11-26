@@ -41,9 +41,6 @@ impl RenderOnce for EmptyState {
             .items_center()
             .justify_center()
             .gap_2()
-            .border_1()
-            .border_color(cx.theme().border)
-            .rounded(cx.theme().radius)
             .child(div().font_medium().child(self.title))
             .children(self.description.map(|description| {
                 div()

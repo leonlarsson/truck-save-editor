@@ -181,9 +181,8 @@ impl Render for GarageDetail {
             t!(cx, "garage-buy-large")
         };
 
-        v_flex()
+        crate::ui::Divided::groups()
             .pt_2()
-            .gap_6()
             .child(group(
                 t!(cx, "detail-about"),
                 v_flex()

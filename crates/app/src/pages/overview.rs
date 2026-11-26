@@ -25,7 +25,7 @@ use crate::labels::{ADR_CLASS_COUNT, adr_class, skill_description, skill_name};
 use crate::session::Session;
 use crate::ui::Tip as _;
 use crate::ui::{
-    AmountChanged, AmountField, GameIconView, LevelPicker, Section, StepButtons, page_body,
+    AmountChanged, AmountField, Divided, GameIconView, LevelPicker, Section, StepButtons, page_body,
 };
 
 pub struct OverviewPage {
@@ -159,6 +159,7 @@ impl OverviewPage {
     fn render_money(&self, cx: &mut Context<Self>) -> Section {
         let steps: [i64; 3] = [100_000, 1_000_000, 10_000_000];
         Section::new(t!(cx, "money"))
+            .panel()
             .description(t!(cx, "money-description"))
             .child(self.money.clone())
             .child(h_flex().gap_2().flex_wrap().children(steps.map(|step| {
@@ -175,8 +176,9 @@ impl OverviewPage {
 
     fn render_experience(&self, cx: &mut Context<Self>) -> Section {
         let experience = self.session.read(cx).career().experience;
-        let section =
-            Section::new(t!(cx, "experience")).description(t!(cx, "experience-description"));
+        let section = Section::new(t!(cx, "experience"))
+            .panel()
+            .description(t!(cx, "experience-description"));
         with_level(
             section,
             experience,
@@ -229,7 +231,7 @@ impl OverviewPage {
                         });
                     })),
             )
-            .children(rows)
+            .child(Divided::rows().children(rows))
     }
 
     /// The player's day: tiredness, the police record and the clock, each with what resets it.
@@ -486,7 +488,7 @@ impl OverviewPage {
         }
         Section::new(t!(cx, "day-section"))
             .description(t!(cx, "day-description"))
-            .child(v_flex().gap_2().children(rows))
+            .child(Divided::rows().children(rows))
     }
 
     fn render_adr(&self, cx: &mut Context<Self>) -> Section {
@@ -593,16 +595,30 @@ pub(crate) fn skill_label(
 impl Render for OverviewPage {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         page_body().child(
-            v_flex()
-                .gap_6()
+            Divided::sections()
                 .max_w(rems(60.))
-                // The company, with Quick start beside it (a fresh career's changes, for this
-                // company). Without a readable profile file there's no name to edit, and Quick
-                // start keeps a row of its own.
-                .child(match self.company.clone() {
-                    Some(input) => Section::new(t!(cx, "company-section"))
+                // The top of the page, with no line inside it: Quick start (a fresh career's
+                // changes), then the two big levers.
+                .child(
+                    v_flex()
+                        .gap_6()
+                        .child(h_flex().justify_end().child(self.quick_start_button(cx)))
+                        .child({
+                            // The big levers side by side, at the same height; they wrap on narrow windows.
+                            let cards = vec![self.render_money(cx), self.render_experience(cx)];
+                            h_flex().flex_wrap().items_stretch().gap_6().children(
+                                cards.into_iter().map(|card| {
+                                    v_flex().flex_1().min_w(rems(14.)).child(card.flex_1())
+                                }),
+                            )
+                        }),
+                )
+                // The company's and the profile's names. Without a readable profile file there's
+                // no name to edit, and no section.
+                .children(self.company.clone().map(|input| {
+                    Section::new(t!(cx, "company-section"))
+                        .aside()
                         .description(t!(cx, "company-name-description"))
-                        .action(self.quick_start_button(cx))
                         .child(
                             h_flex()
                                 .gap_4()
@@ -622,21 +638,7 @@ impl Render for OverviewPage {
                                         .child(Input::new(&profile))
                                 })),
                         )
-                        .into_any_element(),
-                    None => h_flex()
-                        .justify_end()
-                        .child(self.quick_start_button(cx))
-                        .into_any_element(),
-                })
-                .child({
-                    // The big levers side by side, at the same height; they wrap on narrow windows.
-                    let cards = vec![self.render_money(cx), self.render_experience(cx)];
-                    h_flex().flex_wrap().items_stretch().gap_6().children(
-                        cards
-                            .into_iter()
-                            .map(|card| v_flex().flex_1().min_w(rems(14.)).child(card.flex_1())),
-                    )
-                })
+                }))
                 .child(self.render_skills(cx))
                 .child(self.render_adr(cx))
                 .child(self.render_day(cx))
