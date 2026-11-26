@@ -1,5 +1,7 @@
 # Captures one window (by title) to a PNG, or a part of it (-Crop "x,y,width,height", in the
 # window's pixels). Used by scripts/look.sh.
+# Only the development build's window (it runs under WSLg): never the Windows app itself, which
+# may be open beside it with a real save. A window owned by truck-save-editor.exe is passed over.
 param([string]$Title, [string]$Out, [string]$Crop = "")
 Add-Type -AssemblyName System.Drawing
 Add-Type @"
@@ -9,6 +11,7 @@ public class W {
   [DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc f, IntPtr l);
   [DllImport("user32.dll")] public static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
   [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
   [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr h, IntPtr hdc, uint flags);
@@ -18,7 +21,7 @@ public class W {
 "@
 [W]::SetProcessDPIAware() | Out-Null
 $found = [IntPtr]::Zero
-[W]::EnumWindows({ param($h, $l) $sb = New-Object System.Text.StringBuilder 256; [W]::GetWindowText($h, $sb, 256) | Out-Null; if ([W]::IsWindowVisible($h) -and $sb.ToString() -like "*$Title*") { $script:found = $h; return $false }; return $true }, [IntPtr]::Zero) | Out-Null
+[W]::EnumWindows({ param($h, $l) $sb = New-Object System.Text.StringBuilder 256; [W]::GetWindowText($h, $sb, 256) | Out-Null; $owner = 0; [W]::GetWindowThreadProcessId($h, [ref]$owner) | Out-Null; $name = (Get-Process -Id $owner -ErrorAction SilentlyContinue).ProcessName; if ([W]::IsWindowVisible($h) -and $sb.ToString() -like "*$Title*" -and $name -ne "truck-save-editor") { $script:found = $h; return $false }; return $true }, [IntPtr]::Zero) | Out-Null
 if ($found -eq [IntPtr]::Zero) { Write-Output "NOTFOUND"; exit 1 }
 $r = New-Object W+RECT; [W]::GetWindowRect($found, [ref]$r) | Out-Null
 $w = $r.R - $r.L; $hgt = $r.B - $r.T

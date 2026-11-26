@@ -1,4 +1,6 @@
 # Clicks or types into one window (by title). Used by scripts/look.sh.
+# Only the development build's window (it runs under WSLg): never the Windows app itself, which
+# may be open beside it with a real save. A window owned by truck-save-editor.exe is passed over.
 param([string]$Title, [string]$Action, [int]$X = 0, [int]$Y = 0, [string]$Keys = "", [int]$Wheel = 0)
 Add-Type @"
 using System; using System.Runtime.InteropServices; using System.Text;
@@ -7,6 +9,7 @@ public class U {
   [DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc f, IntPtr l);
   [DllImport("user32.dll")] public static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
   [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
   [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
@@ -17,7 +20,7 @@ public class U {
 "@
 [U]::SetProcessDPIAware() | Out-Null
 $found = [IntPtr]::Zero
-[U]::EnumWindows({ param($h, $l) $sb = New-Object System.Text.StringBuilder 256; [U]::GetWindowText($h, $sb, 256) | Out-Null; if ([U]::IsWindowVisible($h) -and $sb.ToString() -like "*$Title*") { $script:found = $h; return $false }; return $true }, [IntPtr]::Zero) | Out-Null
+[U]::EnumWindows({ param($h, $l) $sb = New-Object System.Text.StringBuilder 256; [U]::GetWindowText($h, $sb, 256) | Out-Null; $owner = 0; [U]::GetWindowThreadProcessId($h, [ref]$owner) | Out-Null; $name = (Get-Process -Id $owner -ErrorAction SilentlyContinue).ProcessName; if ([U]::IsWindowVisible($h) -and $sb.ToString() -like "*$Title*" -and $name -ne "truck-save-editor") { $script:found = $h; return $false }; return $true }, [IntPtr]::Zero) | Out-Null
 if ($found -eq [IntPtr]::Zero) { Write-Output "NOTFOUND"; exit 1 }
 [U]::SetForegroundWindow($found) | Out-Null
 Start-Sleep -Milliseconds 200
