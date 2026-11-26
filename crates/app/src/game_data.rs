@@ -187,6 +187,11 @@ pub fn set_game(cx: &mut App, game: Game) {
         }
         None => {
             forget_map(cx);
+            // The other game's data goes at once, not when this one's has been read: until then
+            // nothing is known (and nothing is said), where the other game's answers would be
+            // wrong ones: its DLCs held against this game's saves, its names for this game's
+            // cities.
+            cx.set_global(Loaded::default());
             load(cx);
         }
     }
@@ -860,4 +865,44 @@ pub fn part_name(cx: &App, path: &str) -> String {
             .map(|stem| stem.to_string_lossy().to_uppercase())
             .unwrap_or_default()
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gpui_kit::TestAppContext;
+
+    #[gpui_kit::test]
+    fn another_game_s_installed_content_is_forgotten_as_soon_as_the_game_changes(
+        cx: &mut TestAppContext,
+    ) {
+        cx.update(|cx| {
+            crate::settings::init(cx);
+            // Euro Truck Simulator 2's data is read, with a DLC installed.
+            cx.set_global(CurrentGame(Game::Ets2));
+            let mut installed = gamedata::Installed::default();
+            installed.dlcs.insert("eut2_north".to_string());
+            cx.set_global(Loaded {
+                data: None,
+                installed: Some(Arc::new(installed)),
+                is_loading: false,
+            });
+            assert!(installed_now(cx));
+
+            // American Truck Simulator is picked, and its data isn't read yet: what ETS2 has
+            // installed says nothing about an ATS save, so nothing is known for now.
+            set_game(cx, Game::Ats);
+            assert!(!installed_now(cx));
+            assert!(is_loading(cx));
+
+            // Back to ETS2: its own is shown again at once (it was kept only if its map was
+            // read too; here it's read again).
+            set_game(cx, Game::Ets2);
+            assert_eq!(current_game(cx), Game::Ets2);
+        });
+    }
+
+    fn installed_now(cx: &App) -> bool {
+        installed(cx).is_some()
+    }
 }
