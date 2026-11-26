@@ -66,15 +66,20 @@ impl GaragesPage {
             cx.subscribe(&filter, |this, _, _: &FilterChanged, cx| this.reload(cx)),
             // A click on a column's heading sorts by it (the table itself would select the
             // column, which nothing here uses).
-            cx.subscribe_in(&table, window, |_, table, event: &TableEvent, _, cx| {
+            cx.subscribe_in(&table, window, |this, table, event: &TableEvent, _, cx| {
                 if let TableEvent::SelectColumn(col_ix) = event {
                     let col_ix = *col_ix;
-                    table.update(cx, |table, cx| {
-                        table.delegate_mut().sort_by_header(col_ix, cx);
+                    let is_reset = table.update(cx, |table, cx| {
+                        let is_reset = table.delegate_mut().sort_by_header(col_ix, cx);
                         table.clear_selection(cx);
                         table.refresh(cx);
                         cx.notify();
+                        is_reset
                     });
+                    // Sorting off: the rows go back to the save's own order.
+                    if is_reset {
+                        this.reload(cx);
+                    }
                 }
             }),
             cx.subscribe_in(
@@ -398,22 +403,25 @@ impl GarageTable {
         }
     }
 
-    /// A click on a column's heading: sort by it, ascending first, then the other way. Columns
+    /// A click on a column's heading: sort by it: ascending, then descending, then not at all. Columns
     /// that can't be sorted (Details) are left alone.
-    fn sort_by_header(&mut self, col_ix: usize, cx: &App) {
+    fn sort_by_header(&mut self, col_ix: usize, cx: &App) -> bool {
         let Some(column) = GarageColumn::ALL.get(col_ix).copied() else {
-            return;
+            return false;
         };
         if self.base_column(col_ix, cx).sort.is_none() {
-            return;
+            return false;
         }
         let current = self
             .sort
             .filter(|(sorted, _)| *sorted == column)
             .map(|(_, order)| order);
         let order = crate::ui::next_sort(current);
-        self.sort = Some((column, order));
+        // The third click takes the sort off: the page then lists the rows in the save's order
+        // again (this says so by answering `true`).
+        self.sort = (order != ColumnSort::Default).then_some((column, order));
         self.sort_by(column, order);
+        order == ColumnSort::Default
     }
 
     fn set_garages(&mut self, garages: Vec<Garage>) {
@@ -532,18 +540,17 @@ impl TableDelegate for GarageTable {
         }
     }
 
+    /// The kit calls this for a click on a heading's sort button. That click is also a click on
+    /// the heading itself, which sorts (`sort_by_header`, from the page's `SelectColumn`
+    /// subscription); sorting here too made the two undo each other, so the button seemed to
+    /// do nothing. The heading's way is the one way.
     fn perform_sort(
         &mut self,
-        col_ix: usize,
-        sort: ColumnSort,
+        _: usize,
+        _: ColumnSort,
         _: &mut Window,
         _: &mut Context<TableState<Self>>,
     ) {
-        let Some(column) = GarageColumn::ALL.get(col_ix).copied() else {
-            return;
-        };
-        self.sort = (sort != ColumnSort::Default).then_some((column, sort));
-        self.sort_by(column, sort);
     }
 
     /// Headings as the kit draws them, but the pick column's: a checkbox for every row shown.
