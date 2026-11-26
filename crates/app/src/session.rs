@@ -1005,8 +1005,8 @@ impl Session {
     }
 
     /// Marks viewpoints as visited (watched), as if the player had seen each. Those visited
-    /// already are no change.
-    pub fn visit_viewpoints(&mut self, ids: &[u64], cx: &mut Context<Self>) {
+    /// already are no change. One step for Undo, however many; returns how many were new.
+    pub fn visit_viewpoints(&mut self, ids: &[u64], cx: &mut Context<Self>) -> usize {
         let states = self.viewpoint_states();
         let saved: std::collections::HashMap<u64, Option<save::ViewpointState>> =
             save::cutscene_states(&self.loaded.game)
@@ -1018,8 +1018,9 @@ impl Session {
             .filter(|id| states.get(id) != Some(&save::ViewpointState::Visited))
             .collect();
         if new.is_empty() {
-            return;
+            return 0;
         }
+        let count = new.len();
         self.change(cx, |pending, _| {
             for id in new {
                 // Forgotten earlier: taking that back is enough when the save had it visited.
@@ -1029,12 +1030,13 @@ impl Session {
                 }
             }
         });
+        count
     }
 
     /// Every viewpoint the save may have, visited.
     pub fn visit_every_viewpoint(&mut self, cx: &mut Context<Self>) {
         let all = self.game_viewpoints.clone();
-        self.visit_viewpoints(&all, cx);
+        let _ = self.visit_viewpoints(&all, cx);
     }
 
     /// Forgets a viewpoint, as never found (the game finds it again when driven past).
@@ -1051,6 +1053,34 @@ impl Session {
                 pending.forgotten_viewpoints.insert(id);
             }
         });
+    }
+
+    /// Forgets several viewpoints, as one change (one step for Undo). Returns how many were
+    /// found or visited.
+    pub fn forget_viewpoints(&mut self, ids: &[u64], cx: &mut Context<Self>) -> usize {
+        let states = self.viewpoint_states();
+        let saved: std::collections::HashSet<u64> = save::cutscene_states(&self.loaded.game)
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect();
+        let known: Vec<u64> = ids
+            .iter()
+            .copied()
+            .filter(|id| states.contains_key(id))
+            .collect();
+        if known.is_empty() {
+            return 0;
+        }
+        let count = known.len();
+        self.change(cx, |pending, _| {
+            for id in known {
+                pending.visited_viewpoints.remove(&id);
+                if saved.contains(&id) {
+                    pending.forgotten_viewpoints.insert(id);
+                }
+            }
+        });
+        count
     }
 
     /// How many of the game's viewpoints a document has visited.
@@ -1183,6 +1213,122 @@ impl Session {
                 pending.unvisited_cities.insert(token.to_string());
             }
         });
+    }
+
+    /// Marks several cities as visited, as one change (one step for Undo). Returns how many
+    /// weren't visited before.
+    pub fn visit_cities_many(&mut self, tokens: &[String], cx: &mut Context<Self>) -> usize {
+        let cities = self.cities();
+        let is_visited = |token: &String| {
+            cities
+                .iter()
+                .any(|city| &city.token == token && city.visits > 0)
+        };
+        let new: Vec<String> = tokens
+            .iter()
+            .filter(|token| !is_visited(token))
+            .cloned()
+            .collect();
+        if new.is_empty() {
+            return 0;
+        }
+        let count = new.len();
+        self.change(cx, |pending, _| {
+            for token in new {
+                // Asked to be unvisited earlier: taking that back brings back its count.
+                if !pending.unvisited_cities.remove(&token) {
+                    pending.visited_cities.insert(token);
+                }
+            }
+        });
+        count
+    }
+
+    /// Marks several cities as never visited, as one change. Returns how many were visited.
+    pub fn unvisit_cities_many(&mut self, tokens: &[String], cx: &mut Context<Self>) -> usize {
+        let cities = self.cities();
+        // Each with whether the save itself (or Visit every city) has it visited: those are
+        // taken out when saving.
+        let visited: Vec<(String, bool)> = tokens
+            .iter()
+            .filter(|token| {
+                cities
+                    .iter()
+                    .any(|city| &city.token == *token && city.visits > 0)
+            })
+            .map(|token| {
+                let otherwise = self.was_visited(token) || self.pending.visit_all_cities;
+                (token.clone(), otherwise)
+            })
+            .collect();
+        if visited.is_empty() {
+            return 0;
+        }
+        let count = visited.len();
+        self.change(cx, |pending, _| {
+            for (token, is_visited_otherwise) in visited {
+                pending.visited_cities.remove(&token);
+                if is_visited_otherwise {
+                    pending.unvisited_cities.insert(token);
+                }
+            }
+        });
+        count
+    }
+
+    /// Unlocks several cities' dealers (or agencies), as one change. Returns how many were
+    /// locked. The caller passes only cities that have one.
+    pub fn unlock_many(
+        &mut self,
+        place: Place,
+        tokens: &[String],
+        cx: &mut Context<Self>,
+    ) -> usize {
+        let unlocked = self.unlocked(place);
+        let new: Vec<String> = tokens
+            .iter()
+            .filter(|token| !unlocked.contains(*token))
+            .cloned()
+            .collect();
+        if new.is_empty() {
+            return 0;
+        }
+        let count = new.len();
+        self.change(cx, |pending, _| {
+            for token in new {
+                // Asked to be locked earlier: taking that back is enough.
+                if !pending.locks_mut(place).remove(&token) {
+                    pending.unlocks_mut(place).insert(token);
+                }
+            }
+        });
+        count
+    }
+
+    /// Locks several cities' dealers (or agencies) again, as one change. Returns how many were
+    /// unlocked.
+    pub fn lock_many(&mut self, place: Place, tokens: &[String], cx: &mut Context<Self>) -> usize {
+        let unlocked = self.unlocked(place);
+        let in_save = save::unlocked(&self.loaded.game, place);
+        // Each with whether the save itself has it unlocked: those are taken out when saving.
+        let old: Vec<(String, bool)> = tokens
+            .iter()
+            .filter(|token| unlocked.contains(*token))
+            .map(|token| (token.clone(), in_save.contains(token)))
+            .collect();
+        if old.is_empty() {
+            return 0;
+        }
+        let count = old.len();
+        self.change(cx, |pending, _| {
+            for (token, was_unlocked) in old {
+                pending.unlocks_mut(place).remove(&token);
+                if was_unlocked {
+                    pending.locks_mut(place).insert(token);
+                }
+            }
+        });
+        count
     }
 
     /// Unlocks one city's dealer (or agency), as if the player had driven past it.
@@ -2925,6 +3071,51 @@ mod tests {
         session.update(cx, |session, cx| session.unlock(Place::Dealer, "lyon", cx));
         session.update(cx, |session, cx| session.lock(Place::Dealer, "lyon", cx));
         assert_eq!(count(&session, cx), before);
+    }
+
+    #[gpui_kit::test]
+    fn changes_several_cities_as_one_step(cx: &mut TestAppContext) {
+        let session = session_of(CITIES, cx);
+        let both = ["berlin".to_string(), "lyon".to_string()];
+        let dealers = |session: &Entity<Session>, cx: &mut TestAppContext| {
+            cx.update(|cx| session.read(cx).unlocked(Place::Dealer))
+        };
+
+        // Visiting both: only Lyon is new, and it's one step.
+        let new = session.update(cx, |session, cx| session.visit_cities_many(&both, cx));
+        assert_eq!(new, 1);
+        assert_eq!(visits(&session, "lyon", cx), 1);
+        assert_eq!(visits(&session, "berlin", cx), 4);
+        // Again changes nothing, and leaves no step.
+        let new = session.update(cx, |session, cx| session.visit_cities_many(&both, cx));
+        assert_eq!(new, 0);
+        session.update(cx, |session, cx| session.undo(cx));
+        assert_eq!(visits(&session, "lyon", cx), 0);
+        cx.update(|cx| assert!(!session.read(cx).can_undo()));
+
+        // Unvisiting both: only Berlin was visited; one Undo brings its count back.
+        let gone = session.update(cx, |session, cx| session.unvisit_cities_many(&both, cx));
+        assert_eq!(gone, 1);
+        assert_eq!(visits(&session, "berlin", cx), 0);
+        session.update(cx, |session, cx| session.undo(cx));
+        assert_eq!(visits(&session, "berlin", cx), 4);
+
+        // Unlocking both dealers: Lyon's is new. Locking both takes both, in one step.
+        let new = session.update(cx, |session, cx| {
+            session.unlock_many(Place::Dealer, &both, cx)
+        });
+        assert_eq!(new, 1);
+        assert_eq!(dealers(&session, cx).len(), 2);
+        let locked = session.update(cx, |session, cx| {
+            session.lock_many(Place::Dealer, &both, cx)
+        });
+        assert_eq!(locked, 2);
+        assert!(dealers(&session, cx).is_empty());
+        session.update(cx, |session, cx| session.undo(cx));
+        assert_eq!(dealers(&session, cx).len(), 2);
+        session.update(cx, |session, cx| session.undo(cx));
+        assert_eq!(dealers(&session, cx).len(), 1);
+        cx.update(|cx| assert_eq!(session.read(cx).change_count(), 0));
     }
 
     /// A truck with its engine half worn and three wheels.

@@ -1099,6 +1099,17 @@ picks-done-large = { $count ->
 picks-done-body = Cofnij odwraca zmianę. Nic nie zostanie zapisane, dopóki nie zapiszesz.
 picks-all = Wybierz każdy widoczny wiersz
 picks-row = Wybierz: { $name }
+picks-unlock-dealers = Odblokuj dealerów
+picks-lock-dealers = Zablokuj dealerów
+picks-unlock-agencies = Odblokuj agencje
+picks-lock-agencies = Zablokuj agencje
+picks-done-changed = { $count ->
+    [one] Zmieniono 1 wiersz
+    [few] Zmieniono { $count } wiersze
+    [many] Zmieniono { $count } wierszy
+   *[other] Zmieniono { $count } wiersza
+}
+picks-done-nothing = Nic do zmiany: wybrane wiersze już takie są.
 
 ## Statistics
 page-statistics = Statystyki

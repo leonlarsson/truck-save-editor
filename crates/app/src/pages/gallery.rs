@@ -13,7 +13,7 @@ use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Sizable as _, WindowExt as _,
     button::Button,
     h_flex,
-    table::{DataTable, TableEvent, TableState},
+    table::{ColumnSort, DataTable, TableEvent, TableState},
     v_flex,
 };
 use gpui_kit::{
@@ -197,9 +197,12 @@ impl GalleryView {
         let page = cx.entity().downgrade();
         let details = t!(cx, "details-open");
         let table = cx.new(|cx| {
-            let rows = TextTable::new(columns).with_details(details, move |row, window, cx| {
-                let _ = page.update(cx, |page, cx| page.open_row(row, window, cx));
-            });
+            let rows = TextTable::new(columns)
+                .with_picks()
+                .with_sorting()
+                .with_details(details, move |row, window, cx| {
+                    let _ = page.update(cx, |page, cx| page.open_row(row, window, cx));
+                });
             TableState::new(rows, window, cx)
         });
         let toggles = vec![
@@ -217,11 +220,28 @@ impl GalleryView {
             cx.observe(&session, |this, _, cx| this.reload(cx)),
             game_data::observe(cx, |this, cx| this.reload(cx)),
             cx.subscribe(&filter, |this, _, _: &FilterChanged, cx| this.reload(cx)),
-            cx.subscribe_in(&table, window, |this, _, event: &TableEvent, window, cx| {
-                if let TableEvent::DoubleClickedRow(row) = event {
-                    this.open_row(*row, window, cx);
-                }
-            }),
+            // Picking a row shows the bar of what can be done to the picked viewpoints.
+            cx.observe(&table, |_, _, cx| cx.notify()),
+            cx.subscribe_in(
+                &table,
+                window,
+                |this, table, event: &TableEvent, window, cx| {
+                    match event {
+                        TableEvent::DoubleClickedRow(row) => this.open_row(*row, window, cx),
+                        // A click on a column's heading sorts by it (the table itself would select
+                        // the column, which nothing here uses).
+                        TableEvent::SelectColumn(col_ix) => {
+                            let col_ix = *col_ix;
+                            table.update(cx, |table, cx| {
+                                table.delegate_mut().sort_by_header(col_ix);
+                                table.clear_selection(cx);
+                            });
+                            this.reload(cx);
+                        }
+                        _ => {}
+                    }
+                },
+            ),
         ];
         let mut view = Self {
             session,
@@ -272,8 +292,19 @@ impl GalleryView {
                 filter.matches(&texts, cx)
             })
             .collect();
-        // By country, then name.
+        // By country, then name; then by the column whose heading was clicked, if one was
+        // (rows that are equal there keep that order).
         shown.sort_by(|a, b| a.1[2].cmp(&b.1[2]).then(a.1[0].cmp(&b.1[0])));
+        if let Some((column, order)) = self.table.read(cx).delegate().sort {
+            shown.sort_by(|a, b| {
+                let ordering = a.1.get(column).cmp(&b.1.get(column));
+                if order == ColumnSort::Descending {
+                    ordering.reverse()
+                } else {
+                    ordering
+                }
+            });
+        }
         let rows: Vec<TextRow> = shown
             .iter()
             .map(|(entry, cells)| TextRow {
@@ -289,12 +320,90 @@ impl GalleryView {
         self.shown = shown.into_iter().map(|(entry, _)| entry).collect();
         self.filter
             .update(cx, |filter, cx| filter.set_counts(count, total, cx));
+        // Viewpoints can be picked (by their item in the save); photo trophies are the player's
+        // own photos, which the editor only shows, so their rows have no checkbox.
+        let pick_ids: Vec<Option<String>> = self
+            .shown
+            .iter()
+            .map(|entry| entry.viewpoint_item().map(|item| item.to_string()))
+            .collect();
         self.table.update(cx, |table, cx| {
+            table.delegate_mut().pick_ids = pick_ids;
             table.delegate_mut().rows = rows;
             table.refresh(cx);
             cx.notify();
         });
         cx.notify();
+    }
+
+    /// Ticks the first rows' checkboxes (for `TSE_SCRIPT`'s `pick` step, to look at the bar).
+    pub(crate) fn pick_first(&mut self, count: usize, cx: &mut Context<Self>) {
+        self.table.update(cx, |table, cx| {
+            let delegate = table.delegate_mut();
+            let ids: Vec<String> = delegate
+                .pick_ids
+                .iter()
+                .flatten()
+                .take(count)
+                .cloned()
+                .collect();
+            for id in &ids {
+                if !delegate.picks.contains(id) {
+                    delegate.picks.toggle(id);
+                }
+            }
+            cx.notify();
+        });
+    }
+
+    /// The bar above the table while viewpoints are picked: mark them all visited, or not
+    /// found. Each is one change (one step for Undo).
+    fn render_pick_bar(&self, cx: &mut Context<Self>) -> Option<crate::ui::PickBar> {
+        let picks = self.table.read(cx).delegate().picks.clone();
+        if picks.is_empty() {
+            return None;
+        }
+        // The picks are the viewpoints' items, written as text.
+        let items: Vec<u64> = picks
+            .ids()
+            .iter()
+            .filter_map(|id| id.parse().ok())
+            .collect();
+        let table = self.table.clone();
+        let (visit, forget) = (items.clone(), items);
+        let bar = crate::ui::PickBar::new(picks.len(), move |_, cx| {
+            table.update(cx, |table, cx| {
+                table.delegate_mut().picks.clear();
+                cx.notify();
+            });
+        })
+        .action(
+            Button::new("picks-visit")
+                .small()
+                .outline()
+                .label(t!(cx, "gallery-visit"))
+                .tip(t!(cx, "gallery-visit-tooltip"))
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    let changed = this
+                        .session
+                        .update(cx, |session, cx| session.visit_viewpoints(&visit, cx));
+                    crate::ui::picks_changed(changed, window, cx);
+                })),
+        )
+        .action(
+            Button::new("picks-forget")
+                .small()
+                .outline()
+                .label(t!(cx, "gallery-forget"))
+                .tip(t!(cx, "gallery-forget-tooltip"))
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    let changed = this
+                        .session
+                        .update(cx, |session, cx| session.forget_viewpoints(&forget, cx));
+                    crate::ui::picks_changed(changed, window, cx);
+                })),
+        );
+        Some(bar)
     }
 
     fn open_row(&mut self, row: usize, window: &mut Window, cx: &mut Context<Self>) {
@@ -317,13 +426,17 @@ impl Render for GalleryView {
         let (viewpoints, visited) = (count(GalleryKind::Viewpoint), done(GalleryKind::Viewpoint));
         let (landmarks, captured) = (count(GalleryKind::Landmark), done(GalleryKind::Landmark));
         let has_game = game_data::photo_album(cx).is_some();
+        let pick_bar = self.render_pick_bar(cx);
         v_flex()
             .size_full()
             .gap_4()
             .px_8()
             .py_6()
-            .child(
-                h_flex()
+            // While viewpoints are picked, the bar of what can be done to them takes the
+            // toolbar's place.
+            .child(match pick_bar {
+                Some(bar) => bar.into_any_element(),
+                None => h_flex()
                     .justify_between()
                     .items_center()
                     .gap_4()
@@ -358,8 +471,9 @@ impl Render for GalleryView {
                                 this.session
                                     .update(cx, |session, cx| session.visit_every_viewpoint(cx));
                             })),
-                    ),
-            )
+                    )
+                    .into_any_element(),
+            })
             // Where each is kept, so a change here isn't expected in the profile's other saves.
             .child(
                 div()

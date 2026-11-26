@@ -1044,6 +1044,15 @@ picks-done-large = { $count ->
 picks-done-body = Undo takes it back. Nothing is written until you save.
 picks-all = Pick every row shown
 picks-row = Pick { $name }
+picks-unlock-dealers = Unlock dealers
+picks-lock-dealers = Lock dealers
+picks-unlock-agencies = Unlock agencies
+picks-lock-agencies = Lock agencies
+picks-done-changed = { $count ->
+    [one] Changed 1 row
+   *[other] Changed { $count } rows
+}
+picks-done-nothing = Nothing to change: the rows you picked are like that already.
 
 ## Statistics
 page-statistics = Statistics

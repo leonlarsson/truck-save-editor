@@ -176,6 +176,22 @@ pub fn picks_done(title: SharedString, is_complete: bool, window: &mut Window, c
     );
 }
 
+/// Says what an action on the picked rows changed: how many, or that there was nothing to change
+/// (they were all like that already).
+pub fn picks_changed(count: usize, window: &mut Window, cx: &mut App) {
+    if count > 0 {
+        picks_done(
+            t!(cx, "picks-done-changed", count = count),
+            true,
+            window,
+            cx,
+        );
+        return;
+    }
+    use gpui_kit::component::{WindowExt as _, notification::Notification};
+    window.push_notification(Notification::new().title(t!(cx, "picks-done-nothing")), cx);
+}
+
 /// An item in a list to choose from (a garage to move picked rows to): shown by its name, chosen
 /// by its value (an id).
 #[derive(Clone)]

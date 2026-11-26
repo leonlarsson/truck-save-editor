@@ -35,7 +35,8 @@ pub use meter::Meter;
 pub use page::{PageHeader, page_body};
 pub use path_text::path_text;
 pub use picks::{
-    Choice, DetailChoice, PickBar, Picks, keep_clicks, owned_garages, pick_box, picks_done,
+    Choice, DetailChoice, PickBar, Picks, keep_clicks, owned_garages, pick_box, picks_changed,
+    picks_done,
 };
 pub use section::Section;
 pub use stat::Stat;

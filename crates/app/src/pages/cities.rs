@@ -8,7 +8,7 @@ use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Sizable as _,
     button::Button,
     h_flex,
-    table::{DataTable, TableEvent, TableState},
+    table::{ColumnSort, DataTable, TableEvent, TableState},
     v_flex,
 };
 use gpui_kit::{
@@ -84,9 +84,12 @@ impl CitiesPage {
         let page = cx.entity().downgrade();
         let details = t!(cx, "details-open");
         let table = cx.new(|cx| {
-            let rows = TextTable::new(columns).with_details(details, move |row, window, cx| {
-                let _ = page.update(cx, |page, cx| page.open_city(row, window, cx));
-            });
+            let rows = TextTable::new(columns)
+                .with_picks()
+                .with_sorting()
+                .with_details(details, move |row, window, cx| {
+                    let _ = page.update(cx, |page, cx| page.open_city(row, window, cx));
+                });
             TableState::new(rows, window, cx)
         });
         let toggles = vec![
@@ -102,11 +105,28 @@ impl CitiesPage {
             // ATS's recruitment agencies are found on its map, read after the rest.
             game_data::observe_map_in(window, cx, |this, _, cx| this.reload(cx)),
             cx.subscribe(&filter, |this, _, _: &FilterChanged, cx| this.reload(cx)),
-            cx.subscribe_in(&table, window, |this, _, event: &TableEvent, window, cx| {
-                if let TableEvent::DoubleClickedRow(row) = event {
-                    this.open_city(*row, window, cx);
-                }
-            }),
+            // Picking a row shows the bar of what can be done to the picked cities.
+            cx.observe(&table, |_, _, cx| cx.notify()),
+            cx.subscribe_in(
+                &table,
+                window,
+                |this, table, event: &TableEvent, window, cx| {
+                    match event {
+                        TableEvent::DoubleClickedRow(row) => this.open_city(*row, window, cx),
+                        // A click on a column's heading sorts by it (the table itself would select
+                        // the column, which nothing here uses).
+                        TableEvent::SelectColumn(col_ix) => {
+                            let col_ix = *col_ix;
+                            table.update(cx, |table, cx| {
+                                table.delegate_mut().sort_by_header(col_ix);
+                                table.clear_selection(cx);
+                            });
+                            this.reload(cx);
+                        }
+                        _ => {}
+                    }
+                },
+            ),
         ];
         let mut page = Self {
             session,
@@ -152,7 +172,25 @@ impl CitiesPage {
                 )
             })
             .collect();
+        // By name; then by the column whose heading was clicked, if one was (cities that are
+        // equal there stay in name order).
         cities.sort_by(|a, b| a.0.cmp(&b.0));
+        if let Some((column, order)) = self.table.read(cx).delegate().sort {
+            cities.sort_by(|a, b| {
+                let ordering = match column {
+                    0 => a.0.cmp(&b.0),
+                    // Visits as a number, not as the text the cell shows.
+                    1 => a.1.cmp(&b.1),
+                    2 => a.2.cmp(&b.2),
+                    _ => a.3.cmp(&b.3),
+                };
+                if order == ColumnSort::Descending {
+                    ordering.reverse()
+                } else {
+                    ordering
+                }
+            });
+        }
         self.count = cities.len();
         self.visited = cities.iter().filter(|city| city.1 > 0).count();
         // "Not found yet" is what the cell says when the city has one that's still locked.
@@ -189,12 +227,143 @@ impl CitiesPage {
                 },
             })
             .collect();
+        // A row is picked by its city, so picks follow the cities through search and filters.
+        let pick_ids: Vec<Option<String>> = self.tokens.iter().cloned().map(Some).collect();
         self.table.update(cx, |table, cx| {
+            table.delegate_mut().pick_ids = pick_ids;
             table.delegate_mut().rows = rows;
             table.refresh(cx);
             cx.notify();
         });
         cx.notify();
+    }
+
+    /// Ticks the first rows' checkboxes (for `TSE_SCRIPT`'s `pick` step, to look at the bar).
+    pub(crate) fn pick_first(&mut self, count: usize, cx: &mut Context<Self>) {
+        self.table.update(cx, |table, cx| {
+            let delegate = table.delegate_mut();
+            let ids: Vec<String> = delegate
+                .pick_ids
+                .iter()
+                .flatten()
+                .take(count)
+                .cloned()
+                .collect();
+            for id in &ids {
+                if !delegate.picks.contains(id) {
+                    delegate.picks.toggle(id);
+                }
+            }
+            cx.notify();
+        });
+    }
+
+    /// The bar above the table while cities are picked: what can be done to all of them. Each
+    /// is one change (one step for Undo), however many cities it touches.
+    fn render_pick_bar(&self, cx: &mut Context<Self>) -> Option<crate::ui::PickBar> {
+        let picks = self.table.read(cx).delegate().picks.clone();
+        if picks.is_empty() {
+            return None;
+        }
+        let tokens = picks.ids();
+        let table = self.table.clone();
+        let mut bar = crate::ui::PickBar::new(picks.len(), move |_, cx| {
+            table.update(cx, |table, cx| {
+                table.delegate_mut().picks.clear();
+                cx.notify();
+            });
+        });
+
+        // One button: does its work on the picked cities, then says how many it changed.
+        let action = |id: &'static str,
+                      label: SharedString,
+                      tip: SharedString,
+                      cities: Vec<String>,
+                      work: fn(&mut Session, &[String], &mut Context<Session>) -> usize,
+                      cx: &mut Context<Self>| {
+            Button::new(id)
+                .small()
+                .outline()
+                .label(label)
+                .tip(tip)
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    let changed = this
+                        .session
+                        .update(cx, |session, cx| work(session, &cities, cx));
+                    crate::ui::picks_changed(changed, window, cx);
+                }))
+        };
+        bar = bar
+            .action(action(
+                "picks-visit",
+                t!(cx, "city-visit"),
+                t!(cx, "city-visit-tooltip"),
+                tokens.clone(),
+                |session, cities, cx| session.visit_cities_many(cities, cx),
+                cx,
+            ))
+            .action(action(
+                "picks-unvisit",
+                t!(cx, "city-unvisit"),
+                t!(cx, "city-unvisit-tooltip"),
+                tokens.clone(),
+                |session, cities, cx| session.unvisit_cities_many(cities, cx),
+                cx,
+            ));
+
+        // Dealers and agencies: only when the game's data says where they are, and only for the
+        // picked cities that have one.
+        let session = self.session.read(cx);
+        let with_place = |place: Place| -> Option<Vec<String>> {
+            let cities = session.place_cities(place, cx)?;
+            Some(
+                tokens
+                    .iter()
+                    .filter(|token| cities.contains(*token))
+                    .cloned()
+                    .collect(),
+            )
+        };
+        let (dealers, agencies) = (with_place(Place::Dealer), with_place(Place::Recruitment));
+        if let Some(dealers) = dealers.filter(|cities| !cities.is_empty()) {
+            bar = bar
+                .action(action(
+                    "picks-unlock-dealers",
+                    t!(cx, "picks-unlock-dealers"),
+                    t!(cx, "city-unlock-tooltip"),
+                    dealers.clone(),
+                    |session, cities, cx| session.unlock_many(Place::Dealer, cities, cx),
+                    cx,
+                ))
+                .action(action(
+                    "picks-lock-dealers",
+                    t!(cx, "picks-lock-dealers"),
+                    t!(cx, "city-lock-tooltip"),
+                    dealers,
+                    |session, cities, cx| session.lock_many(Place::Dealer, cities, cx),
+                    cx,
+                ));
+        }
+        if let Some(agencies) = agencies.filter(|cities| !cities.is_empty()) {
+            bar = bar
+                .action(action(
+                    "picks-unlock-agencies",
+                    t!(cx, "picks-unlock-agencies"),
+                    t!(cx, "city-unlock-tooltip"),
+                    agencies.clone(),
+                    |session, cities, cx| session.unlock_many(Place::Recruitment, cities, cx),
+                    cx,
+                ))
+                .action(action(
+                    "picks-lock-agencies",
+                    t!(cx, "picks-lock-agencies"),
+                    t!(cx, "city-lock-tooltip"),
+                    agencies,
+                    |session, cities, cx| session.lock_many(Place::Recruitment, cities, cx),
+                    cx,
+                ));
+        }
+        Some(bar)
     }
 
     /// Opens the panel of the city on this row.
@@ -293,13 +462,17 @@ impl Render for CitiesPage {
             .into_iter()
             .map(|part| div().whitespace_nowrap().child(part));
 
+        let pick_bar = self.render_pick_bar(cx);
         v_flex()
             .size_full()
             .gap_4()
             .px_8()
             .py_6()
-            .child(
-                h_flex()
+            // While cities are picked, the bar of what can be done to them takes the toolbar's
+            // place.
+            .child(match pick_bar {
+                Some(bar) => bar.into_any_element(),
+                None => h_flex()
                     .justify_between()
                     .items_center()
                     .gap_4()
@@ -361,8 +534,9 @@ impl Render for CitiesPage {
                                         this.unlock(Place::Recruitment, cx)
                                     })),
                             ),
-                    ),
-            )
+                    )
+                    .into_any_element(),
+            })
             .child(self.filter.clone())
             // Not hidden, and not just a disabled button: say why, and what makes it work.
             .children(

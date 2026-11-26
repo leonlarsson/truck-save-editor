@@ -7,7 +7,7 @@
 # <slot folder> is a copy of a save (fixtures/…, never a live save). The steps (one per line; see
 # crates/app/src/dev_script.rs) run once the game's data and map have loaded:
 #
-#   page gallery | theme dark | run Visit every city | close | wait 1500 | shot gallery-dark
+#   page gallery | theme dark | run Visit every city | pick 3 | close | wait 1500 | shot gallery-dark
 #
 # `shot <name>` saves the app's window (less its frame) as <out folder>/<name>.png; a name can
 # hold folders. Extra ENV=VALUE pairs go to the app (TSE_THEME=dark, TSE_FIND_CITY=hamburg …).

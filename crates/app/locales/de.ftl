@@ -1048,6 +1048,15 @@ picks-done-large = { $count ->
 picks-done-body = Mit Rückgängig lässt es sich zurücknehmen. Geschrieben wird erst beim Speichern.
 picks-all = Jede angezeigte Zeile auswählen
 picks-row = { $name } auswählen
+picks-unlock-dealers = Händler freischalten
+picks-lock-dealers = Händler sperren
+picks-unlock-agencies = Agenturen freischalten
+picks-lock-agencies = Agenturen sperren
+picks-done-changed = { $count ->
+    [one] 1 Zeile geändert
+   *[other] { $count } Zeilen geändert
+}
+picks-done-nothing = Nichts zu ändern: Die ausgewählten Zeilen sind bereits so.
 
 ## Statistics
 page-statistics = Statistiken

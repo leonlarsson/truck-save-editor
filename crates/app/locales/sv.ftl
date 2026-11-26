@@ -1044,6 +1044,15 @@ picks-done-large = { $count ->
 picks-done-body = Ångra tar tillbaka det. Inget skrivs förrän du sparar.
 picks-all = Välj varje rad som visas
 picks-row = Välj { $name }
+picks-unlock-dealers = Lås upp handlare
+picks-lock-dealers = Lås handlare
+picks-unlock-agencies = Lås upp byråer
+picks-lock-agencies = Lås byråer
+picks-done-changed = { $count ->
+    [one] Ändrade 1 rad
+   *[other] Ändrade { $count } rader
+}
+picks-done-nothing = Inget att ändra: raderna du valde är redan så.
 
 ## Statistics
 page-statistics = Statistik

@@ -7,6 +7,7 @@
 //! theme dark              light or dark, for this run only (the settings stay as they are)
 //! run Visit every city    a palette command, by its label as the palette shows it
 //! open truck              open the first truck's panel (or `trailer`, `coach`)
+//! pick 3                  tick the first three rows' checkboxes (on Cities or Gallery)
 //! close                   close the open panel or dialog
 //! wait 1500               wait that many milliseconds (World map draws its tiles meanwhile)
 //! shot gallery-dark       ask for a picture (see below), and wait until it's taken
@@ -33,6 +34,8 @@ pub enum Step {
     Theme(Appearance),
     Run(String),
     Open(save::VehicleKind),
+    /// Picks the first rows of the page's table, as ticking their checkboxes would.
+    Pick(usize),
     Close,
     Wait(u64),
     Shot(String),
@@ -58,6 +61,7 @@ pub fn parse(text: &str) -> Vec<Step> {
                 _ => None,
             },
             "run" if !rest.is_empty() => Some(Step::Run(rest.to_string())),
+            "pick" => rest.parse().ok().map(Step::Pick),
             "close" => Some(Step::Close),
             "wait" => rest.parse().ok().map(Step::Wait),
             "open" => match rest {
@@ -172,6 +176,7 @@ pub fn act(
                 _ => eprintln!("TSE_SCRIPT: the save has no {kind:?} to open"),
             }
         }
+        Step::Pick(count) => workspace.dev_pick(count, cx),
         Step::Close => {
             window.close_dialog(cx);
             window.close_sheet(cx);

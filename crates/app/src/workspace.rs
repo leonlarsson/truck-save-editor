@@ -442,6 +442,23 @@ impl Workspace {
     }
 
     /// Goes to a page.
+    /// For `TSE_SCRIPT`'s `pick` step: ticks the first rows of the page shown, where its rows
+    /// are picked through the shared table (Cities, Gallery).
+    pub(crate) fn dev_pick(&mut self, count: usize, cx: &mut Context<Self>) {
+        let Some(opened) = &self.opened else {
+            return;
+        };
+        match self.page {
+            Page::Cities => opened
+                .cities
+                .update(cx, |page, cx| page.pick_first(count, cx)),
+            Page::Gallery => opened
+                .gallery
+                .update(cx, |page, cx| page.pick_first(count, cx)),
+            page => eprintln!("TSE_SCRIPT: `pick` doesn't know the {} page", page.slug()),
+        }
+    }
+
     pub(crate) fn go_to(&mut self, page: Page, cx: &mut Context<Self>) {
         self.page = page;
         cx.notify();
