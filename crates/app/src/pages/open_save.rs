@@ -13,6 +13,7 @@ use gpui_kit::component::{
     button::{Button, ButtonGroup, ButtonVariants as _},
     h_flex,
     list::ListItem,
+    select::{SearchableVec, Select, SelectEvent, SelectItem, SelectState},
     spinner::Spinner,
     v_flex,
 };
@@ -21,10 +22,11 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use gpui_kit::{
-    AppContext as _, Context, EventEmitter, ExternalPaths, FocusHandle, InteractiveElement as _,
-    IntoElement, KeyDownEvent, ObjectFit, ParentElement as _, PathPromptOptions, Render,
-    RenderImage, SharedString, StatefulInteractiveElement as _, Styled as _, StyledImage as _,
-    Task, Window, div, img, prelude::FluentBuilder as _, rems,
+    AppContext as _, Context, Entity, EventEmitter, ExternalPaths, FocusHandle,
+    InteractiveElement as _, IntoElement, KeyDownEvent, ObjectFit, ParentElement as _,
+    PathPromptOptions, Render, RenderImage, SharedString, StatefulInteractiveElement as _,
+    Styled as _, StyledImage as _, Subscription, Task, Window, div, img,
+    prelude::FluentBuilder as _, rems,
 };
 use save::{Game, Profile, SearchedFolder, Slot, Source};
 
@@ -36,6 +38,13 @@ use crate::ui::Tip as _;
 
 /// How many of the game's own saves show before "Show more".
 const GAME_SAVES_SHOWN: usize = 3;
+
+/// The most profiles shown as buttons side by side; more are a list to search.
+const PROFILE_BUTTONS_MOST: usize = 3;
+
+/// The most letters the profile buttons can hold together and still fit the column's width
+/// (names can be long, and each button says where its profile is kept too).
+const PROFILE_BUTTONS_LETTERS: usize = 60;
 
 /// Asks the workspace to open a slot.
 #[derive(Clone)]
@@ -75,6 +84,8 @@ pub struct OpenSavePage {
     /// The added folders the last look used, to look again when the settings change them (a
     /// reset in Settings).
     looked_with: Vec<PathBuf>,
+    /// The list of profiles to search, once there have been too many for buttons.
+    profile_select: Option<ProfileSelect>,
     _search: Option<Task<()>>,
     _previews: Option<Task<()>>,
     _settings: Option<gpui_kit::Subscription>,
@@ -95,6 +106,7 @@ impl OpenSavePage {
             previews: HashMap::new(),
             row_focus: HashMap::new(),
             looked_with: Vec::new(),
+            profile_select: None,
             _search: None,
             _previews: None,
             _settings: None,
@@ -339,39 +351,68 @@ impl OpenSavePage {
         cx.notify();
     }
 
-    fn render_profiles(
-        &self,
-        profiles: &[(Profile, Vec<Slot>)],
-        cx: &mut Context<Self>,
-    ) -> impl IntoElement {
+    /// The chosen game's profiles (the game picker above chooses the game), as the profile
+    /// picker lists them.
+    fn profile_options(&self, cx: &Context<Self>) -> Vec<ProfileOption> {
+        let Some(found) = &self.found else {
+            return Vec::new();
+        };
+        let profiles = &found.profiles;
         // The folders added on this screen: a profile found in one is named by that folder (an
         // added backup of a profile would otherwise read the same as the profile itself).
-        let added: Vec<PathBuf> = self
-            .found
+        let added: Vec<&PathBuf> = found
+            .folders
             .iter()
-            .flat_map(|found| found.folders.iter())
             .filter(|folder| folder.source == Source::Added)
-            .map(|folder| folder.dir.clone())
+            .map(|folder| &folder.dir)
             .collect();
         let describe = |profile: &Profile| -> SharedString {
             let root = profile.dir.parent();
-            let place = match root.filter(|root| added.iter().any(|dir| dir == root)) {
+            let place = match root.filter(|root| added.iter().any(|dir| dir.as_path() == *root)) {
                 Some(root) => added_folder_name(root).into(),
                 None => labels::location(cx, profile.location),
             };
             t!(cx, "profile-place", name = &profile.name, place = place)
         };
-
-        // The chosen game's profiles only (the game picker above chooses the game); each button
-        // keeps its place in the whole list, which is what `selected_profile` counts in.
+        // Each choice keeps its place in the whole list, which is what `selected_profile`
+        // counts in.
         let game = self.picked_game(profiles).unwrap_or(Game::Ets2);
-        let shown: Vec<usize> = (0..profiles.len())
+        (0..profiles.len())
             .filter(|&index| profiles[index].0.game == game)
-            .collect();
-        let buttons = shown.iter().map(|&index| {
-            Button::new(("profile", index))
-                .label(describe(&profiles[index].0))
-                .selected(index == self.selected_profile)
+            .map(|index| ProfileOption {
+                index,
+                label: describe(&profiles[index].0),
+            })
+            .collect()
+    }
+
+    /// The profile picker: buttons while the profiles fit side by side, and a list to search
+    /// (`select`, see `synced_profile_select`) when there are more.
+    fn render_profiles(
+        &self,
+        options: Vec<ProfileOption>,
+        select: Option<Entity<SelectState<SearchableVec<ProfileOption>>>>,
+        cx: &mut Context<Self>,
+    ) -> gpui_kit::AnyElement {
+        if let Some(select) = select {
+            // As wide as the column allows, up to a width long names fit in.
+            return div()
+                .w_full()
+                .max_w(rems(22.))
+                .child(
+                    Select::new(&select)
+                        .small()
+                        .search_placeholder(t!(cx, "start-profile-search"))
+                        .accessibility_label(t!(cx, "start-profile")),
+                )
+                .into_any_element();
+        }
+
+        let shown: Vec<usize> = options.iter().map(|option| option.index).collect();
+        let buttons = options.into_iter().map(|option| {
+            Button::new(("profile", option.index))
+                .label(option.label)
+                .selected(option.index == self.selected_profile)
         });
         ButtonGroup::new("profiles")
             .outline()
@@ -382,6 +423,52 @@ impl OpenSavePage {
                     this.select_profile(index, cx);
                 }
             }))
+            .into_any_element()
+    }
+
+    /// The list of profiles to search, holding these choices with the shown profile selected.
+    ///
+    /// It's made and filled here, while drawing, because that's the first place with both the
+    /// profiles and a window: they arrive from a search in the background, which has no window,
+    /// and the kit's list needs one to be made or changed. Nothing is touched when it already
+    /// matches, which is every frame but the first after a change.
+    fn synced_profile_select(
+        &mut self,
+        options: Vec<ProfileOption>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Entity<SelectState<SearchableVec<ProfileOption>>> {
+        let selected_profile = self.selected_profile;
+        let picker = self.profile_select.get_or_insert_with(|| {
+            let state = cx.new(|cx| {
+                SelectState::new(SearchableVec::new(Vec::new()), None, window, cx).searchable(true)
+            });
+            let _chosen = cx.subscribe(
+                &state,
+                |this, _, event: &SelectEvent<SearchableVec<ProfileOption>>, cx| {
+                    if let SelectEvent::Confirm(Some(index)) = event {
+                        this.select_profile(*index, cx);
+                    }
+                },
+            );
+            ProfileSelect {
+                state,
+                options: Vec::new(),
+                _chosen,
+            }
+        });
+        if picker.options != options {
+            picker.options = options.clone();
+            picker.state.update(cx, |state, cx| {
+                state.set_items(SearchableVec::new(options), window, cx)
+            });
+        }
+        if picker.state.read(cx).selected_value() != Some(&selected_profile) {
+            picker.state.update(cx, |state, cx| {
+                state.set_selected_value(&selected_profile, window, cx)
+            });
+        }
+        picker.state.clone()
     }
 
     /// The game whose profiles are shown: the selected profile's (`None` when nothing was found).
@@ -951,7 +1038,7 @@ impl OpenSavePage {
 }
 
 impl Render for OpenSavePage {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let header = h_flex()
             .gap_3()
             .child(
@@ -995,6 +1082,12 @@ impl Render for OpenSavePage {
                     .label(t!(cx, "settings-open"))
                     .on_click(|_, window, cx| crate::pages::settings::open_sheet(window, cx)),
             );
+
+        // Before the list is borrowed below: with too many profiles for buttons, the list to
+        // search is brought up to date, which changes this page.
+        let profile_options = self.profile_options(cx);
+        let profile_select = (profile_options.len() > 1 && !fits_as_buttons(&profile_options))
+            .then(|| self.synced_profile_select(profile_options.clone(), window, cx));
 
         let body = match &self.found {
             None => h_flex()
@@ -1067,13 +1160,13 @@ impl Render for OpenSavePage {
                     .iter()
                     .filter(|(other, _)| other.game == profile.game)
                     .count();
+                let picker = (profiles_of_game > 1)
+                    .then(|| self.render_profiles(profile_options, profile_select, cx));
                 v_flex()
                     .gap_6()
                     // Across the column's full width, like the save rows below.
                     .child(self.render_games(profiles, cx))
-                    .when(profiles_of_game > 1, |this| {
-                        this.child(div().px_3().child(self.render_profiles(profiles, cx)))
-                    })
+                    .children(picker.map(|picker| div().px_3().child(picker)))
                     .child(
                         h_flex()
                             .px_3()
@@ -1138,7 +1231,44 @@ impl Render for OpenSavePage {
     }
 }
 
-/// A preview picture as GPUI draws it (the decoder already gives blue-green-red-alpha order).
+/// One profile in the profile picker.
+#[derive(Clone, PartialEq)]
+struct ProfileOption {
+    /// Its place in the list of every profile found.
+    index: usize,
+    /// Its name and where it's kept.
+    label: SharedString,
+}
+
+impl SelectItem for ProfileOption {
+    type Value = usize;
+
+    fn title(&self) -> SharedString {
+        self.label.clone()
+    }
+
+    fn value(&self) -> &Self::Value {
+        &self.index
+    }
+}
+
+/// The list of profiles to search, with what it was last filled with.
+struct ProfileSelect {
+    state: Entity<SelectState<SearchableVec<ProfileOption>>>,
+    options: Vec<ProfileOption>,
+    _chosen: Subscription,
+}
+
+/// Whether the profiles can be buttons side by side: only a few, with names short enough to fit
+/// the column together. Otherwise the row would run off the edge with no way to reach the rest.
+fn fits_as_buttons(options: &[ProfileOption]) -> bool {
+    let letters: usize = options
+        .iter()
+        .map(|option| option.label.chars().count())
+        .sum();
+    options.len() <= PROFILE_BUTTONS_MOST && letters <= PROFILE_BUTTONS_LETTERS
+}
+
 /// A save row's Duplicate button: off, with the reason, where a copy can't be made.
 fn duplicate_button(
     profile: &Profile,
@@ -1167,6 +1297,7 @@ fn duplicate_button(
         })
 }
 
+/// A preview picture as GPUI draws it (the decoder already gives blue-green-red-alpha order).
 fn render_image(picture: save::Picture) -> Option<RenderImage> {
     let buffer = image::RgbaImage::from_raw(picture.width, picture.height, picture.bgra)?;
     Some(RenderImage::new(vec![image::Frame::new(buffer)]))
@@ -1309,6 +1440,32 @@ mod tests {
             added_folder_name(std::path::Path::new("/d/Old PC/profiles")),
             "Old PC"
         );
+    }
+
+    #[test]
+    fn profiles_are_buttons_only_while_they_fit() {
+        let options = |labels: &[&str]| -> Vec<ProfileOption> {
+            labels
+                .iter()
+                .enumerate()
+                .map(|(index, label)| ProfileOption {
+                    index,
+                    label: SharedString::from(label.to_string()),
+                })
+                .collect()
+        };
+        // A few short names: buttons.
+        assert!(fits_as_buttons(&options(&[
+            "Anna · Steam Cloud",
+            "Bo · This PC"
+        ])));
+        // Many profiles: a list to search, however short the names.
+        assert!(!fits_as_buttons(&options(&["A", "B", "C", "D"])));
+        // A few profiles whose names wouldn't fit the row together.
+        assert!(!fits_as_buttons(&options(&[
+            "Long Haul Logistics 2026 · Steam Cloud",
+            "Long Haul Logistics 2025 · Steam Cloud",
+        ])));
     }
 
     #[gpui_kit::test]

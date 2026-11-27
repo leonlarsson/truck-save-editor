@@ -55,6 +55,8 @@ start-slot-missing = { $count ->
    *[other] Behöver { $count } DLC:er eller moddar som inte är installerade
 }
 start-slot-number = Plats { $number }
+start-profile = Profil
+start-profile-search = Sök profiler…
 profile-place = { $name } · { $place }
 profile-game-place = { $name } · { $game } · { $place }
 start-game-detail = { $profiles ->
