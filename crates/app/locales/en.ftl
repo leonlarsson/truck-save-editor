@@ -55,6 +55,7 @@ start-slot-missing = { $count ->
    *[other] Needs { $count } DLCs or mods that aren't installed
 }
 start-slot-number = Slot { $number }
+start-slot-search = Search by name or slot
 start-profile = Profile
 start-profile-search = Search profiles…
 profile-place = { $name } · { $place }

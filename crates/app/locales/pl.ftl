@@ -60,6 +60,7 @@ start-slot-missing = { $count ->
    *[many] Wymaga DLC lub modyfikacji, których nie zainstalowano: { $count }
 }
 start-slot-number = Slot { $number }
+start-slot-search = Szukaj po nazwie lub slocie
 start-profile = Profil
 start-profile-search = Szukaj profili…
 profile-place = { $name } · { $place }

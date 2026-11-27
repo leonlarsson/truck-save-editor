@@ -35,9 +35,13 @@ use crate::format::thousands;
 use crate::i18n::t;
 use crate::labels;
 use crate::ui::Tip as _;
+use crate::ui::{EmptyState, FilterBar, FilterChanged};
 
 /// How many of the game's own saves show before "Show more".
 const GAME_SAVES_SHOWN: usize = 3;
+
+/// A profile with more saves than this gets a search above them (fewer are seen at a glance).
+const SAVES_BEFORE_SEARCH: usize = 5;
 
 /// The most profiles shown as buttons side by side; more are a list to search.
 const PROFILE_BUTTONS_MOST: usize = 3;
@@ -86,6 +90,8 @@ pub struct OpenSavePage {
     looked_with: Vec<PathBuf>,
     /// The list of profiles to search, once there have been too many for buttons.
     profile_select: Option<ProfileSelect>,
+    /// The search above the shown profile's saves, once it has enough saves to need one.
+    slot_filter: Option<SlotFilter>,
     _search: Option<Task<()>>,
     _previews: Option<Task<()>>,
     _settings: Option<gpui_kit::Subscription>,
@@ -107,6 +113,7 @@ impl OpenSavePage {
             row_focus: HashMap::new(),
             looked_with: Vec::new(),
             profile_select: None,
+            slot_filter: None,
             _search: None,
             _previews: None,
             _settings: None,
@@ -469,6 +476,43 @@ impl OpenSavePage {
             });
         }
         picker.state.clone()
+    }
+
+    /// The search above the shown profile's saves, or `None` (and no search kept) when the
+    /// profile has few enough saves to see at a glance.
+    ///
+    /// Made here, while drawing, for the same reason as the list of profiles
+    /// (`synced_profile_select`): a search field needs a window. Each profile gets a fresh one,
+    /// so a search typed for one profile doesn't hide another's saves.
+    fn synced_slot_filter(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<Entity<FilterBar>> {
+        let (profile_dir, save_count) = self
+            .found
+            .as_ref()
+            .and_then(|found| found.profiles.get(self.selected_profile))
+            .map(|(profile, slots)| (profile.dir.clone(), slots.len()))?;
+        if save_count <= SAVES_BEFORE_SEARCH {
+            self.slot_filter = None;
+            return None;
+        }
+        if let Some(filter) = &self.slot_filter
+            && filter.profile_dir == profile_dir
+        {
+            return Some(filter.bar.clone());
+        }
+        let placeholder = t!(cx, "start-slot-search");
+        let bar = cx.new(|cx| FilterBar::new(placeholder, Vec::new(), window, cx));
+        // Typing in it shows other saves: draw again.
+        let _changed = cx.subscribe(&bar, |_, _, _: &FilterChanged, cx| cx.notify());
+        self.slot_filter = Some(SlotFilter {
+            bar: bar.clone(),
+            profile_dir,
+            _changed,
+        });
+        Some(bar)
     }
 
     /// The game whose profiles are shown: the selected profile's (`None` when nothing was found).
@@ -835,17 +879,46 @@ impl OpenSavePage {
         slots: &[Slot],
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
+        // The search, when the profile has one: by a save's name or its slot ("slot 12").
+        let filter = self.slot_filter.as_ref().map(|filter| filter.bar.clone());
+        let is_searching = filter
+            .as_ref()
+            .is_some_and(|filter| filter.read(cx).is_filtering(cx));
+        let matching: Vec<&Slot> = slots
+            .iter()
+            .filter(|slot| {
+                let Some(filter) = &filter else {
+                    return true;
+                };
+                let name = labels::slot_name(cx, slot);
+                let number = match slot.kind {
+                    save::SlotKind::Manual(number) => {
+                        t!(cx, "start-slot-number", number = number)
+                    }
+                    _ => SharedString::default(),
+                };
+                filter
+                    .read(cx)
+                    .matches(&[name.as_ref(), number.as_ref()], cx)
+            })
+            .collect();
+        if let Some(filter) = &filter {
+            let (shown, total) = (matching.len(), slots.len());
+            filter.update(cx, |filter, cx| filter.set_counts(shown, total, cx));
+        }
+        let has_matches = !matching.is_empty();
         let (own, mut game_made): (Vec<&Slot>, Vec<&Slot>) =
-            slots.iter().partition(|slot| slot.kind.is_manual());
+            matching.into_iter().partition(|slot| slot.kind.is_manual());
         // The game keeps dozens of autosaves; the newest few are the ones worth going back to,
-        // and the rest would push everything after them far down.
-        let hidden = if self.shows_all_game_saves {
+        // and the rest would push everything after them far down. A search shows every match.
+        let hidden = if self.shows_all_game_saves || is_searching {
             0
         } else {
             game_made.len().saturating_sub(GAME_SAVES_SHOWN)
         };
         game_made.truncate(game_made.len() - hidden);
-        let can_fold = self.shows_all_game_saves && game_made.len() > GAME_SAVES_SHOWN;
+        let can_fold =
+            self.shows_all_game_saves && !is_searching && game_made.len() > GAME_SAVES_SHOWN;
         let currency = profile.game.currency_symbol();
 
         let group = |title: SharedString,
@@ -999,6 +1072,15 @@ impl OpenSavePage {
 
         v_flex()
             .gap_6()
+            .children(filter.clone().map(|filter| div().px_3().child(filter)))
+            .when(!has_matches, |this| {
+                this.child(
+                    div().py_6().child(
+                        EmptyState::new(t!(cx, "filter-no-matches"))
+                            .description(t!(cx, "filter-no-matches-body")),
+                    ),
+                )
+            })
             .when(!own.is_empty(), |this| {
                 this.child(group(t!(cx, "start-your-saves"), None, own, cx))
             })
@@ -1088,6 +1170,7 @@ impl Render for OpenSavePage {
         let profile_options = self.profile_options(cx);
         let profile_select = (profile_options.len() > 1 && !fits_as_buttons(&profile_options))
             .then(|| self.synced_profile_select(profile_options.clone(), window, cx));
+        self.synced_slot_filter(window, cx);
 
         let body = match &self.found {
             None => h_flex()
@@ -1257,6 +1340,13 @@ struct ProfileSelect {
     state: Entity<SelectState<SearchableVec<ProfileOption>>>,
     options: Vec<ProfileOption>,
     _chosen: Subscription,
+}
+
+/// The search above a profile's saves, with the profile it was made for.
+struct SlotFilter {
+    bar: Entity<FilterBar>,
+    profile_dir: PathBuf,
+    _changed: Subscription,
 }
 
 /// Whether the profiles can be buttons side by side: only a few, with names short enough to fit
