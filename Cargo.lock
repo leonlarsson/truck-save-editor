@@ -215,7 +215,7 @@ checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 
 [[package]]
 name = "app"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "chrono",
  "dirs 7.0.0",
@@ -2136,7 +2136,7 @@ dependencies = [
 
 [[package]]
 name = "gamedata"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "bcdec_rs",
  "dirs 7.0.0",
@@ -3367,7 +3367,7 @@ dependencies = [
 
 [[package]]
 name = "hashfs"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "flate2",
  "thiserror 2.0.21",
@@ -4147,7 +4147,7 @@ checksum = "4744e383959f0db86ede514b809b1c53251889093803c05267acc7d4e7030d70"
 
 [[package]]
 name = "live"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -4155,7 +4155,7 @@ dependencies = [
 
 [[package]]
 name = "live-plugin"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "live",
 ]
@@ -6393,7 +6393,7 @@ dependencies = [
 
 [[package]]
 name = "save"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "dirs 7.0.0",
  "sii",
@@ -6696,7 +6696,7 @@ dependencies = [
 
 [[package]]
 name = "sii"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "aes 0.9.4",
  "cbc 0.2.1",
