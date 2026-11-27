@@ -2,7 +2,11 @@
 # Takes the README's screenshots (light and dark) and a release's pictures (dark) of a made-up demo
 # profile, so they show nothing of the player's own. Runs the dev build under WSLg.
 #
+#   scripts/screenshots.sh [release version]
 #   scripts/screenshots.sh <slot folder> [release version] [ATS slot folder]
+#
+# The first form is the usual one: it uses the save copies every picture so far came from
+# (fixtures/ets2/coach2 and fixtures/ats/2), so a retake shows the same career as before.
 #
 # <slot folder> is a copy of a save under fixtures/ (never a live save): one with a coach career
 # and a map's worth of driving shows the most. scripts/demo-profile.py turns it into a profile
@@ -19,9 +23,30 @@
 set -euo pipefail
 
 repo="$(cd "$(dirname "$0")/.." && pwd)"
-source_slot="${1:?usage: scripts/screenshots.sh <slot folder> [release version]}"
-version="${2:-}"
-ats_slot="${3:-}"
+# The save copies the pictures are made from, when none are named: the ones every picture so far
+# came from. Another copy (an older save, one with little driven) gives emptier pictures: no money
+# on the start screen, deliveries from years ago, a map with few roads driven.
+default_slot="$repo/fixtures/ets2/coach2"
+default_ats_slot="$repo/fixtures/ats/2"
+if [ $# -eq 0 ] || [ ! -d "$1" ]; then
+    # No folder first: `scripts/screenshots.sh [release version]`, from the usual copies.
+    source_slot="$default_slot"
+    version="${1:-}"
+    ats_slot="$default_ats_slot"
+else
+    source_slot="$1"
+    version="${2:-}"
+    ats_slot="${3:-}"
+fi
+for dir in "$source_slot" ${ats_slot:+"$ats_slot"}; do
+    if [ ! -f "$dir/game.sii" ]; then
+        echo "No save in $dir" >&2
+        exit 1
+    fi
+done
+if [ -z "$ats_slot" ]; then
+    echo "No ATS copy named: the start screen's pictures will show ATS as not found." >&2
+fi
 
 # The editor's own settings say English while the pictures are taken, and go back afterwards.
 settings="$HOME/.config/Truck Save Editor/settings.txt"
@@ -90,9 +115,10 @@ pages="overview statistics coach-career fleet world-map gallery"
         echo "page world-map"
         echo "wait 1500"
         echo "shot $notes/world-map"
-        # Several cities picked, with the bar of what can be done to them.
+        # Several cities picked, with the bar of what can be done to them (five reach cities with
+        # a truck dealer, so the bar shows every action).
         echo "page cities"
-        echo "pick 3"
+        echo "pick 5"
         echo "shot $notes/cities-picked"
         echo "page overview"
         echo "shot $notes/overview"
